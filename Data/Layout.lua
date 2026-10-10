@@ -6,9 +6,10 @@
 --   [tracker]                                              [buffs][minimap]
 --
 --   [party]                                                          [bar4][bar5]
---                                [  cast bar  ]                       (mouseover)
---   [focus]           [stance]                    [pet]
---                                [ swing timer]
+--          [focus]               [swing ranged]                       (mouseover)
+--                                [swing main  ]
+--                     [stance]   [swing off   ]   [pet]
+--                                [  cast bar  ]
 --          [player]   [ bar 3  (Ctrl)  ]   [target]
 --                     [ bar 2  (Shift) ]
 --                     [ bar 1          ]
@@ -50,19 +51,19 @@ local GAP = 8                                  -- luft mellom stacken og player/
 local UNIT_Y = BASE + 40                       -- underkant av player/target (plass til target of target under)
 
 local STACK_TOP = BASE + 3 * ROW               -- overkant av bar 3 (toppen av stacken)
--- Swing timer: Scale 50 % (minste mulige) og minste høyde => tynn strek, halvparten så bred som stacken.
--- Edit Mode-offset for en skalert frame måles i framens egen skala, derfor deles y på SWING_SCALE.
-local SWING_SCALE = 0.5                        -- 50 %
-local SWING_H = 15 * SWING_SCALE               -- synlig høyde på skjermen (7,5 enheter)
-local SWING_Y = STACK_TOP + 2                  -- main hand rett over toppen av stacken
-local SWING_TOP = SWING_Y + 2 * SWING_H + 2    -- overkant av off hand / ranged
-local SMALL_Y = SWING_TOP + 3                  -- stance/pet over swing timerne
-local SMALL_TOP = SMALL_Y + 27                 -- overkant av stance/pet (60 % ikoner = 27 enheter)
-local CAST_Y = SMALL_TOP + 8                   -- cast bar øverst
 
--- Swing timer-settings lagres rått (bredde/høyde i enheter før skala, Scale i steg: 0 = 50 %, 5 = 100 %)
-local SWING = { Scale = 0, Opacity = 100, Width = 213 + 10 * math.floor((2 * HALF - 213) / 10 + 0.5),
-                Height = 15, ShowBarTitle = 0, ShowTime = 0, Visibility = 1 }
+-- Over stacken, nedenfra og opp (alle sentrert på midten av skjermen):
+--   cast bar  ->  swing off hand  ->  swing main hand  ->  swing ranged
+-- Swing timerne er ankret til hverandre og til toppen av cast bar, så de aldri overlapper,
+-- uansett hvor høye framene faktisk er. Stance/pet står på linje med off hand, focus på linje med ranged.
+local CAST_TEXT = 12                           -- teksten under cast bar henger ca. 12 enheter under framen
+local CAST_Y = STACK_TOP + CAST_TEXT + 6       -- underkant av cast bar (6 enheters luft over bar 3)
+local CAST_GAP = 4                             -- luft mellom cast bar og off hand
+local SWING_GAP = 2                            -- luft mellom swing timerne
+
+-- Swing timer-settings lagres rått (bredde/høyde i enheter før skala, Scale i steg)
+-- Width 453 = samme bredde som det står i spillet nå.
+local SWING = { Scale = 0, Opacity = 100, Width = 453, Height = 15, ShowBarTitle = 0, ShowTime = 0, Visibility = 1 }
 
 -- Chat nede til venstre, med to barer uten hotkeys rett over (forbruksvarer + bar 6)
 local CHAT_Y = 40                              -- underkant av chat (plass til skrivefeltet under)
@@ -99,30 +100,34 @@ ns.data.layout = {
           indexEnum = "EditModeMainActionBarEndCapSystemIndices", index = "EndCapRight", keepAnchor = true,
           settingEnum = "EditModeMainActionBarEndCapSetting", rawSettings = { Hidden = 1 } },
 
-        -- Små barer over swing timerne: stance til venstre, pet til høyre, cast bar over midten
-        { label = "Stance bar", system = "ActionBar", indexEnum = ABI, index = "StanceBar",
-          point = "BOTTOMLEFT", relPoint = "BOTTOM", x = -HALF, y = SMALL_Y, settingEnum = AB, settings = SMALL_BAR },
-        { label = "Pet bar", system = "ActionBar", indexEnum = ABI, index = "PetActionBar",
-          point = "BOTTOMRIGHT", relPoint = "BOTTOM", x = HALF, y = SMALL_Y, settingEnum = AB, settings = SMALL_BAR },
-
-        -- Swing timers (innebygd i klienten): tynne streker, halvparten så brede som stacken, rett over bar 3.
-        -- Off hand og ranged deler plass (få har begge). Vises bare i kamp.
-        { label = "Swing timer main hand", system = "SwingTimer",
-          indexEnum = "EditModeSwingTimerSystemIndices", index = "MainHand",
-          point = "BOTTOM", relPoint = "BOTTOM", x = 0, y = SWING_Y / SWING_SCALE,
-          settingEnum = "EditModeSwingTimerSetting", rawSettings = SWING },
-        { label = "Swing timer off hand", system = "SwingTimer",
-          indexEnum = "EditModeSwingTimerSystemIndices", index = "OffHand",
-          point = "BOTTOM", relPoint = "BOTTOM", x = 0, y = (SWING_Y + SWING_H + 2) / SWING_SCALE,
-          settingEnum = "EditModeSwingTimerSetting", rawSettings = SWING },
-        { label = "Swing timer ranged", system = "SwingTimer",
-          indexEnum = "EditModeSwingTimerSystemIndices", index = "Ranged",
-          point = "BOTTOM", relPoint = "BOTTOM", x = 0, y = (SWING_Y + SWING_H + 2) / SWING_SCALE,
-          settingEnum = "EditModeSwingTimerSetting", rawSettings = SWING },
-
+        -- Cast bar rett over stacken
         { label = "Cast bar", system = "CastBar",
           point = "BOTTOM", relPoint = "BOTTOM", x = 0, y = CAST_Y,
           settingEnum = "EditModeCastBarSetting", settings = { LockToPlayerFrame = 0, BarSize = 100, ShowCastTime = 1 } },
+
+        -- Swing timers (innebygd i klienten) over cast bar: off hand nederst, main hand, ranged øverst.
+        -- Kjedet til hverandre, så de alltid ligger tett og sentrert. Vises bare i kamp.
+        { label = "Swing timer off hand", system = "SwingTimer",
+          indexEnum = "EditModeSwingTimerSystemIndices", index = "OffHand",
+          point = "BOTTOM", relPoint = "TOP", relTo = "PlayerCastingBarFrame", x = 0, y = CAST_GAP,
+          settingEnum = "EditModeSwingTimerSetting", rawSettings = SWING },
+        { label = "Swing timer main hand", system = "SwingTimer",
+          indexEnum = "EditModeSwingTimerSystemIndices", index = "MainHand",
+          point = "BOTTOM", relPoint = "TOP", relTo = "SwingTimerOffHandFrame", x = 0, y = SWING_GAP,
+          settingEnum = "EditModeSwingTimerSetting", rawSettings = SWING },
+        { label = "Swing timer ranged", system = "SwingTimer",
+          indexEnum = "EditModeSwingTimerSystemIndices", index = "Ranged",
+          point = "BOTTOM", relPoint = "TOP", relTo = "SwingTimerMainHandFrame", x = 0, y = SWING_GAP,
+          settingEnum = "EditModeSwingTimerSetting", rawSettings = SWING },
+
+        -- Stance til venstre og pet til høyre, på linje med off hand og med kantene til stacken.
+        -- Ankret til midtpunktet på off hand-baren, så x = halv stackbredde uansett hvor bred baren er.
+        { label = "Stance bar", system = "ActionBar", indexEnum = ABI, index = "StanceBar",
+          point = "BOTTOMLEFT", relPoint = "BOTTOM", relTo = "SwingTimerOffHandFrame", x = -HALF, y = 0,
+          settingEnum = AB, settings = SMALL_BAR },
+        { label = "Pet bar", system = "ActionBar", indexEnum = ABI, index = "PetActionBar",
+          point = "BOTTOMRIGHT", relPoint = "BOTTOM", relTo = "SwingTimerOffHandFrame", x = HALF, y = 0,
+          settingEnum = AB, settings = SMALL_BAR },
 
         -- XP / rep: liten, helt nederst under stacken
         { label = "XP-bar (liten, nederst)", system = "StatusTrackingBar",
@@ -139,8 +144,10 @@ ns.data.layout = {
           point = "BOTTOMRIGHT", relPoint = "BOTTOM", x = -(HALF + GAP), y = UNIT_Y, settingEnum = UF, settings = { FrameSize = 100 } },
         { label = "Target", system = "UnitFrame", indexEnum = UFI, index = "Target",
           point = "BOTTOMLEFT", relPoint = "BOTTOM", x = HALF + GAP, y = UNIT_Y, settingEnum = UF, settings = { FrameSize = 100 } },
+        -- Focus over player (samme høyrekant), med underkanten på linje med ranged swing timer
         { label = "Focus", system = "UnitFrame", indexEnum = UFI, index = "Focus",
-          point = "BOTTOMRIGHT", relPoint = "BOTTOM", x = -(HALF + GAP), y = CAST_Y, settingEnum = UF, settings = { FrameSize = 100 } },
+          point = "BOTTOMRIGHT", relPoint = "BOTTOM", relTo = "SwingTimerRangedFrame", x = -(HALF + GAP), y = 0,
+          settingEnum = UF, settings = { FrameSize = 100 } },
 
         -- Gruppe: venstre side
         { label = "Party", system = "UnitFrame", indexEnum = UFI, index = "Party",

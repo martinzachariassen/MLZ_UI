@@ -51,7 +51,8 @@ end
 
 local function AnchorText(a)
     if not a then return "?" end
-    return ("%s %+d,%+d"):format(a.point or "?", math.floor((a.offsetX or 0) + 0.5), math.floor((a.offsetY or 0) + 0.5))
+    local rel = a.relativeTo and a.relativeTo ~= "UIParent" and (" (" .. a.relativeTo .. ")") or ""
+    return ("%s %+d,%+d%s"):format(a.point or "?", math.floor((a.offsetX or 0) + 0.5), math.floor((a.offsetY or 0) + 0.5), rel)
 end
 
 local function FindByName(layouts, name)
@@ -145,7 +146,7 @@ function Layout:Preview()
             id = "frame" .. i, spec = spec, label = spec.label, group = "Plassering",
             old = sys and AnchorText(sys.anchorInfo) or "-",
             new = spec.keepAnchor and "skjules"
-                  or (AnchorText({ point = spec.point, offsetX = spec.x, offsetY = spec.y }) .. SizeText(spec)),
+                  or (AnchorText({ point = spec.point, relativeTo = spec.relTo, offsetX = spec.x, offsetY = spec.y }) .. SizeText(spec)),
             enabled = sys ~= nil and ns.Enabled("layout", "frame" .. i, true),
         }
         if not sys then
