@@ -1,0 +1,29 @@
+## Interface: 16001
+## Title: MLZ UI
+## Notes: Setter opp skalering, layout, keybinds og innstillinger via en installasjonsveiviser. /mlz
+## Author: Martin
+## Version: 0.5.0
+## SavedVariables: MLZUIDB
+## IconTexture: Interface\Icons\INV_Misc_Gear_01
+
+Core.lua
+Probe.lua
+
+Data\CVars.lua
+Data\Bindings.lua
+Data\Layout.lua
+Data\Fade.lua
+Data\Consumables.lua
+
+Modules\Backup.lua
+Modules\Scale.lua
+Modules\Settings.lua
+Modules\Bindings.lua
+Modules\Layout.lua
+Modules\Fade.lua
+Modules\ActionButtons.lua
+Modules\Tweaks.lua
+Modules\Consumables.lua
+
+UI\Widgets.lua
+UI\Installer.lua
