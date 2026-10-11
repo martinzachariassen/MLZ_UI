@@ -53,6 +53,29 @@ B.layers = {
     { modifier = "CTRL-",  prefix = "MULTIACTIONBAR2BUTTON",  bar = "Bar 3" },
 }
 
+-- Stance / form keys (SHAPESHIFTBUTTON1-10 = Blizzard's stance bar). Per movement setup.
+-- These take priority over the layer keys above: SHIFT-1/2/3 become stances, so bar 2 buttons 1-3
+-- lose their key in WASD. ESDF has no stance keys, because SHIFT-2/3 are already used by bar 2 there.
+B.stance = {
+    WASD = {
+        { key = "SHIFT-1", command = "SHAPESHIFTBUTTON1" },
+        { key = "SHIFT-2", command = "SHAPESHIFTBUTTON2" },
+        { key = "SHIFT-3", command = "SHAPESHIFTBUTTON3" },
+    },
+    ESDF = {},
+}
+
+-- Bar buttons that lost their key to a stance key get a new key here (free keys: WASD = G, V, T).
+-- Key = the key that was taken, value = replacement key for the same bar button.
+B.stanceRelocate = {
+    WASD = {
+        ["SHIFT-1"] = "SHIFT-G",
+        ["SHIFT-2"] = "SHIFT-V",
+        ["SHIFT-3"] = "SHIFT-T",
+    },
+    ESDF = {},
+}
+
 -- Mouse (no extra mouse buttons): modifier + wheel to bar 4 (MULTIACTIONBAR3 = right bar 1)
 B.mouse = {
     { key = "SHIFT-MOUSEWHEELUP",   command = "MULTIACTIONBAR3BUTTON1" },

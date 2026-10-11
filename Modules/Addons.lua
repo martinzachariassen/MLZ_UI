@@ -42,7 +42,22 @@ end
 
 local function Show(v)
     if v == nil then return "default" end
+    if type(v) == "table" then
+        local parts = {}
+        for i, x in ipairs(v) do parts[i] = tostring(x) end
+        return "{" .. table.concat(parts, ", ") .. "}"
+    end
     return tostring(v)
+end
+
+-- Equal for plain values and flat arrays (e.g. colors)
+local function Same(a, b)
+    if type(a) ~= "table" or type(b) ~= "table" then return a == b end
+    if #a ~= #b then return false end
+    for i = 1, #a do
+        if a[i] ~= b[i] then return false end
+    end
+    return true
 end
 
 local function Find(id)
@@ -69,7 +84,7 @@ function Addons:Preview()
                     item.old, item.new = Show(current), Show(row.value)
                     item.value = row.value
                     item.enabled = ns.Enabled("addons", id, row.enabled ~= false)
-                    item.alreadySet = current == row.value
+                    item.alreadySet = Same(current, row.value)
                 end
                 items[#items + 1] = item
             end
@@ -78,7 +93,7 @@ function Addons:Preview()
     if #items == 0 then
         items[1] = { id = "none", group = "Other addons", label = "No supported addons loaded",
             old = "-", new = "-", enabled = false, unavailable = true,
-            note = "Install Prat, Auctionator, AtlasLoot, What's Training or RestedXP Guides and run this step again." }
+            note = "Install Prat, Auctionator, AtlasLoot, What's Training, Bagnon, RestedXP Guides or Deadly Boss Mods and run this step again." }
     end
     return items
 end
@@ -105,7 +120,7 @@ function Addons:Apply(items)
         if entry and not item.unavailable then
             local parent, key = Resolve(entry, row, true)
             if parent then
-                parent[key] = row.value
+                parent[key] = type(row.value) == "table" and CopyTable(row.value) or row.value
                 changed = changed + 1
             end
         end
@@ -135,7 +150,7 @@ ns.AddCommand("addons", "shows which supported addons are loaded and which of th
                 local parent, key = Resolve(entry, row)
                 if parent then
                     total = total + 1
-                    if parent[key] ~= row.value then differ = differ + 1 end
+                    if not Same(parent[key], row.value) then differ = differ + 1 end
                 else
                     ns.Print("  |cffff8800not available:|r " .. row.label .. " - " .. Reason(entry, row))
                 end

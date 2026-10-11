@@ -14,6 +14,8 @@ local OPTIONS = {
     { id = "trackerHide", label = "Hide the entire quest tracker", default = false,
       desc = "No tracked quests on screen at all. The quest log (L) and quest markers on the map work as before. /mlz quests toggles it at any time." },    { id = "fps", label = "FPS counter in the bottom-right corner", group = "Info",
       desc = "Small text in the bottom-right corner: FPS (green/yellow/red) and ping in ms. Clicks pass through it. /mlz fps toggles it." },
+    { id = "cleanCombatFont", label = "Clean combat text font", group = "Combat text",
+      desc = "Uses Arial Narrow for floating damage and healing numbers. Needs a full game restart (not just /reload) to take effect." },
 }
 
 local function Cfg() return ns.db and ns.db.tweaks end
@@ -313,6 +315,13 @@ function Tweaks:Restore(snap)
     self:Refresh()
     if not snap.cfg then ns.db.tweaks = nil end
 end
+
+-- DAMAGE_TEXT_FONT is a global read when the world loads, so set it as early as possible.
+ns.On("ADDON_LOADED", function(_, name)
+    if name ~= "MLZ_UI" then return end
+    local c = Cfg()
+    if c and c.cleanCombatFont then _G.DAMAGE_TEXT_FONT = "Fonts\\ARIALN.TTF" end
+end)
 
 ns.On("PLAYER_ENTERING_WORLD", function()
     if Cfg() then

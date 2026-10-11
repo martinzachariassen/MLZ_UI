@@ -9,6 +9,7 @@ local _, ns = ...
 local DEFENSIVE_FORM = 2 -- Warrior: 1 = Battle, 2 = Defensive, 3 = Berserker
 
 local current -- "tank" | "dps" | nil
+local ApplyStyle -- defined below
 
 local function PlatynatorReady()
     return C_AddOns.IsAddOnLoaded("Platynator") and SlashCmdList and SlashCmdList.Platynator
@@ -29,7 +30,9 @@ local function Set(mode, silent)
     if current ~= mode and not silent then
         ns.Print("Nameplates:", mode == "tank" and "|cff4da6ffTANK|r" or "|cffffd100DPS|r")
     end
+    local changed = current ~= mode
     current = mode
+    if changed and ns.db and ns.db.nameplates and ns.db.nameplates.style then ApplyStyle(mode, silent) end
     return true
 end
 
@@ -113,6 +116,89 @@ local function ProfileString()
     return Encode(profile)
 end
 
+------------------------------------------------------------------------
+-- Clean style (/mlz np style). Edits a copy of the enemy design and imports it under the same name.
+------------------------------------------------------------------------
+local function BuildStyled(design, mode)
+    local st = ns.data.nameplates.style
+    design = ns.CopyTable(design)
+    design.scale = st.scale
+
+    local texts = {}
+    for _, t in ipairs(design.texts or {}) do
+        if not st.removeTexts[t.kind] then
+            if t.kind == "health" then t.displayTypes = ns.CopyTable(st.healthText) end
+            texts[#texts + 1] = t
+        end
+    end
+    design.texts = texts
+
+    local bars = {}
+    for _, b in ipairs(design.bars or {}) do
+        if not st.removeBars[b.kind] then
+            if b.kind == "health" and b.autoColors then
+                local colors = {}
+                for _, c in ipairs(b.autoColors) do
+                    if not st.dropColors[mode][c.kind] then colors[#colors + 1] = c end
+                end
+                b.autoColors = colors
+            end
+            bars[#bars + 1] = b
+        end
+    end
+    design.bars = bars
+
+    if st.removeSpecialBars then design.specialBars = {} end
+
+    if design.auras then
+        local auras = {}
+        for _, a in ipairs(design.auras) do
+            if a.kind == "debuffs" then
+                a.scale, a.limit = st.debuffScale, st.debuffLimit
+                auras[#auras + 1] = a
+            elseif not st.removeBuffAuras then
+                auras[#auras + 1] = a
+            end
+        end
+        design.auras = auras
+    end
+
+    design.addon, design.kind = "Platynator", "style"
+    return design
+end
+
+local pendingStyle
+ApplyStyle = function(mode, silent)
+    if InCombatLockdown() then
+        pendingStyle = mode -- applied when combat ends
+        return false
+    end
+    if not CanImport() then return false end
+    local name = ns.data.nameplates.enemyDesign
+    local design = CurrentProfile().designs and CurrentProfile().designs[name]
+    if not design then
+        if not silent then ns.Print("Could not find the design", name, "in the current Platynator profile.") end
+        return false
+    end
+    -- Keep a way back: save the profile once before the first restyle
+    if not ns.db.nameplates.snapshot then ns.db.nameplates.snapshot = ProfileString() end
+    local ok, err = QuietImport(Encode(BuildStyled(design, mode)), name)
+    if not ok then
+        ns.Print("|cffff4444Style import failed:|r", err)
+        return false
+    end
+    if not silent then ns.Print("Clean nameplate style applied (" .. mode .. ").") end
+    return true
+end
+
+ns.On("PLAYER_REGEN_ENABLED", function()
+    if pendingStyle then
+        local m = pendingStyle
+        pendingStyle = nil
+        ApplyStyle(m, true)
+    end
+end)
+
 local function Save()
     if not CanImport() then return end
     ns.db.nameplates.snapshot = ProfileString()
@@ -134,10 +220,17 @@ local function Load()
     end
 end
 
-ns.AddCommand("np", "nameplates: tank | dps | auto | off | tidy | save | load | export", function(arg)
+ns.AddCommand("np", "nameplates: tank | dps | auto | off | tidy | style | save | load | export", function(arg)
     arg = strlower(strtrim(arg or ""))
     ns.db.nameplates = ns.db.nameplates or { auto = true }
-    if arg == "tidy" then
+    if arg == "style" then
+        ns.db.nameplates.style = true
+        ApplyStyle(current or "dps")
+        ns.Print("Clean style is on and follows tank/DPS. /mlz np style off stops it, /mlz np load restores your old profile.")
+    elseif arg == "style off" then
+        ns.db.nameplates.style = false
+        ns.Print("Clean style will no longer be applied. /mlz np load restores your saved profile.")
+    elseif arg == "tidy" then
         Tidy()
     elseif arg == "save" then
         Save()
@@ -171,24 +264,42 @@ local Nameplates = ns.RegisterModule({ key = "nameplates", title = "Nameplates (
 
 function Nameplates:Preview()
     local text = ns.data.nameplates.profileString
-    local item = { id = "profile", group = "Platynator", label = "Import MLZ profile" }
-    if not C_AddOns.IsAddOnLoaded("Platynator") then
-        item.old, item.new, item.enabled, item.unavailable = "-", "Platynator not loaded", false, true
+    local items = {}
+    local loaded = C_AddOns.IsAddOnLoaded("Platynator")
+
+    local profile = { id = "profile", group = "Platynator", label = "Import MLZ profile" }
+    if not loaded then
+        profile.old, profile.new, profile.enabled, profile.unavailable = "-", "Platynator not loaded", false, true
     elseif not text then
-        item.old, item.new, item.enabled, item.unavailable = "-", "no profile string saved", false, true
-        item.note = "Run /mlz np export in a game with your setup and paste the string into profileString in Data/Nameplates.lua."
+        profile.old, profile.new, profile.enabled, profile.unavailable = "-", "no profile string saved", false, true
+        profile.note = "Run /mlz np export in a game with your setup and paste the string into profileString in Data/Nameplates.lua."
     else
-        item.old, item.new = "current profile", "MLZ profile"
-        item.value = text
-        item.enabled = ns.Enabled("nameplates", "profile", true)
-        item.note = "Replaces the settings of your current Platynator profile. Undo puts the old profile back."
+        profile.old, profile.new = "current profile", "MLZ profile"
+        profile.value = text
+        profile.enabled = ns.Enabled("nameplates", "profile", true)
+        profile.note = "Replaces the settings of your current Platynator profile. Undo puts the old profile back."
     end
-    return { item }
+    items[#items + 1] = profile
+
+    local style = { id = "style", group = "Platynator", label = "Clean nameplate style (tank / DPS)" }
+    if not loaded then
+        style.old, style.new, style.enabled, style.unavailable = "-", "Platynator not loaded", false, true
+    else
+        local on = ns.db.nameplates and ns.db.nameplates.style
+        style.old, style.new = on and "on" or "off", "on"
+        style.alreadySet = on and true or false
+        style.styleOn = true
+        style.enabled = ns.Enabled("nameplates", "style", true)
+        style.note = "Minimal enemy nameplates: name and percent inside the bar, cast bar, only your debuffs. Follows Defensive Stance (tank) or DPS. Undo restores your old profile; /mlz np style off stops it."
+    end
+    items[#items + 1] = style
+    return items
 end
 
 function Nameplates:Backup()
-    if not CanImport() then return {} end
-    return { profile = ProfileString() }
+    local snap = { style = ns.db.nameplates and ns.db.nameplates.style or false }
+    if CanImport() then snap.profile = ProfileString() end
+    return snap
 end
 
 function Nameplates:Apply(items)
@@ -198,9 +309,18 @@ function Nameplates:Apply(items)
             if not ok then error("Platynator import failed: " .. tostring(err)) end
         end
     end
+    for _, item in ipairs(items) do
+        if item.styleOn then
+            ns.db.nameplates = ns.db.nameplates or { auto = true }
+            ns.db.nameplates.style = true
+            ApplyStyle(current or "dps")
+        end
+    end
 end
 
 function Nameplates:Restore(snap)
+    ns.db.nameplates = ns.db.nameplates or { auto = true }
+    ns.db.nameplates.style = snap.style and true or false
     if snap.profile and CanImport() then
         QuietImport(snap.profile, PLATYNATOR_CURRENT_PROFILE)
     end

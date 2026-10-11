@@ -24,6 +24,24 @@ ns.data.nameplates = {
         healthText = { "percentage" },   -- was { "absolute", "percentage" }
     },
 
+    -- /mlz np style: a clean look, built from your current enemy design (so your font, anchors and
+    -- colors are kept). Same minimal layout in both modes; only the bar coloring differs.
+    style = {
+        scale = 1,
+        healthText = { "percentage" },
+        removeTexts = { quest = true, castTarget = true },     -- text kinds to remove
+        removeBars = { energy = true },                        -- bar kinds to remove
+        removeSpecialBars = true,                              -- class power circles under the bar
+        removeBuffAuras = true,                                -- keep only your own debuffs
+        debuffScale = 0.8,
+        debuffLimit = 8,
+        -- Bar color rules to drop (autoColors kinds). Order of the rest is kept.
+        dropColors = {
+            tank = { eliteType = true, quest = true },                  -- threat colors stay
+            dps  = { eliteType = true, quest = true, threat = true },   -- plain reaction/class colors
+        },
+    },
+
     -- Optional: paste a full Platynator profile string (PLATY!1!...) here to keep your setup
     -- inside the addon folder. Get it with /mlz np export. /mlz np load uses this if
     -- no snapshot is saved in-game. Leave as nil if you don't want that.

@@ -29,14 +29,13 @@ Instead of silently changing things, it opens an **installation wizard** that sh
 |---|---|
 | **Pixel-perfect scale** | Calculates UI scale from your screen height (`scale = k * 768 / height`). Stores the *mode*, not the number, so it recalculates if your resolution changes. Handles scales below Blizzard's 0.64 CVar limit. |
 | **Edit Mode layout** | Creates a dedicated Edit Mode layout (bars stacked at bottom center, player/target flanking, swing timers, cast bar, corners kept for glance-only info). Your other layouts are untouched. |
-| **Keybinds** | ESDF or WASD movement, a reach-sorted set of base keys, and Shift/Ctrl variants for bars 2 and 3. Detects conflicts and moves displaced actions (e.g. Character panel) to an ALT variant. |
+| **Keybinds** | ESDF or WASD movement, a reach-sorted set of base keys, and Shift/Ctrl variants for bars 2 and 3. With WASD, Shift+1/2/3 switch stance/form (stance bar buttons 1-3), and bar 2 buttons 1-3 move to Shift+G/V/T. Detects conflicts and moves displaced actions (e.g. Character panel) to an ALT variant. |
 | **Settings (CVars)** | Auto loot, auto self-cast, cast on key down, camera distance, nameplate visibility, disable tutorials and more. Each one is optional. CVars that don't exist in your client are skipped. |
 | **Minimalism / fading** | Hides bars 4-5, micro menu, bags, chat buttons and XP bar until mouseover. Dims bars 2-3 out of combat. Damage meter only shows in a group. Uses `SetAlpha` only, so it causes **no taint** and works in combat. |
 | **Action button colors** | Red = out of range, blue = no mana/rage/energy, grey = unusable, like tullaRange. Short hotkey labels (`S1`, `C1`) and hidden macro names. |
-| **Consumables bar** | A small auto-filling bar with the best food, drink, buff food, potions, healthstone, mana gem, bandages and elixirs in your bags. Built on secure item buttons, so it works in combat. |
 | **Nameplates** | Switches [Platynator](https://www.curseforge.com/wow/addons/platynator) settings by stance: Defensive Stance = tank, anything else = DPS. |
-| **Other addons** | Applies recommended settings to Prat, Auctionator, AtlasLoot, What's Training? and RestedXP Guides (see below). |
-| **Tweaks** | Minimap size slider, FPS counter, hide the quest tracker or just its "All Objectives" line. |
+| **Other addons** | Applies recommended settings to Prat, Auctionator, AtlasLoot, What's Training?, Bagnon and RestedXP Guides (see below). |
+| **Tweaks** | Minimap size slider, FPS counter, calmer combat text (small Arial Narrow numbers; the font needs a full game restart), hide the quest tracker or just its "All Objectives" line. |
 | **Backup / undo** | A stack of up to 5 backups. Every wizard run is reversible. |
 | **Export / import** | Share your choices as a string with `/mlz export` and `/mlz import`. |
 | **Health check** | Warns after login if an addon it configures is missing or not loaded. |
@@ -70,7 +69,6 @@ Type `/mlz` in game for the full list. The commands:
 | `/mlz np tank \| dps \| auto \| off \| tidy \| save \| load \| export` | Control nameplate switching |
 | `/mlz fade` | Toggle all fading until next `/reload` |
 | `/mlz buttons` | Toggle action button coloring |
-| `/mlz consumables` | Toggle the consumables bar |
 | `/mlz fps` | Toggle the FPS counter |
 | `/mlz map [size]` | Change minimap size |
 | `/mlz quests` / `/mlz tracker` | Hide/show the quest tracker / its header line |
@@ -90,6 +88,7 @@ MLZ UI **configures** these addons if they are installed and loaded. It does not
 | [Auctionator](https://www.curseforge.com/wow/addons/auctionator) | Hide splash screen, auto-select next item, remember last duration |
 | [AtlasLoot Classic](https://www.curseforge.com/wow/addons/atlasloot-classic-edition) | Optionally hide the minimap button |
 | [What's Training?](https://www.curseforge.com/wow/addons/whats-training) | Hide known weapon skills, show beside trainer window |
+| [Bagnon](https://www.curseforge.com/wow/addons/bagnon) | Bag and bank columns, darker background, softer item glow, no auto-open for crafting/socketing |
 | [RestedXP Guides](https://www.restedxp.com/) | Optionally guide window scale |
 | [Platynator](https://www.curseforge.com/wow/addons/platynator) | Tank/DPS nameplate presets, switched by stance |
 | BugGrabber | Only checked by the health check |
@@ -116,7 +115,7 @@ MLZ_UI/
 ├── MLZ_UI.toc
 ├── Core.lua            namespace, SavedVariables, event bus, combat queue, slash commands
 ├── Probe.lua           client introspection for development
-├── Data/               what to apply (CVars, bindings, layout, fade, consumables, nameplates, addons)
+├── Data/               what to apply (CVars, bindings, layout, fade, nameplates, addons)
 ├── Modules/            how to apply it (one module per area, all with Preview/Apply/Backup/Restore)
 └── UI/                 widgets and the installation wizard
 ```
@@ -140,7 +139,6 @@ Everything is meant to be edited. Open the file in `Data/`:
 | `Data/Bindings.lua` | Movement setups and base keys |
 | `Data/Layout.lua` | Edit Mode frame positions |
 | `Data/Fade.lua` | What fades, when, and how much |
-| `Data/Consumables.lua` | Categories on the consumables bar |
 | `Data/Nameplates.lua` | Tank/DPS nameplate presets |
 | `Data/Addons.lua` | Settings applied to other addons |
 

@@ -13,8 +13,8 @@ Data\CVars.lua
 Data\Bindings.lua
 Data\Layout.lua
 Data\Fade.lua
-Data\Consumables.lua
 Data\Nameplates.lua
+Data\RXP.lua
 Data\Addons.lua
 
 Modules\Backup.lua
@@ -25,7 +25,7 @@ Modules\Layout.lua
 Modules\Fade.lua
 Modules\ActionButtons.lua
 Modules\Tweaks.lua
-Modules\Consumables.lua
+Modules\RXP.lua
 Modules\Nameplates.lua
 Modules\Addons.lua
 Modules\Health.lua

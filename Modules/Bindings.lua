@@ -28,15 +28,26 @@ function Bindings:Desired(movement)
         list[#list + 1] = { key = b.key, command = b.command, group = "Movement (" .. movement .. ")" }
     end
     local keys = D.baseKeys[movement]
+    local stance = D.stance and D.stance[movement] or {}
+    local stanceKeys = {}
+    for _, b in ipairs(stance) do stanceKeys[b.key] = true end
+    local relocate = D.stanceRelocate and D.stanceRelocate[movement] or {}
     for _, layer in ipairs(D.layers) do
         for i, k in ipairs(keys) do
+          local full = layer.modifier .. k
+          if stanceKeys[full] then full = relocate[full] end -- stance keys win; the bar button gets a replacement key
+          if full then
             list[#list + 1] = {
-                key = layer.modifier .. k,
+                key = full,
                 command = layer.prefix .. i,
                 group = layer.bar .. (layer.modifier ~= "" and (" (" .. layer.modifier:sub(1, -2) .. ")") or ""),
                 role = layer.modifier == "" and D.roles[i] or nil,
             }
+          end
         end
+    end
+    for i, b in ipairs(stance) do
+        list[#list + 1] = { key = b.key, command = b.command, group = "Stances", role = "Stance " .. i }
     end
     for _, b in ipairs(D.mouse) do
         list[#list + 1] = { key = b.key, command = b.command, group = "Bar 4 (mouseover)" }
@@ -85,7 +96,11 @@ function Bindings:Preview()
         items[#items + 1] = item
 
         -- Displaced action? Move it to the ALT variant if possible.
-        if item.conflict and not desiredCommands[current] and not D.neverDisplace[current] then
+        local isBarCommand = false
+        for _, layer in ipairs(D.layers) do
+            if current:find("^" .. layer.prefix .. "%d+$") then isBarCommand = true end
+        end
+        if item.conflict and not desiredCommands[current] and not D.neverDisplace[current] and not isBarCommand then
             local hasOtherKey = false
             for _, k in ipairs({ GetBindingKey(current) }) do
                 if k and not desiredKeys[k] then hasOtherKey = true end
@@ -125,6 +140,21 @@ function Bindings:Preview()
                                d.key .. " would not be visible on the button.",
                     }
                 end
+            end
+        end
+    end
+    -- Action bar paging (wheel/shift scrolling bar 1 through its pages): remove every remaining key
+    local pageCommands = { "NEXTACTIONPAGE", "PREVIOUSACTIONPAGE" }
+    for i = 1, 6 do pageCommands[#pageCommands + 1] = "ACTIONPAGE" .. i end
+    for _, cmd in ipairs(pageCommands) do
+        for _, k in ipairs({ GetBindingKey(cmd) }) do
+            if k and not desiredKeys[k] then
+                items[#items + 1] = {
+                    id = "unbind:" .. k, key = k, unbind = true, group = "Extra keys to remove",
+                    label = k, old = Pretty(cmd), new = "none",
+                    enabled = ns.Enabled("bindings", "unbind:" .. k, true),
+                    note = "Stops bar 1 from scrolling to another page (mouse wheel / shift).",
+                }
             end
         end
     end
