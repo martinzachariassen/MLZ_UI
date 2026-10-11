@@ -1,10 +1,10 @@
--- MLZ UI: Edit Mode-layout
--- Lager (eller oppdaterer) en egen Edit Mode-layout ut fra Data/Layout.lua.
--- Andre layouts røres ikke. Angre bytter tilbake til layouten som var aktiv før.
+-- MLZ UI: Edit Mode layout
+-- Creates (or updates) a dedicated Edit Mode layout based on Data/Layout.lua.
+-- Other layouts are left alone. Undo switches back to the layout that was active before.
 --
--- C_EditMode.GetLayouts() returnerer bare lagrede layouts. Blizzard-UI-et legger presets
--- (Modern/Classic) foran, så indeksen til SetActiveLayout = antall presets + indeks i lagrede.
--- Etter endring anbefales /reload, så Edit Mode-UI-et ikke sitter med gammel data.
+-- C_EditMode.GetLayouts() only returns saved layouts. The Blizzard UI puts the presets
+-- (Modern/Classic) first, so the SetActiveLayout index = number of presets + index among saved.
+-- A /reload is recommended after changes so the Edit Mode UI doesn't hold stale data.
 
 local _, ns = ...
 
@@ -22,7 +22,7 @@ local function Available()
     return C_EditMode and C_EditMode.GetLayouts and C_EditMode.SaveLayouts and C_EditMode.SetActiveLayout and Enum and Enum.EditModeSystem
 end
 
--- Henter layout-info. Returnerer raw, presets, aktiv layout-tabell
+-- Fetches layout info. Returns raw, presets, active layout table
 function Layout:GetInfo()
     local ok, raw = pcall(C_EditMode.GetLayouts)
     if not ok or type(raw) ~= "table" then return nil end
@@ -36,17 +36,17 @@ end
 
 local function FindSystem(layoutInfo, spec)
     local sys = Enum.EditModeSystem[spec.system]
-    if sys == nil then return nil, "systemet " .. spec.system .. " finnes ikke" end
+    if sys == nil then return nil, "system " .. spec.system .. " does not exist" end
     local idx
     if spec.indexEnum then
         local e = Enum[spec.indexEnum]
         idx = e and e[spec.index]
-        if idx == nil then return nil, spec.indexEnum .. "." .. tostring(spec.index) .. " finnes ikke" end
+        if idx == nil then return nil, spec.indexEnum .. "." .. tostring(spec.index) .. " does not exist" end
     end
     for _, s in ipairs(layoutInfo.systems or {}) do
         if s.system == sys and (idx == nil or s.systemIndex == idx) then return s end
     end
-    return nil, "ikke i layouten"
+    return nil, "not in the layout"
 end
 
 local function AnchorText(a)
@@ -62,7 +62,7 @@ local function FindByName(layouts, name)
 end
 
 ------------------------------------------------------------------------
--- Konvertering fra visningsverdi (det Edit Mode viser, f.eks. 80 %) til lagret verdi
+-- Conversion from display value (what Edit Mode shows, e.g. 80 %) to stored value
 ------------------------------------------------------------------------
 local function FindDisplayInfo(sysEnum, setting)
     local mgr = EditModeSettingDisplayInfoManager
@@ -73,9 +73,9 @@ local function FindDisplayInfo(sysEnum, setting)
     end
 end
 
--- currentRaw = verdien som ligger lagret i dag (brukes til å gjenkjenne lagringsformatet)
+-- currentRaw = the currently stored value (used to detect the storage format)
 function Layout:ToRaw(sysEnum, sysIndex, setting, value, currentRaw)
-    -- 1) Spør Blizzards egen system-frame om konvertering hvis metoden finnes
+    -- 1) Ask Blizzard's own system frame to convert, if the method exists
     local mgr = EditModeManagerFrame
     if mgr and type(mgr.registeredSystemFrames) == "table" then
         for _, frame in ipairs(mgr.registeredSystemFrames) do
@@ -86,22 +86,22 @@ function Layout:ToRaw(sysEnum, sysIndex, setting, value, currentRaw)
             end
         end
     end
-    -- 2) Bruk slider-info: lagret verdi = steg fra minimum, med mindre dagens verdi viser at den lagres rått
+    -- 2) Use slider info: stored value = steps from minimum, unless the current value shows it is stored raw
     local info = FindDisplayInfo(sysEnum, setting)
     if info and info.minValue and info.maxValue then
         local v = math.max(info.minValue, math.min(info.maxValue, value))
         local step = (info.stepSize and info.stepSize > 0) and info.stepSize or 1
         local steps = (info.maxValue - info.minValue) / step
-        -- Bare slidere med ConvertValue lagres som steg; resten (antall, padding) lagres rått
+        -- Only sliders with ConvertValue are stored as steps; the rest (counts, padding) are stored raw
         if not info.ConvertValue then return v end
         if type(currentRaw) == "number" and currentRaw >= info.minValue and currentRaw <= info.maxValue and currentRaw > steps then
-            return v -- lagres rått
+            return v -- stored raw
         end
         return math.floor((v - info.minValue) / step + 0.5)
     end
-    -- 3) Av/på og nedtrekk lagres rått
+    -- 3) Toggles and dropdowns are stored raw
     if info then return value end
-    -- Ukjent: bare små heltall (av/på, retning) er trygge å sette rått
+    -- Unknown: only small integers (on/off, direction) are safe to set raw
     if value == 0 or value == 1 then return value end
     return nil
 end
@@ -114,44 +114,44 @@ local function SizeText(spec)
 end
 
 ------------------------------------------------------------------------
--- Modulgrensesnitt
+-- Module interface
 ------------------------------------------------------------------------
 function Layout:Preview()
     local data = ns.data.layout
     if not Available() then
-        return { { id = "na", label = "Edit Mode", old = "-", new = "ikke tilgjengelig", enabled = false, unavailable = true,
-                   note = "Fant ikke C_EditMode i denne klienten. Kjør /mlz probe og send resultatet." } }
+        return { { id = "na", label = "Edit Mode", old = "-", new = "not available", enabled = false, unavailable = true,
+                   note = "C_EditMode not found in this client. Run /mlz probe and send the output." } }
     end
     local raw, _, active = self:GetInfo()
     if not raw or not active then
-        return { { id = "na", label = "Edit Mode", old = "-", new = "kunne ikke lese layouts", enabled = false, unavailable = true } }
+        return { { id = "na", label = "Edit Mode", old = "-", new = "could not read layouts", enabled = false, unavailable = true } }
     end
 
     local items = {}
     local exists = FindByName(raw.layouts, data.name)
     items[#items + 1] = {
-        id = "__layout", label = "Layout \"" .. data.name .. "\"", group = "Oppsett",
-        old = "aktiv: " .. tostring(active.layoutName or "?"),
-        new = exists and "oppdateres og aktiveres" or "opprettes og aktiveres",
+        id = "__layout", label = "Layout \"" .. data.name .. "\"", group = "Setup",
+        old = "active: " .. tostring(active.layoutName or "?"),
+        new = exists and "will be updated and activated" or "will be created and activated",
         enabled = true,
-        note = "Andre layouts (f.eks. dine egne) blir ikke endret. Du kan bytte tilbake i Edit Mode eller med /mlz undo.",
+        note = "Other layouts (e.g. your own) are not changed. You can switch back in Edit Mode or with /mlz undo.",
     }
     items[#items + 1] = {
-        id = "__bars", label = "Vis action bars", group = "Oppsett",
+        id = "__bars", label = "Show action bars", group = "Setup",
         old = "", new = "Bar " .. table.concat(data.showBars, ", "), enabled = true,
     }
     for i, spec in ipairs(data.frames) do
         local sys, err = FindSystem(active, spec)
         local item = {
-            id = "frame" .. i, spec = spec, label = spec.label, group = "Plassering",
+            id = "frame" .. i, spec = spec, label = spec.label, group = "Placement",
             old = sys and AnchorText(sys.anchorInfo) or "-",
-            new = spec.keepAnchor and "skjules"
+            new = spec.keepAnchor and "hidden"
                   or (AnchorText({ point = spec.point, relativeTo = spec.relTo, offsetX = spec.x, offsetY = spec.y }) .. SizeText(spec)),
             enabled = sys ~= nil and ns.Enabled("layout", "frame" .. i, true),
         }
         if not sys then
             item.unavailable = true
-            item.new = "hoppes over"
+            item.new = "skipped"
             item.note = err
         end
         items[#items + 1] = item
@@ -176,7 +176,7 @@ local function ShowBars(list)
     for _, n in ipairs(list) do want[n] = true end
     if SetActionBarToggles and GetActionBarToggles then
         local t = { GetActionBarToggles() }
-        -- rekkefølge: bottomLeft (2), bottomRight (3), right (4), left (5), bar 6, 7, 8
+        -- order: bottomLeft (2), bottomRight (3), right (4), left (5), bar 6, 7, 8
         pcall(SetActionBarToggles, want[2] or t[1], want[3] or t[2], want[4] or t[3], want[5] or t[4],
             want[6] or t[5], want[7] or t[6], want[8] or t[7])
     end
@@ -199,13 +199,13 @@ function Layout:Apply(items)
     if not doLayout or not Available() then return end
 
     local raw, presets, active = self:GetInfo()
-    if not raw or not active then ns.Print("|cffff4444Kunne ikke lese Edit Mode-layouts.|r") return end
+    if not raw or not active then ns.Print("|cffff4444Could not read Edit Mode layouts.|r") return end
 
     local idx, target = FindByName(raw.layouts, data.name)
     if not target then
         local max = Constants and Constants.EditModeConsts and Constants.EditModeConsts.EditModeMaxLayoutsPerType
         if max and #raw.layouts >= max then
-            ns.Print("|cffff4444For mange Edit Mode-layouts (maks " .. max .. "). Slett en i Edit Mode og prøv igjen.|r")
+            ns.Print("|cffff4444Too many Edit Mode layouts (max " .. max .. "). Delete one in Edit Mode and try again.|r")
             return
         end
         target = ns.CopyTable(active)
@@ -221,10 +221,10 @@ function Layout:Apply(items)
     local function SetSetting(sys, spec, name, value, convert)
         local setting = Enum[spec.settingEnum][name]
         if setting == nil then
-            log[#log + 1] = spec.label .. " " .. name .. ": ukjent setting"
+            log[#log + 1] = spec.label .. " " .. name .. ": unknown setting"
             return
         end
-        -- Bare settings systemet allerede har endres (nye felt kan få SaveLayouts til å feile)
+        -- Only change settings the system already has (new fields can make SaveLayouts fail)
         for _, st in ipairs(sys.settings or {}) do
             if st.setting == setting then
                 local new = value
@@ -234,7 +234,7 @@ function Layout:Apply(items)
                 return
             end
         end
-        log[#log + 1] = spec.label .. " " .. name .. ": finnes ikke på systemet"
+        log[#log + 1] = spec.label .. " " .. name .. ": not present on the system"
     end
 
     for _, spec in ipairs(specs) do
@@ -260,40 +260,40 @@ function Layout:Apply(items)
             moved = moved + 1
         end
     end
-    ns.db.layoutLog = log -- havner i SavedVariables, så vi kan sjekke konverteringen etter /reload
+    ns.db.layoutLog = log -- ends up in SavedVariables, so we can check the conversion after /reload
 
     raw.activeLayout = #presets + idx
     local ok, err = pcall(C_EditMode.SaveLayouts, raw)
-    if not ok then ns.Print("|cffff4444SaveLayouts feilet:|r", err) return end
+    if not ok then ns.Print("|cffff4444SaveLayouts failed:|r", err) return end
     ok, err = pcall(C_EditMode.SetActiveLayout, #presets + idx)
-    if not ok then ns.Print("|cffff4444SetActiveLayout feilet:|r", err) end
-    ns.Debug("layout lagret, frames flyttet:", moved)
+    if not ok then ns.Print("|cffff4444SetActiveLayout failed:|r", err) end
+    ns.Debug("layout saved, frames moved:", moved)
     ns.needsReload = true
 end
 
--- Endrer én setting (i visningsenheter, f.eks. 120 %) i MLZ UI-layouten og lagrer.
--- Brukes av /mlz map. Returnerer ok, feilmelding.
+-- Changes a single setting (in display units, e.g. 120 %) in the MLZ UI layout and saves.
+-- Used by /mlz map. Returns ok, error message.
 function Layout:UpdateOne(id, name, value)
-    if not Available() then return false, "Edit Mode-API mangler" end
+    if not Available() then return false, "Edit Mode API missing" end
     local spec
     for _, sp in ipairs(ns.data.layout.frames) do if sp.id == id then spec = sp end end
-    if not spec then return false, "ukjent frame " .. tostring(id) end
+    if not spec then return false, "unknown frame " .. tostring(id) end
     local raw = self:GetInfo()
-    if not raw then return false, "kunne ikke lese layouts" end
+    if not raw then return false, "could not read layouts" end
     local _, target = FindByName(raw.layouts, ns.data.layout.name)
-    if not target then return false, "MLZ UI-layouten finnes ikke ennå (kjør /mlz install)" end
+    if not target then return false, "The MLZ UI layout does not exist yet (run /mlz install)" end
     local sys, why = FindSystem(target, spec)
     if not sys then return false, why end
     local setting = Enum[spec.settingEnum] and Enum[spec.settingEnum][name]
     for _, st in ipairs(sys.settings or {}) do
         if st.setting == setting then
             local new = self:ToRaw(sys.system, sys.systemIndex, setting, value, st.value)
-            if new == nil then return false, "kunne ikke konvertere verdien" end
+            if new == nil then return false, "could not convert the value" end
             st.value = new
             return pcall(C_EditMode.SaveLayouts, raw)
         end
     end
-    return false, name .. " finnes ikke på systemet"
+    return false, name .. " is not present on the system"
 end
 
 function Layout:Restore(snap)

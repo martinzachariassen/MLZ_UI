@@ -1,49 +1,49 @@
--- MLZ UI: CVar-tabell
--- Rediger fritt. Hver rad:
---   name    = CVar-navn (sjekkes med C_CVar.GetCVarInfo før bruk, ukjente hoppes over)
---   value   = ønsket verdi (string eller tall)
---   label   = kort tekst i veiviseren
---   desc    = forklaring (tooltip)
---   enabled = forhåndsvalgt i veiviseren? (brukeren kan slå av/på hver rad)
---   choices = (valgfritt) liste med verdier som kan bla gjennom ved klikk
+-- MLZ UI: CVar table
+-- Edit freely. Each row:
+--   name    = CVar name (checked with C_CVar.GetCVarInfo before use, unknown ones are skipped)
+--   value   = desired value (string or number)
+--   label   = short text in the setup wizard
+--   desc    = explanation (tooltip)
+--   enabled = preselected in the setup wizard? (the user can toggle each row)
+--   choices = (optional) list of values to cycle through on click
 
 local _, ns = ...
 
 ns.data.cvars = {
-    -- Loot og interaksjon
+    -- Loot and interaction
     { name = "autoLootDefault", value = "1", label = "Auto loot", enabled = true,
-      desc = "Plukker opp alt loot automatisk uten Shift-klikk." },
+      desc = "Picks up all loot automatically without Shift-click." },
     { name = "autoSelfCast", value = "1", label = "Auto self-cast", enabled = true,
-      desc = "Hjelpende spells kastes på deg selv hvis du ikke har et vennlig mål." },
-    { name = "autoDismountFlying", value = "1", label = "Auto dismount (flygende)", enabled = true,
-      desc = "Hopper av flygende mount når du kaster en spell." },
-    { name = "autoClearAFK", value = "1", label = "Fjern AFK automatisk", enabled = true,
-      desc = "Fjerner AFK-status når du begynner å spille igjen." },
+      desc = "Helpful spells are cast on yourself if you have no friendly target." },
+    { name = "autoDismountFlying", value = "1", label = "Auto dismount (flying)", enabled = true,
+      desc = "Dismounts from a flying mount when you cast a spell." },
+    { name = "autoClearAFK", value = "1", label = "Clear AFK automatically", enabled = true,
+      desc = "Removes AFK status when you start playing again." },
 
-    -- Kamp
-    { name = "ActionButtonUseKeyDown", value = "1", label = "Cast på tastenedtrykk", enabled = true,
-      desc = "Spells aktiveres når tasten trykkes ned, ikke når den slippes. Raskere respons." },
-    { name = "SpellQueueWindow", value = "200", label = "Spell queue-vindu (ms)", enabled = false,
+    -- Combat
+    { name = "ActionButtonUseKeyDown", value = "1", label = "Cast on key down", enabled = true,
+      desc = "Spells fire when the key is pressed, not when it is released. Faster response." },
+    { name = "SpellQueueWindow", value = "200", label = "Spell queue window (ms)", enabled = false,
       choices = { "100", "150", "200", "250", "300", "400" },
-      desc = "Hvor tidlig du kan trykke neste spell før forrige er ferdig. Standard 400. Lavere = mer presis, krever lav ping. Klikk verdien for å bytte." },
+      desc = "How early you can press the next spell before the previous one finishes. Default 400. Lower = more precise, requires low ping. Click the value to change it." },
 
-    -- Kamera
-    { name = "cameraDistanceMaxZoomFactor", value = "2.6", label = "Maks kamerazoom", enabled = true,
-      desc = "Lar deg zoome lenger ut. Klienten kan begrense verdien." },
+    -- Camera
+    { name = "cameraDistanceMaxZoomFactor", value = "2.6", label = "Max camera zoom", enabled = true,
+      desc = "Lets you zoom further out. The client may cap the value." },
 
     -- Nameplates
-    { name = "nameplateShowEnemies", value = "1", label = "Fiende-nameplates", enabled = true,
-      desc = "Viser nameplates over fiender." },
-    { name = "nameplateShowFriends", value = "0", label = "Skjul venn-nameplates", enabled = true,
-      desc = "Skjuler nameplates over vennlige spillere og NPC-er." },
+    { name = "nameplateShowEnemies", value = "1", label = "Enemy nameplates", enabled = true,
+      desc = "Shows nameplates above enemies." },
+    { name = "nameplateShowFriends", value = "0", label = "Hide friendly nameplates", enabled = true,
+      desc = "Hides nameplates above friendly players and NPCs." },
 
-    -- Lyd og støy
-    { name = "Sound_EnableErrorSpeech", value = "0", label = "Skru av feil-stemme", enabled = true,
-      desc = "Fjerner stemmen som sier 'Not enough mana', 'Out of range' osv." },
-    { name = "showTutorials", value = "0", label = "Skru av tutorials", enabled = true,
-      desc = "Skjuler tutorial-popups." },
+    -- Sound and noise
+    { name = "Sound_EnableErrorSpeech", value = "0", label = "Disable error speech", enabled = true,
+      desc = "Removes the voice that says 'Not enough mana', 'Out of range' etc." },
+    { name = "showTutorials", value = "0", label = "Disable tutorials", enabled = true,
+      desc = "Hides tutorial popups." },
 
-    -- Utvikling
-    { name = "scriptErrors", value = "1", label = "Vis Lua-feil (utvikling)", enabled = false,
-      desc = "Viser Lua-feil på skjermen. Nyttig mens vi tester addonen." },
+    -- Development
+    { name = "scriptErrors", value = "1", label = "Show Lua errors (development)", enabled = false,
+      desc = "Shows Lua errors on screen. Useful while testing the addon." },
 }

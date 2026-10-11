@@ -1,15 +1,15 @@
--- MLZ UI: Action-knapper
--- Gjør det lett å se HVORFOR en knapp ikke kan brukes, slik tullaRange / Bartender4 / ElvUI gjør:
---   rød  = målet er utenfor rekkevidde
---   blå  = ikke nok mana / energi / rage
---   grå  = kan ikke brukes nå (feil form, mangler reagent osv.)
--- I tillegg korte, tydelige hotkeys (S1 = Shift+1, C1 = Ctrl+1) og skjulte makronavn.
+-- MLZ UI: Action buttons
+-- Makes it easy to see WHY a button can't be used, like tullaRange / Bartender4 / ElvUI do:
+--   red   = target is out of range
+--   blue  = not enough mana / energy / rage
+--   grey  = can't be used right now (wrong form, missing reagent, etc.)
+-- Also short, clear hotkeys (S1 = Shift+1, C1 = Ctrl+1) and hidden macro names.
 --
--- Endrer bare farge på ikon-teksturen og tekst, aldri selve knappene, så det er trygt i kamp og gir ikke taint.
+-- Only changes the color of the icon texture and text, never the buttons themselves, so it is safe in combat and causes no taint.
 
 local _, ns = ...
 
-local AB = ns.RegisterModule({ key = "actionbuttons", title = "Action-knapper" })
+local AB = ns.RegisterModule({ key = "actionbuttons", title = "Action buttons" })
 
 local PREFIXES = {
     "ActionButton", "MultiBarBottomLeftButton", "MultiBarBottomRightButton", "MultiBarRightButton",
@@ -17,30 +17,30 @@ local PREFIXES = {
 }
 
 local COLORS = {
-    range    = { 0.95, 0.20, 0.20 },  -- utenfor rekkevidde
-    mana     = { 0.30, 0.45, 1.00 },  -- ikke nok ressurs
-    unusable = { 0.30, 0.30, 0.30 },  -- kan ikke brukes
-    -- Blizzard sine egne farger, brukes når en funksjon er slått av
+    range    = { 0.95, 0.20, 0.20 },  -- out of range
+    mana     = { 0.30, 0.45, 1.00 },  -- not enough resource
+    unusable = { 0.30, 0.30, 0.30 },  -- can't be used
+    -- Blizzard's own colors, used when a feature is turned off
     bzMana     = { 0.5, 0.5, 1.0 },
     bzUnusable = { 0.4, 0.4, 0.4 },
     normal   = { 1, 1, 1 },
 }
 
 local OPTIONS = {
-    { id = "range", label = "Rød ved utenfor rekkevidde",
-      desc = "Hele ikonet blir rødt når målet er for langt unna, ikke bare hotkey-teksten." },
-    { id = "mana", label = "Blå ved lite mana/ressurs",
-      desc = "Tydeligere blåfarge når du mangler mana, energi eller rage." },
-    { id = "unusable", label = "Mørk grå når den ikke kan brukes",
-      desc = "Feil form/stance, mangler reagent, krever et mål osv." },
-    { id = "hotkeys", label = "Korte hotkeys",
-      desc = "Kort og tydelig tast øverst til høyre på alle knapper: 1 på bar 1, S1 (Shift+1) på bar 2, C1 (Ctrl+1) på bar 3. Musehjul vises som SWU/CWU." },
-    { id = "macroNames", label = "Skjul makronavn",
-      desc = "Navnet på makroer vises ikke på knappen (ikonet er nok)." },
+    { id = "range", label = "Red when out of range",
+      desc = "The whole icon turns red when the target is too far away, not just the hotkey text." },
+    { id = "mana", label = "Blue when low on mana/resource",
+      desc = "Clearer blue tint when you lack mana, energy or rage." },
+    { id = "unusable", label = "Dark grey when unusable",
+      desc = "Wrong form/stance, missing reagent, requires a target, etc." },
+    { id = "hotkeys", label = "Short hotkeys",
+      desc = "Short, clear key in the top right of every button: 1 on bar 1, S1 (Shift+1) on bar 2, C1 (Ctrl+1) on bar 3. Mouse wheel is shown as SWU/CWU." },
+    { id = "macroNames", label = "Hide macro names",
+      desc = "Macro names are not shown on the button (the icon is enough)." },
 }
 
 ------------------------------------------------------------------------
--- API (navnene har flyttet seg mellom klientversjoner)
+-- API (names have moved between client versions)
 ------------------------------------------------------------------------
 local CAB = C_ActionBar or {}
 local HasActionFn = CAB.HasAction or HasAction
@@ -61,7 +61,7 @@ local function Buttons()
 end
 
 ------------------------------------------------------------------------
--- Farger
+-- Colors
 ------------------------------------------------------------------------
 local function State(cfg, action)
     if not HasActionFn or not HasActionFn(action) then return nil end
@@ -75,7 +75,7 @@ local function State(cfg, action)
     return "normal"
 end
 
-local colored = {} -- knapper vi har farget, så vi kan sette dem tilbake
+local colored = {} -- buttons we have colored, so we can reset them
 
 local function Color(btn, force)
     local cfg = Cfg()
@@ -94,9 +94,9 @@ local function Color(btn, force)
 end
 
 ------------------------------------------------------------------------
--- Hotkeys og makronavn
+-- Hotkeys and macro names
 ------------------------------------------------------------------------
--- Binding-kommando per knappe-prefix (brukes hvis knappen ikke selv har commandName)
+-- Binding command per button prefix (used if the button has no commandName of its own)
 local COMMANDS = {
     ActionButton = "ACTIONBUTTON", MultiBarBottomLeftButton = "MULTIACTIONBAR1BUTTON",
     MultiBarBottomRightButton = "MULTIACTIONBAR2BUTTON", MultiBarRightButton = "MULTIACTIONBAR3BUTTON",
@@ -149,7 +149,7 @@ local function FixHotkey(btn)
     if not cfg or not cfg.hotkeys or not hk then return end
     local cmd = Command(btn)
     local key = cmd and GetBindingKey(cmd)
-    if not key then return end -- ingen tast: la Blizzard vise rekkevidde-prikken som før
+    if not key then return end -- no key: let Blizzard show the range dot as before
     StyleHotkey(btn, hk)
     hk:SetText(ShortKey(key))
     hk:SetAlpha(1)
@@ -164,14 +164,14 @@ local function FixName(btn)
 end
 
 ------------------------------------------------------------------------
--- Hooks og oppdateringsløkke
+-- Hooks and update loop
 ------------------------------------------------------------------------
 local hooked = {}
 
 local function HookButton(btn)
     if hooked[btn] then return end
     hooked[btn] = true
-    -- Blizzard setter fargen på nytt i UpdateUsable; vi farger rett etterpå, så det ikke blinker
+    -- Blizzard resets the color in UpdateUsable; we color right after so it doesn't flicker
     if type(btn.UpdateUsable) == "function" then
         hooksecurefunc(btn, "UpdateUsable", function(self) Color(self, true) end)
     end
@@ -187,7 +187,7 @@ local globalsHooked = false
 local function HookGlobals()
     if globalsHooked then return end
     globalsHooked = true
-    -- Eldre klienter bruker globale funksjoner i stedet for metoder
+    -- Older clients use global functions instead of methods
     if type(ActionButton_UpdateUsable) == "function" then
         hooksecurefunc("ActionButton_UpdateUsable", function(self) Color(self, true) end)
     end
@@ -218,7 +218,7 @@ function AB:Refresh()
         if cfg.hotkeys then FixHotkey(b) end
         b.mlzState = nil
     end
-    -- Hvis fargene er slått av: sett tilbake til normal (Blizzard tar over ved neste oppdatering)
+    -- If colors are turned off: reset to normal (Blizzard takes over on the next update)
     if not (cfg.range or cfg.mana or cfg.unusable) then
         for b in pairs(colored) do
             local icon = b.icon or b.Icon
@@ -232,7 +232,7 @@ function AB:Refresh()
 end
 
 ------------------------------------------------------------------------
--- Modulgrensesnitt
+-- Module interface
 ------------------------------------------------------------------------
 function AB:Preview()
     local items = {}
@@ -241,12 +241,12 @@ function AB:Preview()
     for _, o in ipairs(OPTIONS) do
         local item = {
             id = o.id, label = o.label, group = "Action bars", note = o.desc,
-            old = (cur and cur[o.id]) and "på" or "standard",
-            new = "på",
+            old = (cur and cur[o.id]) and "on" or "default",
+            new = "on",
             enabled = hasButtons and ns.Enabled("actionbuttons", o.id, true),
         }
         if cur and cur[o.id] then item.alreadySet = true end
-        if not hasButtons then item.unavailable, item.new = true, "fant ingen knapper" end
+        if not hasButtons then item.unavailable, item.new = true, "no buttons found" end
         items[#items + 1] = item
     end
     return items
@@ -279,11 +279,11 @@ ns.On("UPDATE_BINDINGS", function()
     for _, b in ipairs(buttons) do FixHotkey(b) end
 end)
 
-ns.AddCommand("buttons", "slår farging av action-knapper av/på (range/mana/ubrukelig)", function()
+ns.AddCommand("buttons", "toggles action button coloring on/off (range/mana/unusable)", function()
     local cfg = Cfg()
-    if not cfg then ns.Print("Ikke satt opp. Kjør /mlz install.") return end
+    if not cfg then ns.Print("Not set up. Run /mlz install.") return end
     local on = not (cfg.range or cfg.mana or cfg.unusable)
     cfg.range, cfg.mana, cfg.unusable = on, on, on
     AB:Refresh()
-    ns.Print("Farging av action-knapper:", on and "på" or "av")
+    ns.Print("Action button coloring:", on and "on" or "off")
 end)

@@ -1,22 +1,22 @@
--- MLZ UI: Skalering
--- Pixel-perfect: én UI-piksel = k fysiske piksler  =>  skala = k * 768 / skjermhøyde.
--- Modusen lagres (ikke selve tallet), så skalaen regnes ut på nytt hvis oppløsningen endres.
--- Blizzard tillater ikke uiScale under 0.64 via CVar, så under det settes UIParent:SetScale direkte.
+-- MLZ UI: Scaling
+-- Pixel-perfect: one UI pixel = k physical pixels  =>  scale = k * 768 / screen height.
+-- The mode is saved (not the number itself), so the scale is recalculated if the resolution changes.
+-- Blizzard does not allow uiScale below 0.64 via CVar, so below that UIParent:SetScale is set directly.
 
 local _, ns = ...
 
-local Scale = ns.RegisterModule({ key = "scale", title = "Skalering" })
+local Scale = ns.RegisterModule({ key = "scale", title = "Scaling" })
 
 local CVAR_MIN, CVAR_MAX = 0.64, 1.15
 
 local MODES = {
-    { value = "auto",    text = "Auto (anbefalt)" },
+    { value = "auto",    text = "Auto (recommended)" },
     { value = "0.71",    text = "Normal 0.71" },
-    { value = "0.64",    text = "Kompakt 0.64" },
-    { value = "0.57",    text = "Ekstra kompakt 0.57" },
+    { value = "0.64",    text = "Compact 0.64" },
+    { value = "0.57",    text = "Extra compact 0.57" },
     { value = "0.50",    text = "Minimal 0.50" },
-    { value = "pixel1",  text = "Pixel-perfekt (768/høyde)" },
-    { value = "1.00",    text = "Blizzard standard 1.00" },
+    { value = "pixel1",  text = "Pixel-perfect (768/height)" },
+    { value = "1.00",    text = "Blizzard default 1.00" },
 }
 
 local function ScreenHeight()
@@ -30,8 +30,8 @@ function Scale:Compute(mode)
     if mode == "pixel1" then
         s = 768 / h
     elseif mode == "auto" or mode == nil then
-        -- Pixel-perfekt hvis det gir en fornuftig størrelse (1080p = 0.71, 1440p = 0.53),
-        -- ellers kompakt 0.64. Fast skala = samme andel av skjermen på alle oppløsninger.
+        -- Pixel-perfect if that gives a sensible size (1080p = 0.71, 1440p = 0.53),
+        -- otherwise compact 0.64. Fixed scale = same share of the screen at every resolution.
         s = 768 / h
         if s < 0.53 or s > 0.72 then s = 0.64 end
     else
@@ -45,7 +45,7 @@ local function ModeText(mode)
     return tostring(mode)
 end
 
--- Selve påføringen. Kalles ved Apply og ved login/oppløsningsendring hvis brukeren har godtatt skalering.
+-- The actual application. Called on Apply and on login/resolution change if the user has accepted scaling.
 local applying = false
 function Scale:ApplyScale(mode)
     if applying then return end
@@ -60,11 +60,11 @@ function Scale:ApplyScale(mode)
     end
     applying = false
     self:UpdateSafeArea()
-    ns.Debug(("skala %.4f (modus %s, høyde %d)"):format(s, tostring(mode), ScreenHeight()))
+    ns.Debug(("scale %.4f (mode %s, height %d)"):format(s, tostring(mode), ScreenHeight()))
 end
 
--- MLZ_Safe: en sentrert 16:9-container som egne frames kan ankres til,
--- slik at HUD-en ikke sprer seg på ultrawide.
+-- MLZ_Safe: a centered 16:9 container that our own frames can anchor to,
+-- so the HUD doesn't spread out on ultrawide.
 function Scale:UpdateSafeArea()
     local f = _G.MLZ_Safe
     if not f then
@@ -77,7 +77,7 @@ function Scale:UpdateSafeArea()
 end
 
 ------------------------------------------------------------------------
--- Modulgrensesnitt
+-- Module interface
 ------------------------------------------------------------------------
 function Scale:Preview()
     local pw, ph = GetPhysicalScreenSize()
@@ -91,12 +91,12 @@ function Scale:Preview()
     return {
         {
             id = "uiScale",
-            label = "UI-skala",
+            label = "UI scale",
             old = ("%.3f"):format(UIParent:GetScale()),
             new = choices[idx].text, value = mode,
             choices = choices, choiceIndex = idx,
             enabled = true,
-            note = ("Skjerm %dx%d. Lavere tall = mindre UI og mer av verden. Samme tall gir samme andel av skjermen på alle oppløsninger. Klikk verdien for å bytte."):format(pw or 0, ph or 0),
+            note = ("Screen %dx%d. Lower number = smaller UI and more of the world. The same number gives the same share of the screen at every resolution. Click the value to change it."):format(pw or 0, ph or 0),
         },
     }
 end
@@ -128,13 +128,13 @@ function Scale:Restore(snap)
 end
 
 ------------------------------------------------------------------------
--- Hold skalaen riktig ved login og når oppløsning/skala endres
+-- Keep the scale correct on login and when resolution/scale changes
 ------------------------------------------------------------------------
 local function Reapply()
     if ns.db and ns.db.scale.applied then
-        -- Vent ett frame så Blizzards egen UI_SCALE_CHANGED-håndtering er ferdig først
+        -- Wait one frame so Blizzard's own UI_SCALE_CHANGED handling finishes first
         C_Timer.After(0, function()
-            ns.RunOutOfCombat(function() Scale:ApplyScale(ns.db.scale.mode) end, "skalering")
+            ns.RunOutOfCombat(function() Scale:ApplyScale(ns.db.scale.mode) end, "scaling")
         end)
     else
         Scale:UpdateSafeArea()
@@ -145,11 +145,11 @@ ns.On("PLAYER_ENTERING_WORLD", Reapply)
 ns.On("DISPLAY_SIZE_CHANGED", Reapply)
 ns.On("UI_SCALE_CHANGED", Reapply)
 
-ns.AddCommand("scale", "regner ut og setter skalaen på nytt (valgfritt: auto, 0.64, 0.57, pixel1 ...)", function(arg)
+ns.AddCommand("scale", "recalculates and reapplies the scale (optional: auto, 0.64, 0.57, pixel1 ...)", function(arg)
     if arg and arg ~= "" then ns.db.scale.mode = arg:lower() end
     ns.db.scale.applied = true
     ns.RunOutOfCombat(function()
         Scale:ApplyScale(ns.db.scale.mode)
-        ns.Print(("Skala satt til %.3f (%s)."):format(Scale:Compute(ns.db.scale.mode), ModeText(ns.db.scale.mode)))
-    end, "skalering")
+        ns.Print(("Scale set to %.3f (%s)."):format(Scale:Compute(ns.db.scale.mode), ModeText(ns.db.scale.mode)))
+    end, "scaling")
 end)

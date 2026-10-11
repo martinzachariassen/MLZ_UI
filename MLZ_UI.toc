@@ -1,6 +1,6 @@
 ## Interface: 16001
 ## Title: MLZ UI
-## Notes: Setter opp skalering, layout, keybinds og innstillinger via en installasjonsveiviser. /mlz
+## Notes: Sets up scaling, layout, keybinds and settings via an installation wizard. /mlz
 ## Author: Martin
 ## Version: 0.5.0
 ## SavedVariables: MLZUIDB

@@ -1,6 +1,6 @@
 -- MLZ UI: Keybinds
--- Bygger ønskede bindings fra Data/Bindings.lua, finner konflikter med dagens bindings
--- og flytter fortrengte handlinger (f.eks. Character-panel på C) til ALT-varianten.
+-- Builds the desired bindings from Data/Bindings.lua, finds conflicts with current bindings
+-- and moves displaced actions (e.g. Character panel on C) to the ALT variant.
 
 local _, ns = ...
 
@@ -19,13 +19,13 @@ local function CurrentAction(key)
     return action
 end
 
--- Returnerer liste med { key, command, group, role } for valgt bevegelsesoppsett
+-- Returns a list of { key, command, group, role } for the chosen movement setup
 function Bindings:Desired(movement)
     local D = ns.data.bindings
     movement = D.movement[movement] and movement or "ESDF"
     local list = {}
     for _, b in ipairs(D.movement[movement]) do
-        list[#list + 1] = { key = b.key, command = b.command, group = "Bevegelse (" .. movement .. ")" }
+        list[#list + 1] = { key = b.key, command = b.command, group = "Movement (" .. movement .. ")" }
     end
     local keys = D.baseKeys[movement]
     for _, layer in ipairs(D.layers) do
@@ -39,7 +39,7 @@ function Bindings:Desired(movement)
         end
     end
     for _, b in ipairs(D.mouse) do
-        list[#list + 1] = { key = b.key, command = b.command, group = "Bar 4 (mus)" }
+        list[#list + 1] = { key = b.key, command = b.command, group = "Bar 4 (mouseover)" }
     end
     return list
 end
@@ -57,7 +57,7 @@ function Bindings:Preview()
 
     local items = {}
 
-    -- Valg av bevegelse (ikke en binding i seg selv)
+    -- Movement choice (not a binding in itself)
     local mchoices, midx = {}, 1
     local names = { "ESDF", "WASD" }
     for i, n in ipairs(names) do
@@ -65,10 +65,10 @@ function Bindings:Preview()
         if n == movement then midx = i end
     end
     items[#items + 1] = {
-        id = MOVEMENT_ID, label = "Bevegelse", group = "Oppsett",
+        id = MOVEMENT_ID, label = "Movement", group = "Setup",
         old = "", new = movement, value = movement, choices = mchoices, choiceIndex = midx,
         enabled = true, rebuild = true,
-        note = "ESDF gir flere taster rundt fingrene. Klikk verdien for å bytte (listen oppdateres).",
+        note = "ESDF gives more keys around your fingers. Click the value to switch (the list updates).",
     }
 
     local displacedTargets = {}
@@ -84,7 +84,7 @@ function Bindings:Preview()
         }
         items[#items + 1] = item
 
-        -- Fortrengt handling? Flytt til ALT-varianten hvis mulig.
+        -- Displaced action? Move it to the ALT variant if possible.
         if item.conflict and not desiredCommands[current] and not D.neverDisplace[current] then
             local hasOtherKey = false
             for _, k in ipairs({ GetBindingKey(current) }) do
@@ -95,34 +95,34 @@ function Bindings:Preview()
                 if not desiredKeys[newKey] and not displacedTargets[newKey] and CurrentAction(newKey) == "" then
                     displacedTargets[newKey] = true
                     items[#items + 1] = {
-                        id = newKey, key = newKey, command = current, group = "Flyttede handlinger",
-                        label = newKey, old = "", new = Pretty(current) .. "  |cff888888(var " .. d.key .. ")|r",
+                        id = newKey, key = newKey, command = current, group = "Moved actions",
+                        label = newKey, old = "", new = Pretty(current) .. "  |cff888888(was " .. d.key .. ")|r",
                         enabled = item.enabled, displaced = true,
                     }
                 else
                     items[#items + 1] = {
-                        id = "lost:" .. d.key, group = "Flyttede handlinger",
-                        label = d.key, old = Pretty(current), new = "mister tast",
+                        id = "lost:" .. d.key, group = "Moved actions",
+                        label = d.key, old = Pretty(current), new = "loses key",
                         enabled = false, unavailable = true,
-                        note = newKey .. " er opptatt. Sett en ny tast for denne i Blizzards keybind-meny om du trenger den.",
+                        note = newKey .. " is taken. Set a new key for this in Blizzard's keybinding menu if you need it.",
                     }
                 end
             end
         end
     end
 
-    -- Ekstra taster på action-knappene våre (f.eks. Blizzards standard 9/0/-/= på knapp 9-12).
-    -- Blizzard viser bare den FØRSTE tasten på knappen, så de må bort for at riktig tast skal vises.
+    -- Extra keys on our action buttons (e.g. Blizzard's default 9/0/-/= on buttons 9-12).
+    -- Blizzard only shows the FIRST key on the button, so they must be removed for the right key to show.
     for _, d in ipairs(desired) do
         if d.command:find("BUTTON%d+$") then
             for _, k in ipairs({ GetBindingKey(d.command) }) do
                 if k and k ~= d.key and not desiredKeys[k] then
                     items[#items + 1] = {
-                        id = "unbind:" .. k, key = k, unbind = true, group = "Ekstra taster som fjernes",
-                        label = k, old = Pretty(d.command), new = "ingen",
+                        id = "unbind:" .. k, key = k, unbind = true, group = "Extra keys to remove",
+                        label = k, old = Pretty(d.command), new = "none",
                         enabled = ns.Enabled("bindings", "unbind:" .. k, true),
-                        note = "Knappen har allerede " .. d.key .. ". Med to taster viser Blizzard bare den første, så " ..
-                               d.key .. " ville ikke synes på knappen.",
+                        note = "The button already has " .. d.key .. ". With two keys Blizzard only shows the first, so " ..
+                               d.key .. " would not be visible on the button.",
                     }
                 end
             end
@@ -134,7 +134,7 @@ end
 function Bindings:OnChoice(item)
     if item.id == MOVEMENT_ID then
         ns.db.movement = item.value
-        return true -- bygg listen på nytt
+        return true -- rebuild the list
     end
 end
 
@@ -162,28 +162,28 @@ end
 function Bindings:Apply(items)
     local n = 0
     local list = BindingItems(items)
-    -- Fjern ekstra taster først, så de nye bindingene står alene på knappene
+    -- Remove extra keys first, so the new bindings are alone on the buttons
     for _, item in ipairs(list) do
         if item.unbind then pcall(SetBinding, item.key) end
     end
     for _, item in ipairs(list) do
         if item.unbind then
-            -- allerede gjort
+            -- already done
         else
         local ok, result = pcall(SetBinding, item.key, item.command)
         if ok and result ~= false then
             n = n + 1
         else
-            ns.Print("|cffff4444Kunne ikke binde|r", item.key, "->", item.command, ok and "" or result)
+            ns.Print("|cffff4444Could not bind|r", item.key, "->", item.command, ok and "" or result)
         end
         end
     end
     Save()
-    ns.Debug("bindings satt:", n)
+    ns.Debug("bindings set:", n)
 end
 
 function Bindings:Restore(snap)
-    -- Først løs alle tastene vi rørte, så legg tilbake de gamle handlingene
+    -- First unbind all keys we touched, then restore the old actions
     for key in pairs(snap.keys) do SetBinding(key) end
     for key, action in pairs(snap.keys) do
         if action ~= "" then SetBinding(key, action) end

@@ -1,18 +1,18 @@
--- MLZ UI: Kategorier for auto-baren med forbruksvarer
--- Rediger fritt. Logikken ligger i Modules/Consumables.lua.
+-- MLZ UI: Categories for the consumables auto bar
+-- Edit freely. The logic lives in Modules/Consumables.lua.
 --
--- Baren viser én knapp per kategori (den beste du har i bagen) i rekkefølgen under.
--- Kategorier uten noe i bagen skjules. "Beste" = høyest påkrevd nivå / item level, og conjured
--- (mage-laget) foretrekkes ved likt nivå, siden det forsvinner når du logger ut.
+-- The bar shows one button per category (the best one in your bags) in the order below.
+-- Categories with nothing in your bags are hidden. "Best" = highest required level / item level, and conjured
+-- (mage-made) is preferred at equal level, since it disappears when you log out.
 --
--- Felter:
---   id, label   = intern id og navn i tooltip
---   max         = antall knapper kategorien kan bruke (standard 1, f.eks. 2 for elixirs)
---   ids         = faste item-ID-er (healthstone, mana gems)
---   class/sub   = itemklasse / underklasse (0 = Consumable: 1 Potion, 2 Elixir, 3 Flask, 4 Scroll,
+-- Fields:
+--   id, label   = internal id and name in tooltip
+--   max         = number of buttons the category can use (default 1, e.g. 2 for elixirs)
+--   ids         = fixed item IDs (healthstone, mana gems)
+--   class/sub   = item class / subclass (0 = Consumable: 1 Potion, 2 Elixir, 3 Flask, 4 Scroll,
 --                 5 Food & Drink, 7 Bandage)
---   match       = funksjon(info) -> true/false. info har name, spell (navnet på "Use"-spellen) og
---                 text (all tooltip-tekst, små bokstaver)
+--   match       = function(info) -> true/false. info has name, spell (name of the "Use" spell) and
+--                 text (all tooltip text, lowercase)
 
 local _, ns = ...
 
@@ -25,11 +25,11 @@ end
 local function IsWellFed(i) return i.text:find("well fed") ~= nil end
 
 ns.data.consumables = {
-    { id = "food", label = "Mat (health)", class = 0, sub = 5,
+    { id = "food", label = "Food (health)", class = 0, sub = 5,
       match = function(i) return not IsDrink(i) and not IsWellFed(i) end },
-    { id = "drink", label = "Drikke (mana)", class = 0, sub = 5,
+    { id = "drink", label = "Drink (mana)", class = 0, sub = 5,
       match = function(i) return IsDrink(i) and not IsWellFed(i) end },
-    { id = "buffFood", label = "Buff-mat (Well Fed)", class = 0, sub = 5,
+    { id = "buffFood", label = "Buff food (Well Fed)", class = 0, sub = 5,
       match = IsWellFed },
     { id = "healthPotion", label = "Healing potion", class = 0, sub = 1,
       match = function(i) return i.text:find("restores %d+ to %d+ health") ~= nil end },
@@ -39,11 +39,11 @@ ns.data.consumables = {
     { id = "manaGem", label = "Mana gem", ids = MANA_GEMS },
     { id = "bandage", label = "Bandage", class = 0, sub = 7,
       altMatch = function(i) return i.name:find("Bandage") ~= nil end },
-    { id = "elixir", label = "Elixir / flask / scroll / annen potion", max = 3,
+    { id = "elixir", label = "Elixir / flask / scroll / other potion", max = 3,
       match = function(i)
           if i.classID ~= 0 then return false end
           if i.subID == 2 or i.subID == 3 or i.subID == 4 then return true end
-          -- Potions som ikke er healing/mana (Swiftness, Free Action, Rage osv.)
+          -- Potions that aren't healing/mana (Swiftness, Free Action, Rage etc.)
           return i.subID == 1 and not i.text:find("restores %d+ to %d+ health")
               and not i.text:find("restores %d+ to %d+ mana")
       end },

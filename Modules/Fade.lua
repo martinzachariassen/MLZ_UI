@@ -1,16 +1,16 @@
--- MLZ UI: Minimalisme (fading)
--- Gjør Blizzard-frames usynlige/dempede til du trenger dem, ut fra Data/Fade.lua.
--- Bruker bare SetAlpha (lov også i kamp), aldri Hide/Show på beskyttede frames, så det gir ikke taint.
--- Keybinds virker selv om en bar er usynlig.
+-- MLZ UI: Minimalism (fading)
+-- Makes Blizzard frames invisible/dimmed until you need them, based on Data/Fade.lua.
+-- Only uses SetAlpha (allowed in combat too), never Hide/Show on protected frames, so it causes no taint.
+-- Keybinds work even when a bar is invisible.
 
 local _, ns = ...
 
-local Fade = ns.RegisterModule({ key = "fade", title = "Minimalisme" })
+local Fade = ns.RegisterModule({ key = "fade", title = "Minimalism" })
 
 local MODE_TEXT = {
-    mouseover = "skjult til mouseover",
-    combat = "dempet utenfor kamp",
-    hideInCombat = "skjult i kamp",
+    mouseover = "hidden until mouseover",
+    combat = "dimmed out of combat",
+    hideInCombat = "hidden in combat",
 }
 
 local function Frames(row)
@@ -23,9 +23,9 @@ local function Frames(row)
 end
 
 ------------------------------------------------------------------------
--- Oppdateringsløkke
+-- Update loop
 ------------------------------------------------------------------------
-local touched = {} -- frames vi har endret alpha på, så vi kan sette dem tilbake
+local touched = {} -- frames whose alpha we changed, so we can reset them
 
 local function TargetAlpha(row, hovered, inCombat, hasTarget)
     if row.mode == "mouseover" then
@@ -55,7 +55,7 @@ local function Update()
             for _, f in ipairs(frames) do
                 local cur = f:GetAlpha()
                 if math.abs(cur - target) > 0.01 then
-                    -- myk overgang: tar noen tiendedels sekunder
+                    -- smooth transition: takes a few tenths of a second
                     local step = (target > cur) and 0.34 or 0.2
                     local new = cur + math.max(-step, math.min(step, target - cur))
                     f:SetAlpha(new)
@@ -114,7 +114,7 @@ local function ChatWindowAlphas()
 end
 
 ------------------------------------------------------------------------
--- Modulgrensesnitt
+-- Module interface
 ------------------------------------------------------------------------
 function Fade:Preview()
     local items = {}
@@ -122,22 +122,22 @@ function Fade:Preview()
     for _, row in ipairs(ns.data.fade) do
         local exists = #Frames(row) > 0
         local item = {
-            id = row.id, label = row.label, group = "Skjul til du trenger det", note = row.desc,
-            old = current[row.id] and MODE_TEXT[row.mode] or "alltid synlig",
+            id = row.id, label = row.label, group = "Hide until needed", note = row.desc,
+            old = current[row.id] and MODE_TEXT[row.mode] or "always visible",
             new = MODE_TEXT[row.mode] .. (row.alpha and (" (" .. math.floor(row.alpha * 100) .. "%)") or ""),
             enabled = exists and ns.Enabled("fade", row.id, row.enabled),
         }
         if not exists then
-            item.unavailable, item.new, item.note = true, "finnes ikke", "Fant ingen av: " .. table.concat(row.frames, ", ")
+            item.unavailable, item.new, item.note = true, "does not exist", "Found none of: " .. table.concat(row.frames, ", ")
         end
         items[#items + 1] = item
     end
     items[#items + 1] = {
-        id = "__chat", label = "Ren chat", group = "Chat",
-        old = ns.db.chatTweaks and "på" or "standard",
-        new = ("fader etter %ds, skjulte faner og bakgrunn"):format(ns.data.chat.fadeAfter),
+        id = "__chat", label = "Clean chat", group = "Chat",
+        old = ns.db.chatTweaks and "on" or "default",
+        new = ("fades after %ds, hidden tabs and background"):format(ns.data.chat.fadeAfter),
         enabled = ns.Enabled("fade", "__chat", true),
-        note = "Chat-linjer forsvinner etter litt tid (scroll eller hold musen over for å se dem igjen). Faner og bakgrunn vises bare ved mouseover.",
+        note = "Chat lines disappear after a while (scroll or hover to see them again). Tabs and background only show on mouseover.",
     }
     return items
 end
@@ -181,20 +181,20 @@ function Fade:Restore(snap)
 end
 
 ------------------------------------------------------------------------
--- Ved login
+-- On login
 ------------------------------------------------------------------------
 ns.On("PLAYER_ENTERING_WORLD", function()
     if ns.db.chatTweaks then Fade:ApplyChat() end
     if ns.db.fade and next(ns.db.fade) then Fade:Start() end
 end)
 
-ns.AddCommand("fade", "slår all fading av/på midlertidig (til neste /reload)", function()
+ns.AddCommand("fade", "temporarily toggles all fading on/off (until next /reload)", function()
     ns.fadePaused = not ns.fadePaused
     if ns.fadePaused then
         Fade:ResetAlpha()
-        ns.Print("Fading av. Skriv /mlz fade igjen for å slå på.")
+        ns.Print("Fading off. Type /mlz fade again to turn it on.")
     else
         Fade:Start()
-        ns.Print("Fading på.")
+        ns.Print("Fading on.")
     end
 end)

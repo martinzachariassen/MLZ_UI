@@ -1,7 +1,7 @@
 -- MLZ UI: Probe
--- /mlz probe samler info om klienten (API-er, CVars, Edit Mode, bindings) og lagrer
--- det i MLZUIDB.probe. Etter /reload eller logout ligger alt i
--- WTF/Account/<konto>/SavedVariables/MLZ_UI.lua, slik at vi kan verifisere i stedet for å gjette.
+-- /mlz probe collects info about the client (APIs, CVars, Edit Mode, bindings) and stores
+-- it in MLZUIDB.probe. After /reload or logout everything is in
+-- WTF/Account/<account>/SavedVariables/MLZ_UI.lua, so we can verify instead of guessing.
 
 local _, ns = ...
 
@@ -50,7 +50,7 @@ local EXTRA_CVARS = {
 
 local function SafeCopy(v, depth)
     depth = depth or 0
-    if depth > 8 then return "<for dypt>" end
+    if depth > 8 then return "<too deep>" end
     local t = type(v)
     if t == "table" then
         local out = {}
@@ -104,7 +104,7 @@ function ns.RunProbe(silent)
     for _, row in ipairs(ns.data.cvars or {}) do p.cvars[row.name] = CVarInfo(row.name) end
     for _, name in ipairs(EXTRA_CVARS) do p.cvars[name] = CVarInfo(name) end
 
-    -- Alle Enum-tabeller som har med Edit Mode å gjøre
+    -- All Enum tables related to Edit Mode
     p.enums = {}
     if Enum then
         for k, v in pairs(Enum) do
@@ -113,7 +113,7 @@ function ns.RunProbe(silent)
     end
     if Constants and Constants.EditModeConsts then p.enums.EditModeConsts = SafeCopy(Constants.EditModeConsts) end
 
-    -- Edit Mode-layouts (rå fra C_EditMode, samt listen Blizzard-UI-et ser inkl. presets)
+    -- Edit Mode layouts (raw from C_EditMode, plus the list the Blizzard UI sees incl. presets)
     p.editMode = {}
     if C_EditMode and C_EditMode.GetLayouts then
         local ok, info = pcall(C_EditMode.GetLayouts)
@@ -134,7 +134,7 @@ function ns.RunProbe(silent)
         end
     end
 
-    -- Alle bindings
+    -- All bindings
     p.bindings = { set = GetCurrentBindingSet and GetCurrentBindingSet() or nil, list = {} }
     if GetNumBindings and GetBinding then
         for i = 1, GetNumBindings() do
@@ -145,7 +145,7 @@ function ns.RunProbe(silent)
         end
     end
 
-    -- Action bar-synlighet
+    -- Action bar visibility
     if GetActionBarToggles then
         p.actionBarToggles = { GetActionBarToggles() }
     end
@@ -157,7 +157,7 @@ function ns.RunProbe(silent)
         end
     end
 
-    -- Edit Mode slider-info (min/max/steg) per system, for å verifisere konverteringen av størrelser
+    -- Edit Mode slider info (min/max/step) per system, to verify size conversion
     local mgr = EditModeSettingDisplayInfoManager
     if mgr and type(mgr.systemSettingDisplayInfo) == "table" then
         p.editMode.displayInfo = SafeCopy(mgr.systemSettingDisplayInfo)
@@ -174,20 +174,20 @@ function ns.RunProbe(silent)
     ns.db.probe = p
     if silent then return end
 
-    -- Kort oppsummering i chat
-    ns.Print(("Build %s (%s), toc %s. Skjerm %dx%d, UIParent %.0fx%.0f, skala %.3f"):format(
+    -- Short summary in chat
+    ns.Print(("Build %s (%s), toc %s. Screen %dx%d, UIParent %.0fx%.0f, scale %.3f"):format(
         tostring(version), tostring(build), tostring(toc), pw or 0, ph or 0,
         UIParent:GetWidth(), UIParent:GetHeight(), UIParent:GetEffectiveScale()))
     local missing = {}
     for _, name in ipairs(API_LIST) do if not p.api[name] then missing[#missing + 1] = name end end
-    ns.Print("Mangler API:", #missing > 0 and table.concat(missing, ", ") or "ingen")
+    ns.Print("Missing APIs:", #missing > 0 and table.concat(missing, ", ") or "none")
     local layouts = p.editMode.raw and p.editMode.raw.layouts
-    ns.Print("Edit Mode: lagrede layouts =", layouts and #layouts or "?",
-        ", aktiv =", p.editMode.raw and p.editMode.raw.activeLayout or "?",
+    ns.Print("Edit Mode: saved layouts =", layouts and #layouts or "?",
+        ", active =", p.editMode.raw and p.editMode.raw.activeLayout or "?",
         ", presets =", p.editMode.presetCount or "?")
-    ns.Print("Probe lagret. Skriv |cffffff00/reload|r så havner den i SavedVariables/MLZ_UI.lua.")
+    ns.Print("Probe saved. Type |cffffff00/reload|r to write it to SavedVariables/MLZ_UI.lua.")
 end
 
-ns.AddCommand("probe", "samler klient-info til verifisering (lagres i SavedVariables)", function()
+ns.AddCommand("probe", "collects client info for verification (saved in SavedVariables)", function()
     ns.RunProbe()
 end)

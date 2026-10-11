@@ -1,18 +1,18 @@
 -- MLZ UI: Core
--- Felles namespace, SavedVariables, event-bus, kamp-kø og slash-kommandoer.
+-- Shared namespace, SavedVariables, event bus, combat queue and slash commands.
 
 local ADDON, ns = ...
-MLZUI = ns -- global for /dump MLZUI under utvikling
+MLZUI = ns -- global for /dump MLZUI during development
 
 ns.name = "MLZ UI"
 ns.version = "0.5.0"
-ns.modules = {}       -- registrerte moduler i rekkefølge (Scale, Settings, Layout, Bindings)
-ns.data = {}          -- data-tabeller (Data/*.lua)
+ns.modules = {}       -- registered modules in order (Scale, Settings, Layout, Bindings)
+ns.data = {}          -- data tables (Data/*.lua)
 
 local DB_VERSION = 1
 
 ------------------------------------------------------------------------
--- Utskrift
+-- Output
 ------------------------------------------------------------------------
 local PREFIX = "|cff33ccffMLZ UI|r: "
 
@@ -27,7 +27,7 @@ function ns.Debug(...)
 end
 
 ------------------------------------------------------------------------
--- Hjelpefunksjoner
+-- Helpers
 ------------------------------------------------------------------------
 function ns.CopyTable(src)
     if type(src) ~= "table" then return src end
@@ -36,7 +36,7 @@ function ns.CopyTable(src)
     return t
 end
 
--- Husker av/på-valg fra veiviseren per modul og element
+-- Remembers on/off choices from the wizard per module and item
 function ns.Enabled(modKey, id, default)
     local v = ns.db and ns.db.toggles[modKey .. ":" .. tostring(id)]
     if v == nil then return default end
@@ -47,18 +47,18 @@ function ns.SetEnabled(modKey, id, value)
     ns.db.toggles[modKey .. ":" .. tostring(id)] = value and true or false
 end
 
--- Kaller f trygt og returnerer ok, resultat...
+-- Calls f safely and returns ok, result...
 function ns.Try(f, ...)
-    if type(f) ~= "function" then return false, "ikke en funksjon" end
+    if type(f) ~= "function" then return false, "not a function" end
     return pcall(f, ...)
 end
 
 ------------------------------------------------------------------------
--- Moduler
--- En modul er en tabell med:
---   key, title          -- id og visningsnavn
---   :Preview()          -- returnerer liste med { id, label, old, new, enabled, note, conflict }
---   :Apply(items)       -- utfører valgte endringer (items = de som har enabled = true)
+-- Modules
+-- A module is a table with:
+--   key, title          -- id and display name
+--   :Preview()          -- returns a list of { id, label, old, new, enabled, note, conflict }
+--   :Apply(items)       -- applies selected changes (items = those with enabled = true)
 ------------------------------------------------------------------------
 function ns.RegisterModule(mod)
     ns.modules[#ns.modules + 1] = mod
@@ -85,19 +85,19 @@ eventFrame:SetScript("OnEvent", function(_, event, ...)
     if not list then return end
     for i = 1, #list do
         local ok, err = pcall(list[i], event, ...)
-        if not ok then ns.Print("|cffff4444Feil i", event .. ":|r", err) end
+        if not ok then ns.Print("|cffff4444Error in", event .. ":|r", err) end
     end
 end)
 
 ------------------------------------------------------------------------
--- Kamp-kø: ting som er blokkert i kamp kjøres når kampen er over
+-- Combat queue: things blocked in combat run when combat ends
 ------------------------------------------------------------------------
 local queue = {}
 
 function ns.RunOutOfCombat(fn, label)
     if InCombatLockdown() then
         table.insert(queue, { fn = fn, label = label })
-        ns.Print("I kamp. Kjører", label or "endringen", "når kampen er over.")
+        ns.Print("In combat. Running", label or "the change", "when combat ends.")
         return false
     end
     fn()
@@ -108,7 +108,7 @@ ns.On("PLAYER_REGEN_ENABLED", function()
     while #queue > 0 do
         local job = table.remove(queue, 1)
         local ok, err = pcall(job.fn)
-        if not ok then ns.Print("|cffff4444Feil i kø-jobb|r", job.label or "", err) end
+        if not ok then ns.Print("|cffff4444Error in queued job|r", job.label or "", err) end
     end
 end)
 
@@ -117,13 +117,13 @@ end)
 ------------------------------------------------------------------------
 local defaults = {
     dbVersion = DB_VERSION,
-    installed = false,     -- har veiviseren blitt fullført?
+    installed = false,     -- has the wizard been completed?
     debug = false,
-    scale = { mode = "auto" },   -- se Modules/Scale.lua
+    scale = { mode = "auto" },   -- see Modules/Scale.lua
     movement = "ESDF",
-    spellQueueWindow = nil,      -- nil = ikke rør
-    toggles = {},                -- ["modul:id"] = true/false, husker valg i veiviseren
-    backup = nil,                -- se Modules/Backup.lua
+    spellQueueWindow = nil,      -- nil = don't touch
+    toggles = {},                -- ["module:id"] = true/false, remembers wizard choices
+    backup = nil,                -- see Modules/Backup.lua
 }
 
 local function ApplyDefaults(db, def)
@@ -133,7 +133,7 @@ local function ApplyDefaults(db, def)
 end
 
 local function Migrate(db)
-    -- Fremtidige migreringer: if db.dbVersion < 2 then ... end
+    -- Future migrations: if db.dbVersion < 2 then ... end
     db.dbVersion = DB_VERSION
 end
 
@@ -146,7 +146,7 @@ ns.On("ADDON_LOADED", function(_, name)
 end)
 
 ns.On("PLAYER_LOGIN", function()
-    ns.Print("lastet (v" .. ns.version .. "). Skriv |cffffff00/mlz|r for hjelp.")
+    ns.Print("loaded (v" .. ns.version .. "). Type |cffffff00/mlz|r for help.")
     C_Timer.After(5, function()
         if ns.RunProbe then pcall(ns.RunProbe, true) end
     end)
@@ -158,7 +158,7 @@ ns.On("PLAYER_LOGIN", function()
 end)
 
 ------------------------------------------------------------------------
--- Slash-kommandoer
+-- Slash commands
 ------------------------------------------------------------------------
 local commands = {}
 
@@ -167,7 +167,7 @@ function ns.AddCommand(name, help, fn)
 end
 
 local function ShowHelp()
-    ns.Print("kommandoer:")
+    ns.Print("commands:")
     local names = {}
     for name in pairs(commands) do names[#names + 1] = name end
     table.sort(names)
@@ -176,9 +176,9 @@ local function ShowHelp()
     end
 end
 
-ns.AddCommand("debug", "slår debug-utskrift av/på", function()
+ns.AddCommand("debug", "toggles debug output on/off", function()
     ns.db.debug = not ns.db.debug
-    ns.Print("debug:", ns.db.debug and "på" or "av")
+    ns.Print("debug:", ns.db.debug and "on" or "off")
 end)
 
 SLASH_MLZUI1 = "/mlz"

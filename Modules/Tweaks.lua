@@ -1,25 +1,25 @@
--- MLZ UI: Småjusteringer
---   * Skjul "All Objectives"-linjen øverst i quest trackeren, eller hele trackeren
---   * /mlz map: slider for størrelsen på minimap (lagres i Edit Mode-layouten)
+-- MLZ UI: Tweaks
+--   * Hide the "All Objectives" line at the top of the quest tracker, or the whole tracker
+--   * /mlz map: slider for the minimap size (saved in the Edit Mode layout)
 --
--- Endrer bare alpha/skala på Blizzard-frames som ikke er beskyttet, så det er trygt og gir ikke taint.
+-- Only changes alpha/scale on unprotected Blizzard frames, so it is safe and causes no taint.
 
 local _, ns = ...
 
-local Tweaks = ns.RegisterModule({ key = "tweaks", title = "Småjusteringer" })
+local Tweaks = ns.RegisterModule({ key = "tweaks", title = "Tweaks" })
 
 local OPTIONS = {
-    { id = "trackerHeader", label = 'Skjul "All Objectives"-linjen',
-      desc = "Fjerner overskriften/fanen øverst i quest trackeren. Questene vises fortsatt, og hver seksjon (Quests osv.) kan fortsatt foldes sammen. /mlz tracker slår den av/på." },
-    { id = "trackerHide", label = "Skjul hele quest trackeren", default = false,
-      desc = "Ingen trackede quests på skjermen i det hele tatt. Questloggen (L) og quest-markeringer på kartet virker som før. /mlz quests slår den av/på når som helst." },    { id = "fps", label = "FPS-teller nede i høyre hjørne", group = "Info",
-      desc = "Liten tekst helt nede til høyre: FPS (grønn/gul/rød) og ping i ms. Klikker går gjennom den. /mlz fps slår den av/på." },
+    { id = "trackerHeader", label = 'Hide the "All Objectives" line',
+      desc = "Removes the header/tab at the top of the quest tracker. Quests are still shown, and each section (Quests etc.) can still be collapsed. /mlz tracker toggles it." },
+    { id = "trackerHide", label = "Hide the entire quest tracker", default = false,
+      desc = "No tracked quests on screen at all. The quest log (L) and quest markers on the map work as before. /mlz quests toggles it at any time." },    { id = "fps", label = "FPS counter in the bottom-right corner", group = "Info",
+      desc = "Small text in the bottom-right corner: FPS (green/yellow/red) and ping in ms. Clicks pass through it. /mlz fps toggles it." },
 }
 
 local function Cfg() return ns.db and ns.db.tweaks end
 
 ------------------------------------------------------------------------
--- Quest tracker-overskrift
+-- Quest tracker header
 ------------------------------------------------------------------------
 local headerHooked = false
 local function TrackerHeader()
@@ -33,7 +33,7 @@ local function TrackerHeader()
     if header.MinimizeButton then header.MinimizeButton:EnableMouse(not hide) end
     if not headerHooked then
         headerHooked = true
-        -- Blizzard kan sette alpha på nytt (hover/oppdatering); hold den skjult
+        -- Blizzard may reset the alpha (hover/update); keep it hidden
         local busy = false
         hooksecurefunc(header, "SetAlpha", function(self, a)
             local c = Cfg()
@@ -46,9 +46,9 @@ local function TrackerHeader()
 end
 
 ------------------------------------------------------------------------
--- Hele quest trackeren
--- Trackeren kan ha beskyttede quest-item-knapper, så Hide() kjøres bare utenfor kamp.
--- Vises den i kamp, gjøres den usynlig med alpha til kampen er over.
+-- Entire quest tracker
+-- The tracker may have protected quest item buttons, so Hide() only runs out of combat.
+-- If it is shown in combat, it is made invisible via alpha until combat ends.
 ------------------------------------------------------------------------
 local TRACKERS = { "ObjectiveTrackerFrame", "QuestWatchFrame" }
 local trackerHooked = {}
@@ -61,7 +61,7 @@ local function HideTracker(frame)
         ns.RunOutOfCombat(function()
             local c2 = Cfg()
             if c2 and c2.trackerHide then frame:Hide() end
-        end, "skjuling av quest tracker")
+        end, "hiding quest tracker")
     else
         frame:Hide()
     end
@@ -83,16 +83,16 @@ local function TrackerVisibility()
                 ns.RunOutOfCombat(function()
                     frame:SetAlpha(1)
                     frame:Show()
-                    -- La Blizzard bygge innholdet på nytt
+                    -- Let Blizzard rebuild the contents
                     if frame.Update then pcall(frame.Update, frame) end
-                end, "visning av quest tracker")
+                end, "showing quest tracker")
             end
         end
     end
 end
 
 ------------------------------------------------------------------------
--- FPS-teller (nede i høyre hjørne, under bag-knappene)
+-- FPS counter (bottom-right corner, below the bag buttons)
 ------------------------------------------------------------------------
 local fpsFrame
 local function FpsColor(fps)
@@ -147,15 +147,15 @@ function Tweaks:Refresh()
     pcall(Fps)
 end
 
-ns.AddCommand("fps", "viser/skjuler FPS-telleren nede til høyre", function()
+ns.AddCommand("fps", "shows/hides the FPS counter in the bottom right", function()
     ns.db.tweaks = ns.db.tweaks or {}
     ns.db.tweaks.fps = not ns.db.tweaks.fps
     Tweaks:Refresh()
-    ns.Print("FPS-teller:", ns.db.tweaks.fps and "på" or "av")
+    ns.Print("FPS counter:", ns.db.tweaks.fps and "on" or "off")
 end)
 
 ------------------------------------------------------------------------
--- Minimap-størrelse (/mlz map)
+-- Minimap size (/mlz map)
 ------------------------------------------------------------------------
 local MAP_MIN, MAP_MAX, MAP_STEP = 50, 200, 10
 
@@ -179,10 +179,10 @@ local function SaveMap(size)
     PreviewMap(size)
     local ok, err = ns.modules.layout:UpdateOne("minimap", "Size", size)
     if ok then
-        ns.Print("Minimap-størrelse:", size .. "%. Lagret i Edit Mode-layouten.")
+        ns.Print("Minimap size:", size .. "%. Saved in the Edit Mode layout.")
     else
-        ns.Print("Minimap satt til", size .. "% nå, men ble ikke lagret i layouten:", tostring(err),
-            "(den brukes neste gang du kjører layout-steget i /mlz install)")
+        ns.Print("Minimap set to", size .. "% for now, but it was not saved in the layout:", tostring(err),
+            "(it will be used the next time you run the layout step in /mlz install)")
     end
 end
 
@@ -198,7 +198,7 @@ local function OpenMapSlider()
         f:RegisterForDrag("LeftButton")
         f:SetScript("OnDragStart", f.StartMoving)
         f:SetScript("OnDragStop", f.StopMovingOrSizing)
-        f.title = ns.W.Text(f, "GameFontHighlight", "MLZ UI: Minimap-størrelse", "CENTER")
+        f.title = ns.W.Text(f, "GameFontHighlight", "MLZ UI: Minimap size", "CENTER")
         f.title:SetPoint("TOP", 0, -5)
 
         local s = CreateFrame("Slider", nil, f)
@@ -229,16 +229,16 @@ local function OpenMapSlider()
         end)
         f.slider = s
 
-        local save = ns.W.Button(f, "Lagre", 90, 22, function()
+        local save = ns.W.Button(f, "Save", 90, 22, function()
             f.saved = true
             SaveMap(f.current)
             f:Hide()
         end)
         save:SetPoint("BOTTOMRIGHT", -12, 10)
-        local reset = ns.W.Button(f, "Standard (130%)", 120, 22, function() s:SetValue(130) end)
+        local reset = ns.W.Button(f, "Default (130%)", 120, 22, function() s:SetValue(130) end)
         reset:SetPoint("BOTTOMLEFT", 12, 10)
 
-        -- Lukket uten å lagre: tilbake til slik den var
+        -- Closed without saving: revert to how it was
         f:SetScript("OnHide", function()
             if not f.saved and f.original then PreviewMap(f.original) end
         end)
@@ -252,27 +252,27 @@ local function OpenMapSlider()
     mapFrame:Show()
 end
 
-ns.AddCommand("map", "endrer størrelsen på minimap (slider, eller f.eks. /mlz map 120)", function(arg)
+ns.AddCommand("map", "changes the minimap size (slider, or e.g. /mlz map 120)", function(arg)
     local n = tonumber(arg)
     if n then SaveMap(n) else OpenMapSlider() end
 end)
 
-ns.AddCommand("quests", "skjuler/viser hele quest trackeren", function()
+ns.AddCommand("quests", "hides/shows the entire quest tracker", function()
     ns.db.tweaks = ns.db.tweaks or {}
     ns.db.tweaks.trackerHide = not ns.db.tweaks.trackerHide
     Tweaks:Refresh()
-    ns.Print("Quest tracker:", ns.db.tweaks.trackerHide and "skjult" or "vises")
+    ns.Print("Quest tracker:", ns.db.tweaks.trackerHide and "hidden" or "shown")
 end)
 
-ns.AddCommand("tracker", 'skjuler/viser "All Objectives"-linjen i quest trackeren', function()
+ns.AddCommand("tracker", 'hides/shows the "All Objectives" line in the quest tracker', function()
     ns.db.tweaks = ns.db.tweaks or {}
     ns.db.tweaks.trackerHeader = not ns.db.tweaks.trackerHeader
     Tweaks:Refresh()
-    ns.Print('"All Objectives"-linjen:', ns.db.tweaks.trackerHeader and "skjult" or "vises")
+    ns.Print('"All Objectives" line:', ns.db.tweaks.trackerHeader and "hidden" or "shown")
 end)
 
 ------------------------------------------------------------------------
--- Modulgrensesnitt
+-- Module interface
 ------------------------------------------------------------------------
 function Tweaks:Preview()
     local items = {}
@@ -281,16 +281,16 @@ function Tweaks:Preview()
     for _, o in ipairs(OPTIONS) do
         local item = {
             id = o.id, label = o.label, group = o.group or "Quest tracker", note = o.desc,
-            old = (cur and cur[o.id]) and (o.group and "på" or "skjult") or (o.group and "av" or "vises"),
-            new = o.group and "på" or "skjult",
+            old = (cur and cur[o.id]) and (o.group and "on" or "hidden") or (o.group and "off" or "shown"),
+            new = o.group and "on" or "hidden",
             enabled = ns.Enabled("tweaks", o.id, o.default ~= false),
         }
         if cur and cur[o.id] then item.alreadySet = true end
         if o.id == "trackerHide" and not (_G.ObjectiveTrackerFrame or _G.QuestWatchFrame) then
-            item.unavailable, item.new, item.enabled = true, "fant ikke trackeren", false
+            item.unavailable, item.new, item.enabled = true, "tracker not found", false
         end
         if o.id == "trackerHeader" and not hasTracker then
-            item.unavailable, item.new, item.enabled = true, "fant ikke overskriften", false
+            item.unavailable, item.new, item.enabled = true, "header not found", false
         end
         items[#items + 1] = item
     end
@@ -317,7 +317,7 @@ end
 ns.On("PLAYER_ENTERING_WORLD", function()
     if Cfg() then
         Tweaks:Refresh()
-        C_Timer.After(2, function() Tweaks:Refresh() end) -- trackeren bygges litt senere
+        C_Timer.After(2, function() Tweaks:Refresh() end) -- the tracker is built a bit later
     end
     local ov = ns.db.overrides
     if ov and ov.minimapSize then PreviewMap(ov.minimapSize) end

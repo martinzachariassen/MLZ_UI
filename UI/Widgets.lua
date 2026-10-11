@@ -1,4 +1,4 @@
--- MLZ UI: Små UI-byggeklosser for veiviseren
+-- MLZ UI: Small UI building blocks for the wizard
 
 local _, ns = ...
 
@@ -32,7 +32,7 @@ function W.Check(parent, label, onClick)
     return c
 end
 
--- Scrollbar liste: et ScrollFrame med en innholdsframe
+-- Scrollable list: a ScrollFrame with a content frame
 function W.ScrollArea(parent)
     local sf = CreateFrame("ScrollFrame", nil, parent, "UIPanelScrollFrameTemplate")
     local content = CreateFrame("Frame", nil, sf)
@@ -43,7 +43,7 @@ function W.ScrollArea(parent)
     return sf
 end
 
--- Tooltip-hjelper
+-- Tooltip helper
 function W.Tooltip(frame, title, text)
     frame:SetScript("OnEnter", function(self)
         if not title and not text then return end
@@ -55,7 +55,7 @@ function W.Tooltip(frame, title, text)
     frame:SetScript("OnLeave", function() GameTooltip:Hide() end)
 end
 
--- Fargekoder
+-- Color codes
 W.C = {
     gold = "|cffffd100", grey = "|cff808080", red = "|cffff5555", green = "|cff55ff55",
     blue = "|cff33ccff", white = "|cffffffff", r = "|r",

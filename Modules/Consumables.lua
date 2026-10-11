@@ -1,14 +1,14 @@
--- MLZ UI: Auto-bar for forbruksvarer
--- En liten bar over chatten som fyller seg selv med det beste du har i bagen: mat, drikke,
--- buff-mat, potions, healthstone, mana gem, bandages og elixirs. Ingen hotkeys, bare klikk.
--- Kategorier og rekkefølge: Data/Consumables.lua. Plassering: ns.data.utilBarPos i Data/Layout.lua.
+-- MLZ UI: Auto bar for consumables
+-- A small bar above the chat that fills itself with the best you have in your bags: food, drink,
+-- buff food, potions, healthstone, mana gem, bandages and elixirs. No hotkeys, just click.
+-- Categories and order: Data/Consumables.lua. Position: ns.data.utilBarPos in Data/Layout.lua.
 --
--- Knappene er Blizzards sikre "item"-knapper (som RXPGuides/AutoBar bruker), så de virker i kamp.
--- Hvilket item en knapp bruker kan bare byttes utenfor kamp; i kamp oppdateres bare antall og cooldown.
+-- The buttons are Blizzard's secure "item" buttons (as used by RXPGuides/AutoBar), so they work in combat.
+-- Which item a button uses can only be changed out of combat; in combat only count and cooldown are updated.
 
 local _, ns = ...
 
-local CB = ns.RegisterModule({ key = "consumables", title = "Forbruksvarer" })
+local CB = ns.RegisterModule({ key = "consumables", title = "Consumables" })
 
 local CIS = C_Item or {}
 local CC = C_Container or {}
@@ -24,7 +24,7 @@ local GetCooldown = CC.GetItemCooldown or GetItemCooldown
 local function Cfg() return ns.db and ns.db.consumables end
 
 ------------------------------------------------------------------------
--- Klassifisering av items (resultatet huskes per item-ID)
+-- Item classification (result is cached per item ID)
 ------------------------------------------------------------------------
 local scanTip
 local function TooltipText(itemID)
@@ -59,7 +59,7 @@ local function Classify(itemID)
     local c = cache[itemID]
     if c then return c end
     local name, _, _, ilvl, minLevel = GetInfo(itemID)
-    if not name then pendingInfo = true return nil end -- ikke lastet ennå; GET_ITEM_INFO_RECEIVED tar det
+    if not name then pendingInfo = true return nil end -- not loaded yet; GET_ITEM_INFO_RECEIVED handles it
     local _, _, _, _, _, classID, subID = GetInfoInstant(itemID)
     local info = {
         name = name, classID = classID, subID = subID,
@@ -91,7 +91,7 @@ local function Better(a, b)
     return a.id < b.id
 end
 
--- Returnerer liste med { id, cat, label } i rekkefølge
+-- Returns a list of { id, cat, label } in order
 local function Pick()
     local playerLevel = UnitLevel("player") or 60
     local found, seen = {}, {}
@@ -122,7 +122,7 @@ local function Pick()
 end
 
 ------------------------------------------------------------------------
--- Baren
+-- The bar
 ------------------------------------------------------------------------
 local bar
 local buttons = {}
@@ -165,7 +165,7 @@ local function CreateButton(i)
     return b
 end
 
--- Antall og cooldown (trygt i kamp)
+-- Count and cooldown (safe in combat)
 local function UpdateCounts()
     for _, b in ipairs(buttons) do
         if b.itemID and b:IsShown() then
@@ -184,7 +184,7 @@ local function UpdateCounts()
     end
 end
 
--- Bytter hvilke items knappene bruker (bare utenfor kamp)
+-- Changes which items the buttons use (out of combat only)
 local dirty = false
 local function Rebuild()
     local cfg = Cfg()
@@ -219,7 +219,7 @@ local function BuildBar()
     bar:SetFrameStrata("MEDIUM")
 end
 
--- Samler mange BAG_UPDATE-events til én oppdatering
+-- Batches many BAG_UPDATE events into a single update
 local queued = false
 local function Queue()
     if queued then return end
@@ -246,26 +246,26 @@ ns.On("PLAYER_REGEN_ENABLED", function() if dirty then Rebuild() end end)
 ns.On("BAG_UPDATE_COOLDOWN", function() if bar then UpdateCounts() end end)
 ns.On("BAG_UPDATE", function() if bar then UpdateCounts() end end)
 
-ns.AddCommand("consumables", "slår auto-baren for food/potions av/på", function()
+ns.AddCommand("consumables", "toggles the food/potions auto bar on/off", function()
     ns.db.consumables = ns.db.consumables or {}
     ns.db.consumables.enabled = not ns.db.consumables.enabled
     CB:Refresh()
-    ns.Print("Auto-bar for forbruksvarer:", ns.db.consumables.enabled and "på" or "av",
-        InCombatLockdown() and "(etter kamp)" or "")
+    ns.Print("Consumables auto bar:", ns.db.consumables.enabled and "on" or "off",
+        InCombatLockdown() and "(after combat)" or "")
 end)
 
 ------------------------------------------------------------------------
--- Modulgrensesnitt
+-- Module interface
 ------------------------------------------------------------------------
 function CB:Preview()
     local cur = Cfg()
     local names = {}
     for _, def in ipairs(ns.data.consumables) do names[#names + 1] = def.label end
     return { {
-        id = "enabled", label = "Auto-bar for forbruksvarer (over chat)", group = "Barer uten hotkeys",
-        note = "Fyller seg selv med det beste du har av: " .. table.concat(names, ", ") ..
-               ". Bare kategorier du har noe av vises. /mlz consumables slår den av/på.",
-        old = (cur and cur.enabled) and "på" or "av", new = "på",
+        id = "enabled", label = "Consumables auto bar (above chat)", group = "Bars without hotkeys",
+        note = "Fills itself with the best you have of: " .. table.concat(names, ", ") ..
+               ". Only categories you have something of are shown. /mlz consumables toggles it on/off.",
+        old = (cur and cur.enabled) and "on" or "off", new = "on",
         enabled = ns.Enabled("consumables", "enabled", true),
         alreadySet = cur and cur.enabled or nil,
     } }

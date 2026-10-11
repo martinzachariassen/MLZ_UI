@@ -1,10 +1,10 @@
--- MLZ UI: Innstillinger (CVars)
--- Leser tabellen i Data/CVars.lua, sammenligner med dagens verdier og setter de valgte.
--- CVars som ikke finnes i klienten hoppes over.
+-- MLZ UI: Settings (CVars)
+-- Reads the table in Data/CVars.lua, compares it with the current values and sets the selected ones.
+-- CVars that don't exist in the client are skipped.
 
 local _, ns = ...
 
-local Settings = ns.RegisterModule({ key = "settings", title = "Innstillinger" })
+local Settings = ns.RegisterModule({ key = "settings", title = "Settings" })
 
 local function CVarExists(name)
     if C_CVar and C_CVar.GetCVarInfo then
@@ -26,7 +26,7 @@ function Settings:Preview()
     for _, row in ipairs(ns.data.cvars) do
         local item = { id = row.name, label = row.label, note = row.desc }
         if not CVarExists(row.name) then
-            item.old, item.new = "-", "finnes ikke"
+            item.old, item.new = "-", "not available"
             item.enabled, item.unavailable = false, true
         else
             item.old = GetCVar(row.name)
@@ -65,11 +65,11 @@ function Settings:Apply(items)
                 changed = changed + 1
                 if item.id == "SpellQueueWindow" then ns.db.spellQueueWindow = item.value end
             else
-                ns.Print("|cffff4444Kunne ikke sette|r", item.id, err)
+                ns.Print("|cffff4444Could not set|r", item.id, err)
             end
         end
     end
-    ns.Debug("CVars satt:", changed)
+    ns.Debug("CVars set:", changed)
 end
 
 function Settings:Restore(snap)
