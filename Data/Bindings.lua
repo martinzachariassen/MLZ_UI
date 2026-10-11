@@ -26,15 +26,22 @@ B.movement = {
 }
 
 -- 12 base keys per movement setup (left hand). The order = buttons 1-12 on the bar.
+-- Sorted by reach: the keys under resting fingers get the most-pressed buttons (rotation).
+--   ESDF: pinky rests on A (free), so A/Q are the best keys; R/T/G for the index finger.
+--         Numbers are a longer reach than with WASD (hand sits one key to the right), so 1 is left out.
+--         A MUST be in this list, otherwise it keeps Blizzard's default turn/strafe binding.
+--   WASD: 1-4 and Q/E are closest; 5 is a stretch, so it gets a cooldown instead of rotation.
+-- Free keys for later: ESDF = V, B, 5, 1.  WASD = G, V, T.
 B.baseKeys = {
-    ESDF = { "1", "2", "3", "4", "5", "Q", "W", "R", "T", "Z", "X", "C" },
-    WASD = { "1", "2", "3", "4", "5", "Q", "E", "R", "F", "Z", "X", "C" },
+    ESDF = { "Q", "W", "R", "T", "A", "G", "3", "4", "2", "Z", "X", "C" },
+    WASD = { "1", "2", "3", "4", "Q", "E", "R", "F", "5", "Z", "X", "C" },
 }
 
--- Role per button (shown in the setup wizard as a hint, does not affect the binding)
+-- Role per button (shown in the setup wizard as a hint, does not affect the binding).
+-- Shared by both movement setups, so keep baseKeys ordered to match.
 B.roles = {
-    "Rotation", "Rotation", "Rotation", "Rotation", "Rotation",
-    "Interrupt", "Defensive", "Main cooldown", "Secondary cooldown",
+    "Rotation", "Rotation", "Rotation", "Rotation", "Rotation", "Rotation",
+    "Interrupt", "Defensive", "Main cooldown",
     "Mobility", "CC/utility", "Dispel/utility",
 }
 

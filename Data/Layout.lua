@@ -5,7 +5,7 @@
 --
 --   [tracker]                                              [buffs][minimap]
 --
---   [party]                                                          [bar4][bar5]
+--                                                                    [bar4][bar5]
 --          [focus]               [swing ranged]                       (mouseover)
 --                                [swing main  ]
 --                     [stance]   [swing off   ]   [pet]
@@ -13,6 +13,7 @@
 --          [player]   [ bar 3  (Ctrl)  ]   [target]
 --                     [ bar 2  (Shift) ]
 --                     [ bar 1          ]
+--   [party / raid    ]   (5 per row, growing upward from here)
 --   [bar 6, separate ]
 --   [food/pots, auto ]
 --   [chat]            [ XP / rep, small]                    [meter][micro/bags]
@@ -21,7 +22,7 @@
 --   * The middle of the screen stays clear. Everything you need in combat is grouped at the bottom center.
 --   * The bars are tightly stacked (2 units apart), with no art, gryphons or empty slots.
 --   * Player and target flank the stack, so your eyes never travel further than the edge of the bars.
---   * Corners are for things you only glance at. Bags, micro menu and bars 4-5 are hidden until mouseover.
+--   * Corners are for things you only glance at. Bags, micro menu and bars 4-5 are hidden until mouseover. The meter only shows in a group.
 --
 -- Fields:
 --   point    = the point on the frame being anchored
@@ -71,6 +72,10 @@ local CHAT_H = 170                             -- chat height
 local UTIL_Y = CHAT_Y + CHAT_H + 28            -- auto bar for consumables (above the chat tabs)
 local UTIL_BTN = 32                            -- button size in both bars above chat
 ns.data.utilBarPos = { point = "BOTTOMLEFT", x = 6, y = UTIL_Y, size = UTIL_BTN, spacing = PAD }
+
+-- Party / raid frames: bottom left, directly above bar 6. 80 x 40 per frame, 5 per row = 400 wide (same as chat).
+local GROUP_W, GROUP_H, GROUP_ROW = 80, 40, 5
+local GROUP_Y = UTIL_Y + 2 * UTIL_BTN + 4 + 8  -- bar 6 sits at UTIL_Y + UTIL_BTN + 4 and is UTIL_BTN tall
 
 local MAIN_BAR = { Orientation = 0, NumRows = 1, NumIcons = 12, IconSize = ICON, IconPadding = PAD,
                    HideBarArt = 1, HideBarScrolling = 1, AlwaysShowButtons = 0 }
@@ -149,11 +154,19 @@ ns.data.layout = {
           point = "BOTTOMRIGHT", relPoint = "BOTTOM", relTo = "SwingTimerRangedFrame", x = -(HALF + GAP), y = 0,
           settingEnum = UF, settings = { FrameSize = 100 } },
 
-        -- Group: left side
+        -- Group: bottom left, right above bar 6 (and growing upward), so it sits close to the action but out of the middle.
+        -- Raid-style frames for both party and raid, same compact shape: 5 per row, tanks first, then healers, then dps.
+        -- A party is one row of 5, a 25-man is 5 rows, a 40-man is 8 rows.
         { label = "Party", system = "UnitFrame", indexEnum = UFI, index = "Party",
-          point = "LEFT", relPoint = "LEFT", x = 10, y = 60, settingEnum = UF, settings = { UseRaidStylePartyFrames = 1 } },
+          point = "BOTTOMLEFT", relPoint = "BOTTOMLEFT", x = 6, y = GROUP_Y,
+          settingEnum = UF, settings = {
+              UseRaidStylePartyFrames = 1, ShowPartyFrameBackground = 0, UseHorizontalGroups = 1,
+              FrameWidth = GROUP_W, FrameHeight = GROUP_H, DisplayBorder = 0, SortPlayersBy = 0, BuffIconSize = 50 } },
         { label = "Raid", system = "UnitFrame", indexEnum = UFI, index = "Raid",
-          point = "LEFT", relPoint = "LEFT", x = 10, y = 60 },
+          point = "BOTTOMLEFT", relPoint = "BOTTOMLEFT", x = 6, y = GROUP_Y,
+          settingEnum = UF, settings = {
+              RaidGroupDisplayType = 3, RowSize = GROUP_ROW, SortPlayersBy = 0,
+              FrameWidth = GROUP_W, FrameHeight = GROUP_H, DisplayBorder = 0, BuffIconSize = 50 } },
 
         -- Top right: minimap (130 %), small buffs to its left
         -- Size can be changed with /mlz map (stored in MLZUIDB.overrides.minimapSize and overrides 130 here).

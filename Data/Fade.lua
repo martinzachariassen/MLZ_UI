@@ -5,6 +5,7 @@
 --   "mouseover"    = invisible until you hover the mouse over it
 --   "combat"       = visible in combat, with a target or on mouseover, otherwise dimmed to `alpha`
 --   "hideInCombat" = visible out of combat, hidden in combat (except on mouseover)
+--   "group"        = visible in a party or raid (or on mouseover), invisible when solo
 -- frames = Blizzard frame names. All that exist in the client are affected (unknown names are ignored).
 --          Mousing over one of them shows the whole group.
 -- Everything is fully shown while Edit Mode is open.
@@ -21,6 +22,9 @@ ns.data.fade = {
     { id = "bags", label = "Bag buttons", mode = "mouseover", enabled = true,
       frames = { "BagsBar" },
       desc = "The bag icons. B opens all bags anyway." },
+    { id = "meter", label = "Damage meter (only in a group)", mode = "group", enabled = true,
+      frames = { "DamageMeter" },
+      desc = "Hidden when you are solo, shown in a party or raid. Hover over where it sits to peek at it solo." },
     { id = "bar23", label = "Bars 2 and 3 (out of combat)", mode = "combat", alpha = 0.25, enabled = true,
       frames = { "MultiBarBottomLeft", "MultiBarBottomRight" },
       desc = "Dimmed when you are out of combat with no target. Fully visible in combat or on mouseover." },

@@ -1,0 +1,197 @@
+-- MLZ UI: Nameplates (Platynator tank/DPS)
+-- Switches a few Platynator settings depending on stance: Defensive Stance = tank, all others = DPS.
+-- Platynator has no public profile API, so this goes through its own slash command
+-- (/platy config <name> <value>), which only handles simple values (numbers, text, on/off).
+-- Everything else (designs, colors, threat) stays the same in both modes.
+
+local _, ns = ...
+
+local DEFENSIVE_FORM = 2 -- Warrior: 1 = Battle, 2 = Defensive, 3 = Berserker
+
+local PRESETS = {
+    tank = {
+        not_target_alpha = 1,          -- all mobs fully visible so you can see threat
+        obscured_combat_alpha = 0.7,   -- mobs behind objects are still easy to see
+    },
+    dps = {
+        not_target_alpha = 0.75,       -- fades non-targets, focus on your target
+        obscured_combat_alpha = 0.4,
+    },
+}
+
+local current -- "tank" | "dps" | nil
+
+local function PlatynatorReady()
+    return C_AddOns.IsAddOnLoaded("Platynator") and SlashCmdList and SlashCmdList.Platynator
+end
+
+local function Set(mode, silent)
+    if not PlatynatorReady() then
+        if not silent then ns.Print("Platynator is not loaded.") end
+        return false
+    end
+    -- Platynator prints a line per setting; mute it while we apply the preset
+    local realPrint = print
+    print = function() end
+    for name, value in pairs(PRESETS[mode]) do
+        pcall(SlashCmdList.Platynator, "config " .. name .. " " .. value)
+    end
+    print = realPrint
+    if current ~= mode and not silent then
+        ns.Print("Nameplates:", mode == "tank" and "|cff4da6ffTANK|r" or "|cffffd100DPS|r")
+    end
+    current = mode
+    return true
+end
+
+local function Auto()
+    if not (ns.db and ns.db.nameplates and ns.db.nameplates.auto) then return end
+    if UnitClassBase and UnitClassBase("player") ~= "WARRIOR" then return end
+    Set(GetShapeshiftForm() == DEFENSIVE_FORM and "tank" or "dps")
+end
+
+ns.On("PLAYER_ENTERING_WORLD", function()
+    ns.db.nameplates = ns.db.nameplates or { auto = true }
+    C_Timer.After(1, Auto)
+end)
+ns.On("UPDATE_SHAPESHIFT_FORM", Auto)
+
+------------------------------------------------------------------------
+-- Design tidy, save/restore and export
+-- All writes go through Platynator's own import API (Platynator.API.ImportString),
+-- using the same string format as its Export button: PLATY!1! + base64(compress(CBOR)).
+------------------------------------------------------------------------
+local function Encode(tbl)
+    return "PLATY!1!" .. C_EncodingUtil.EncodeBase64(C_EncodingUtil.CompressString(C_EncodingUtil.SerializeCBOR(tbl)))
+end
+
+local function CanImport()
+    if not (C_AddOns.IsAddOnLoaded("Platynator") and Platynator and Platynator.API and Platynator.API.ImportString
+        and C_EncodingUtil and PLATYNATOR_CONFIG and PLATYNATOR_CURRENT_PROFILE) then
+        ns.Print("Platynator (or its import API) is not available.")
+        return false
+    end
+    if InCombatLockdown() then
+        ns.Print("Not in combat, please.")
+        return false
+    end
+    return true
+end
+
+local function CurrentProfile()
+    return PLATYNATOR_CONFIG.Profiles[PLATYNATOR_CURRENT_PROFILE]
+end
+
+-- Platynator prints a thank-you line on every import; mute it
+local function QuietImport(text, name)
+    local realPrint = print
+    print = function() end
+    local ok, err = pcall(Platynator.API.ImportString, text, name)
+    print = realPrint
+    return ok, err
+end
+
+local function Tidy()
+    if not CanImport() then return end
+    local cfg = ns.data.nameplates
+    local design = CurrentProfile().designs and CurrentProfile().designs[cfg.enemyDesign]
+    if not design then
+        ns.Print("Could not find the design", cfg.enemyDesign, "in the current Platynator profile.")
+        return
+    end
+    design = ns.CopyTable(design)
+    design.scale = cfg.tidy.scale
+    local changed = 0
+    for _, text in ipairs(design.texts or {}) do
+        if text.kind == "health" then
+            text.displayTypes = ns.CopyTable(cfg.tidy.healthText)
+            changed = changed + 1
+        end
+    end
+    design.addon, design.kind = "Platynator", "style"
+    local ok, err = QuietImport(Encode(design), cfg.enemyDesign)
+    if ok then
+        ns.Print(("Tidied %s: scale %s, %d health text(s) set to %s."):format(
+            cfg.enemyDesign, cfg.tidy.scale, changed, table.concat(cfg.tidy.healthText, "+")))
+    else
+        ns.Print("|cffff4444Import failed:|r", err)
+    end
+end
+
+local function ProfileString()
+    local profile = ns.CopyTable(CurrentProfile())
+    profile.addon, profile.version, profile.kind = "Platynator", 1, "profile"
+    return Encode(profile)
+end
+
+local function Save()
+    if not CanImport() then return end
+    ns.db.nameplates.snapshot = ProfileString()
+    ns.Print("Saved the current Platynator profile (" .. PLATYNATOR_CURRENT_PROFILE .. ") in MLZ UI.")
+end
+
+local function Load()
+    if not CanImport() then return end
+    local text = ns.db.nameplates.snapshot or ns.data.nameplates.profileString
+    if not text then
+        ns.Print("Nothing saved yet. Use /mlz np save first.")
+        return
+    end
+    local ok, err = QuietImport(text, PLATYNATOR_CURRENT_PROFILE)
+    if ok then
+        ns.Print("Restored the saved profile into", PLATYNATOR_CURRENT_PROFILE .. ".")
+    else
+        ns.Print("|cffff4444Import failed:|r", err)
+    end
+end
+
+local copyFrame
+local function ShowCopy(text)
+    if not copyFrame then
+        local f = CreateFrame("Frame", "MLZUINameplateCopy", UIParent, "BasicFrameTemplateWithInset")
+        f:SetSize(520, 160)
+        f:SetPoint("CENTER")
+        f:SetFrameStrata("DIALOG")
+        f.TitleText:SetText("MLZ UI: Platynator profile (Ctrl+C to copy)")
+        local box = CreateFrame("EditBox", nil, f, "InputBoxTemplate")
+        box:SetPoint("TOPLEFT", 16, -40)
+        box:SetPoint("BOTTOMRIGHT", -16, 16)
+        box:SetAutoFocus(true)
+        box:SetMaxLetters(0)
+        box:SetScript("OnEscapePressed", function() f:Hide() end)
+        f.box = box
+        copyFrame = f
+    end
+    copyFrame.box:SetText(text)
+    copyFrame.box:HighlightText()
+    copyFrame:Show()
+end
+
+ns.AddCommand("np", "nameplates: tank | dps | auto | off | tidy | save | load | export", function(arg)
+    arg = strlower(strtrim(arg or ""))
+    ns.db.nameplates = ns.db.nameplates or { auto = true }
+    if arg == "tidy" then
+        Tidy()
+    elseif arg == "save" then
+        Save()
+    elseif arg == "load" then
+        Load()
+    elseif arg == "export" then
+        if CanImport() then ShowCopy(ProfileString()) end
+    elseif arg == "tank" or arg == "dps" then
+        ns.db.nameplates.auto = false
+        Set(arg)
+        ns.Print("Auto stance switching is off. Use /mlz np auto to turn it back on.")
+    elseif arg == "auto" then
+        ns.db.nameplates.auto = true
+        current = nil
+        Auto()
+        ns.Print("Nameplates follow stance (Defensive = tank, otherwise DPS).")
+    elseif arg == "off" then
+        ns.db.nameplates.auto = false
+        ns.Print("Auto stance switching is off.")
+    else
+        ns.Print("Nameplates:", current or "unknown", "| auto:", ns.db.nameplates.auto and "on" or "off")
+        ns.Print("Use /mlz np tank, dps, auto, off, tidy, save, load or export.")
+    end
+end)

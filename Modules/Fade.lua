@@ -11,6 +11,7 @@ local MODE_TEXT = {
     mouseover = "hidden until mouseover",
     combat = "dimmed out of combat",
     hideInCombat = "hidden in combat",
+    group = "hidden when solo",
 }
 
 local function Frames(row)
@@ -28,7 +29,9 @@ end
 local touched = {} -- frames whose alpha we changed, so we can reset them
 
 local function TargetAlpha(row, hovered, inCombat, hasTarget)
-    if row.mode == "mouseover" then
+    if row.mode == "group" then
+        return (hovered or IsInGroup()) and 1 or 0
+    elseif row.mode == "mouseover" then
         return hovered and 1 or 0
     elseif row.mode == "combat" then
         return (inCombat or hasTarget or hovered) and 1 or (row.alpha or 0.3)
