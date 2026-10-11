@@ -55,9 +55,24 @@ function Bindings:Desired(movement)
     return list
 end
 
+-- What the movement keys are bound to right now (for the "Current" column)
+local function CurrentMovement()
+    for _, k in ipairs({ GetBindingKey("MOVEFORWARD") }) do
+        if k == "E" then return "ESDF" end
+        if k == "W" then return "WASD" end
+    end
+    return "custom"
+end
+
+-- The movement choice is only saved on Apply. Until then it lives here, so closing the
+-- wizard without applying leaves the saved setup alone.
+function Bindings:BeginWizard()
+    self.pendingMovement = nil
+end
+
 function Bindings:Preview()
     local D = ns.data.bindings
-    local movement = ns.db.movement or "ESDF"
+    local movement = self.pendingMovement or ns.db.movement or "ESDF"
     local desired = self:Desired(movement)
 
     local desiredKeys, desiredCommands = {}, {}
@@ -77,8 +92,8 @@ function Bindings:Preview()
     end
     items[#items + 1] = {
         id = MOVEMENT_ID, label = "Movement", group = "Setup",
-        old = "", new = movement, value = movement, choices = mchoices, choiceIndex = midx,
-        enabled = true, rebuild = true,
+        old = CurrentMovement(), new = movement, value = movement, choices = mchoices, choiceIndex = midx,
+        enabled = true, fixed = true,
         note = "ESDF gives more keys around your fingers. Click the value to switch (the list updates).",
     }
 
@@ -112,13 +127,14 @@ function Bindings:Preview()
                     items[#items + 1] = {
                         id = newKey, key = newKey, command = current, group = "Moved actions",
                         label = newKey, old = "", new = Pretty(current) .. "  |cff888888(was " .. d.key .. ")|r",
-                        enabled = item.enabled, displaced = true,
+                        enabled = ns.Enabled("bindings", newKey, true), displaced = true, requires = d.key,
+                        note = "Only moved if " .. d.key .. " is changed above.",
                     }
                 else
                     items[#items + 1] = {
                         id = "lost:" .. d.key, group = "Moved actions",
                         label = d.key, old = Pretty(current), new = "loses key",
-                        enabled = false, unavailable = true,
+                        enabled = false, unavailable = true, requires = d.key,
                         note = newKey .. " is taken. Set a new key for this in Blizzard's keybinding menu if you need it.",
                     }
                 end
@@ -135,7 +151,7 @@ function Bindings:Preview()
                     items[#items + 1] = {
                         id = "unbind:" .. k, key = k, unbind = true, group = "Extra keys to remove",
                         label = k, old = Pretty(d.command), new = "none",
-                        enabled = ns.Enabled("bindings", "unbind:" .. k, true),
+                        enabled = ns.Enabled("bindings", "unbind:" .. k, true), requires = d.key,
                         note = "The button already has " .. d.key .. ". With two keys Blizzard only shows the first, so " ..
                                d.key .. " would not be visible on the button.",
                     }
@@ -163,7 +179,7 @@ end
 
 function Bindings:OnChoice(item)
     if item.id == MOVEMENT_ID then
-        ns.db.movement = item.value
+        self.pendingMovement = item.value
         return true -- rebuild the list
     end
 end
@@ -177,7 +193,7 @@ local function BindingItems(items)
 end
 
 function Bindings:Backup(items)
-    local snap = { set = GetCurrentBindingSet and GetCurrentBindingSet() or nil, keys = {} }
+    local snap = { set = GetCurrentBindingSet and GetCurrentBindingSet() or nil, keys = {}, movement = ns.db.movement }
     for _, item in ipairs(BindingItems(items)) do
         snap.keys[item.key] = CurrentAction(item.key)
     end
@@ -197,18 +213,20 @@ function Bindings:Apply(items)
         if item.unbind then pcall(SetBinding, item.key) end
     end
     for _, item in ipairs(list) do
-        if item.unbind then
-            -- already done
-        else
-        local ok, result = pcall(SetBinding, item.key, item.command)
-        if ok and result ~= false then
-            n = n + 1
-        else
-            ns.Print("|cffff4444Could not bind|r", item.key, "->", item.command, ok and "" or result)
-        end
+        if not item.unbind then
+            local ok, result = pcall(SetBinding, item.key, item.command)
+            if ok and result ~= false then
+                n = n + 1
+            else
+                ns.Print("|cffff4444Could not bind|r", item.key, "->", item.command, ok and "" or result)
+            end
         end
     end
     Save()
+    for _, item in ipairs(items) do
+        if item.id == MOVEMENT_ID then ns.db.movement = item.value end
+    end
+    self.pendingMovement = nil
     ns.Debug("bindings set:", n)
 end
 
@@ -219,4 +237,5 @@ function Bindings:Restore(snap)
         if action ~= "" then SetBinding(key, action) end
     end
     Save(snap.set)
+    if snap.movement then ns.db.movement = snap.movement end
 end

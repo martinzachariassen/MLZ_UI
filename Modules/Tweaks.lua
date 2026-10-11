@@ -12,7 +12,8 @@ local OPTIONS = {
     { id = "trackerHeader", label = 'Hide the "All Objectives" line',
       desc = "Removes the header/tab at the top of the quest tracker. Quests are still shown, and each section (Quests etc.) can still be collapsed. /mlz tracker toggles it." },
     { id = "trackerHide", label = "Hide the entire quest tracker", default = false,
-      desc = "No tracked quests on screen at all. The quest log (L) and quest markers on the map work as before. /mlz quests toggles it at any time." },    { id = "fps", label = "FPS counter in the bottom-right corner", group = "Info",
+      desc = "No tracked quests on screen at all. The quest log (L) and quest markers on the map work as before. /mlz quests toggles it at any time." },
+    { id = "fps", label = "FPS counter in the bottom-right corner", group = "Info",
       desc = "Small text in the bottom-right corner: FPS (green/yellow/red) and ping in ms. Clicks pass through it. /mlz fps toggles it." },
     { id = "cleanCombatFont", label = "Clean combat text font", group = "Combat text",
       desc = "Uses Arial Narrow for floating damage and healing numbers. Needs a full game restart (not just /reload) to take effect." },
@@ -200,8 +201,8 @@ local function OpenMapSlider()
         f:RegisterForDrag("LeftButton")
         f:SetScript("OnDragStart", f.StartMoving)
         f:SetScript("OnDragStop", f.StopMovingOrSizing)
-        f.title = ns.W.Text(f, "GameFontHighlight", "MLZ UI: Minimap size", "CENTER")
-        f.title:SetPoint("TOP", 0, -5)
+        ns.W.SetTitle(f, "MLZ UI: Minimap size")
+        tinsert(UISpecialFrames, "MLZUI_MapSize") -- ESC closes (and reverts, see OnHide)
 
         local s = CreateFrame("Slider", nil, f)
         s:SetOrientation("HORIZONTAL")
@@ -281,13 +282,15 @@ function Tweaks:Preview()
     local cur = Cfg()
     local hasTracker = _G.ObjectiveTrackerFrame and _G.ObjectiveTrackerFrame.Header
     for _, o in ipairs(OPTIONS) do
+        local isOn = (cur and cur[o.id]) and true or false
+        local offText = o.group and "off" or "shown"
         local item = {
             id = o.id, label = o.label, group = o.group or "Quest tracker", note = o.desc,
-            old = (cur and cur[o.id]) and (o.group and "on" or "hidden") or (o.group and "off" or "shown"),
+            toggle = true, isOn = isOn, offText = offText,
+            old = isOn and (o.group and "on" or "hidden") or offText,
             new = o.group and "on" or "hidden",
-            enabled = ns.Enabled("tweaks", o.id, o.default ~= false),
+            enabled = isOn or ns.Enabled("tweaks", o.id, o.default ~= false),
         }
-        if cur and cur[o.id] then item.alreadySet = true end
         if o.id == "trackerHide" and not (_G.ObjectiveTrackerFrame or _G.QuestWatchFrame) then
             item.unavailable, item.new, item.enabled = true, "tracker not found", false
         end
@@ -305,7 +308,7 @@ end
 
 function Tweaks:Apply(items)
     local cfg = ns.CopyTable(ns.db.tweaks) or {}
-    for _, item in ipairs(items) do cfg[item.id] = true end
+    for _, item in ipairs(items) do cfg[item.id] = item.enabled or nil end -- unticked = turn off
     ns.db.tweaks = cfg
     self:Refresh()
 end

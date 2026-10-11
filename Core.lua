@@ -6,10 +6,10 @@ MLZUI = ns -- global for /dump MLZUI during development
 
 ns.name = "MLZ UI"
 ns.version = "0.5.0"
-ns.modules = {}       -- registered modules in order (Scale, Settings, Layout, Bindings)
+ns.modules = {}       -- registered modules, in load order (see MLZ_UI.toc), also indexed by key
 ns.data = {}          -- data tables (Data/*.lua)
 
-local DB_VERSION = 1
+local DB_VERSION = 2
 
 ------------------------------------------------------------------------
 -- Output
@@ -134,7 +134,10 @@ end
 
 -- migrations[n] upgrades a database from version n-1 to n. Add new steps at the end and bump DB_VERSION.
 local migrations = {
-    -- [2] = function(db) ... end,
+    -- v2: the RXP column became opt-in (a row in the wizard). Keep it on for existing installs.
+    [2] = function(db)
+        if db.installed and db.rxpColumn == nil then db.rxpColumn = true end
+    end,
 }
 
 local function Migrate(db)
@@ -157,7 +160,9 @@ ns.On("ADDON_LOADED", function(_, name)
 end)
 
 ns.On("PLAYER_LOGIN", function()
-    ns.Print("loaded (v" .. ns.version .. "). Type |cffffff00/mlz|r for help.")
+    if ns.db.debug or not ns.db.installed then
+        ns.Print("loaded (v" .. ns.version .. "). Type |cffffff00/mlz|r for help.")
+    end
     C_Timer.After(5, function()
         if ns.RunProbe then pcall(ns.RunProbe, true) end
     end)

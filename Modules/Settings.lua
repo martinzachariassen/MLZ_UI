@@ -41,13 +41,17 @@ function Settings:Preview()
                 end
                 item.choiceIndex = item.choiceIndex or 1
             end
-            local userChoice = ns.Enabled("settings", row.name, row.enabled)
-            item.enabled = userChoice
+            item.enabled = ns.Enabled("settings", row.name, row.enabled)
             item.alreadySet = Same(item.old, target)
         end
         items[#items + 1] = item
     end
     return items
+end
+
+-- Picking another value in the wizard can turn an "already set" row into a change (or back)
+function Settings:OnChoice(item)
+    item.alreadySet = Same(item.old, item.value)
 end
 
 function Settings:Backup(items)

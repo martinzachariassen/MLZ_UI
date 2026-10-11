@@ -1,4 +1,5 @@
--- MLZ UI: Settings for other addons (Prat, Auctionator, AtlasLoot, WhatsTraining, Bagnon, RXPGuides)
+-- MLZ UI: Settings for other addons (Prat, Auctionator, AtlasLoot, WhatsTraining, Bagnon, RXPGuides,
+-- Deadly Boss Mods, Leatrix Plus, Leatrix Maps)
 -- Edit this file to change what the wizard step "Other addons" sets. MLZ UI never downloads or
 -- updates these addons; it only configures the ones that are installed and loaded.
 --
@@ -8,6 +9,9 @@
 --   root    = function returning the table that `path` starts from (nil = not available yet)
 --   rows    = { id, label, desc, path = { "key", "subkey" }, value, enabled }
 --             `enabled = false` means the row is listed but off until you tick it.
+--             A row can have its own `root`. Instead of path/value a row can set several keys at
+--             once: set = { { path = {...}, value = ... }, ... } and show = "%s %s" (format for the
+--             wizard, one %s per key in order).
 --
 -- Keys come from each addon's own SavedVariables / defaults, so they only apply to the version
 -- you have installed. Rows whose key doesn't exist are skipped with "not available".
@@ -112,70 +116,53 @@ ns.data.addons = {
         rows = {
             { id = "scale", label = "Guide window scale", desc = "Scale of the guide window. Off by default: tick it if you want 1.1.",
               path = { "windowScale" }, value = 1.1, enabled = false },
-            { id = "lock_frames", label = "Lock frames", desc = "Locks the guide window against dragging (the arrow, targets and items are fixed in a column on the right by MLZ UI, see Data/RXP.lua).",
+            { id = "lock_frames", label = "Lock frames", desc = "Locks the guide window against dragging.",
               path = { "lockFrames" }, value = true },
+            { id = "column", label = "Fixed column on the right", desc = "MLZ UI places the guide, arrow, targets and items in one column on the right edge (see Data/RXP.lua). Needs /reload; when off, the boxes are movable again after /reload.",
+              root = function() return ns.db end, path = { "rxpColumn" }, value = true },
         },
     },
     -- Deadly Boss Mods. Positions are in UIParent units (same as the Edit Mode layout, 1200 units tall).
     -- The middle of the screen stays clear: timers on the right above the damage meter, warnings top center.
+    -- Each row sets several keys at once (`set`), shown with `show` in the wizard.
     {
-        addon = "DBM-Core", title = "Deadly Boss Mods (warnings)",
+        addon = "DBM-Core", title = "Deadly Boss Mods",
         root = function() return DBM and DBM.Options end,
         rows = {
-            { id = "warn_point", label = "Warning anchor", desc = "Normal warnings are anchored to the top center of the screen.",
-              path = { "WarningPoint" }, value = "TOP" },
-            { id = "warn_x", label = "Warning X", desc = "Centered horizontally.",
-              path = { "WarningX" }, value = 0 },
-            { id = "warn_y", label = "Warning Y", desc = "Above the swing timers and cast bar, out of the middle.",
-              path = { "WarningY" }, value = -230 },
-            { id = "warn_size", label = "Warning font size", desc = "18 instead of 20, quieter.",
-              path = { "WarningFontSize" }, value = 18 },
-            { id = "sw_point", label = "Special warning anchor", desc = "Big 'move / interrupt' warnings are anchored to the top center.",
-              path = { "SpecialWarningPoint" }, value = "TOP" },
-            { id = "sw_x", label = "Special warning X", desc = "Centered horizontally.",
-              path = { "SpecialWarningX" }, value = 0 },
-            { id = "sw_y", label = "Special warning Y", desc = "Just below the normal warnings, still in your field of view.",
-              path = { "SpecialWarningY" }, value = -290 },
-            { id = "sw_size", label = "Special warning font size", desc = "28 instead of 35: still clear, but it doesn't cover the screen.",
-              path = { "SpecialWarningFontSize2" }, value = 28 },
-            { id = "info_point", label = "Info frame anchor", desc = "Info frame (e.g. debuff lists) sits on the right, away from the middle.",
-              path = { "InfoFramePoint" }, value = "RIGHT" },
-            { id = "info_x", label = "Info frame X", desc = "Left of bars 4-5.",
-              path = { "InfoFrameX" }, value = -330 },
-            { id = "info_y", label = "Info frame Y", desc = "Slightly above the middle of the right edge.",
-              path = { "InfoFrameY" }, value = 160 },
-            { id = "range_point", label = "Range frame anchor", desc = "Range frame sits on the right, above the info frame.",
-              path = { "RangeFramePoint" }, value = "RIGHT" },
-            { id = "range_x", label = "Range frame X", desc = "Left of bars 4-5.",
-              path = { "RangeFrameX" }, value = -330 },
-            { id = "range_y", label = "Range frame Y", desc = "Above the info frame.",
-              path = { "RangeFrameY" }, value = 300 },
-            { id = "range_radar_point", label = "Radar anchor", desc = "Radar sits next to the range frame.",
-              path = { "RangeFrameRadarPoint" }, value = "RIGHT" },
-            { id = "range_radar_x", label = "Radar X", desc = "Left of bars 4-5.",
-              path = { "RangeFrameRadarX" }, value = -330 },
-            { id = "range_radar_y", label = "Radar Y", desc = "Above the info frame.",
-              path = { "RangeFrameRadarY" }, value = 300 },
+            { id = "warn", label = "Warnings", show = "%s %s,%s  %spt",
+              desc = "Normal warnings at the top center, above the cast bar, font 18 instead of 20.",
+              set = { { path = { "WarningPoint" }, value = "TOP" }, { path = { "WarningX" }, value = 0 },
+                      { path = { "WarningY" }, value = -230 }, { path = { "WarningFontSize" }, value = 18 } } },
+            { id = "sw", label = "Special warnings", show = "%s %s,%s  %spt",
+              desc = "Big 'move / interrupt' warnings just below the normal ones, font 28 instead of 35.",
+              set = { { path = { "SpecialWarningPoint" }, value = "TOP" }, { path = { "SpecialWarningX" }, value = 0 },
+                      { path = { "SpecialWarningY" }, value = -290 }, { path = { "SpecialWarningFontSize2" }, value = 28 } } },
+            { id = "info", label = "Info frame", show = "%s %s,%s",
+              desc = "Debuff lists etc. on the right, left of bars 4-5, away from the middle.",
+              set = { { path = { "InfoFramePoint" }, value = "RIGHT" }, { path = { "InfoFrameX" }, value = -330 },
+                      { path = { "InfoFrameY" }, value = 160 } } },
+            { id = "range", label = "Range frame", show = "%s %s,%s",
+              desc = "On the right, above the info frame.",
+              set = { { path = { "RangeFramePoint" }, value = "RIGHT" }, { path = { "RangeFrameX" }, value = -330 },
+                      { path = { "RangeFrameY" }, value = 300 } } },
+            { id = "radar", label = "Range radar", show = "%s %s,%s",
+              desc = "Next to the range frame.",
+              set = { { path = { "RangeFrameRadarPoint" }, value = "RIGHT" }, { path = { "RangeFrameRadarX" }, value = -330 },
+                      { path = { "RangeFrameRadarY" }, value = 300 } } },
         },
     },
     {
         addon = "DBM-StatusBarTimers", title = "Deadly Boss Mods (timer bars)",
         root = function() return DBT and DBT.Options end,
         rows = {
-            { id = "bar_point", label = "Timer anchor", desc = "Bars hang from the right edge, above the damage meter.",
-              path = { "TimerPoint" }, value = "BOTTOMRIGHT" },
-            { id = "bar_x", label = "Timer X", desc = "Left of bars 4-5 (mouseover).",
-              path = { "TimerX" }, value = -100 },
-            { id = "bar_y", label = "Timer Y", desc = "Above the damage meter.",
-              path = { "TimerY" }, value = 360 },
-            { id = "bar_up", label = "Grow upward", desc = "New bars stack upward, away from the damage meter.",
-              path = { "ExpandUpwards" }, value = true },
-            { id = "bar_width", label = "Bar width", desc = "Slimmer bars (170 instead of 183).",
-              path = { "Width" }, value = 170 },
-            { id = "bar_height", label = "Bar height", desc = "Thin bars (16 instead of 20).",
-              path = { "Height" }, value = 16 },
-            { id = "bar_scale", label = "Bar scale", desc = "Same size as the default.",
-              path = { "Scale" }, value = 0.9 },
+            { id = "position", label = "Timer position", show = "%s %s,%s  up: %s",
+              desc = "Bars hang from the right edge above the damage meter and stack upward.",
+              set = { { path = { "TimerPoint" }, value = "BOTTOMRIGHT" }, { path = { "TimerX" }, value = -100 },
+                      { path = { "TimerY" }, value = 360 }, { path = { "ExpandUpwards" }, value = true } } },
+            { id = "size", label = "Timer size", show = "%sx%s  x%s",
+              desc = "Slimmer bars: 170x16 instead of 183x20, at 90% scale.",
+              set = { { path = { "Width" }, value = 170 }, { path = { "Height" }, value = 16 },
+                      { path = { "Scale" }, value = 0.9 } } },
             { id = "huge", label = "No separate large bars", desc = "Bars stay in one stack instead of jumping to the center of the screen at 10 seconds.",
               path = { "HugeBarsEnabled" }, value = false },
         },

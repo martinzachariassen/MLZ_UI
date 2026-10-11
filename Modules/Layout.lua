@@ -133,17 +133,17 @@ function Layout:Preview()
         id = "__layout", label = "Layout \"" .. data.name .. "\"", group = "Setup",
         old = "active: " .. tostring(active.layoutName or "?"),
         new = exists and "will be updated and activated" or "will be created and activated",
-        enabled = true,
+        enabled = ns.Enabled("layout", "__layout", true),
         note = "Other layouts (e.g. your own) are not changed. You can switch back in Edit Mode or with /mlz undo.",
     }
     items[#items + 1] = {
         id = "__bars", label = "Show action bars", group = "Setup",
-        old = "", new = "Bar " .. table.concat(data.showBars, ", "), enabled = true,
+        old = "", new = "Bar " .. table.concat(data.showBars, ", "), enabled = ns.Enabled("layout", "__bars", true),
     }
     for i, spec in ipairs(data.frames) do
         local sys, err = FindSystem(active, spec)
         local item = {
-            id = "frame" .. i, spec = spec, label = spec.label, group = "Placement",
+            id = "frame" .. i, spec = spec, label = spec.label, group = "Placement", requires = "__layout",
             old = sys and AnchorText(sys.anchorInfo) or "-",
             new = spec.keepAnchor and "hidden"
                   or (AnchorText({ point = spec.point, relativeTo = spec.relTo, offsetX = spec.x, offsetY = spec.y }) .. SizeText(spec)),

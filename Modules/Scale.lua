@@ -79,6 +79,12 @@ end
 ------------------------------------------------------------------------
 -- Module interface
 ------------------------------------------------------------------------
+-- True when this mode is already saved and the screen is already at that scale
+function Scale:IsCurrent(mode)
+    return ns.db.scale.applied and (ns.db.scale.mode or "auto") == mode
+        and math.abs(UIParent:GetScale() - self:Compute(mode)) < 0.001
+end
+
 function Scale:Preview()
     local pw, ph = GetPhysicalScreenSize()
     local mode = ns.db.scale.mode or "auto"
@@ -95,10 +101,15 @@ function Scale:Preview()
             old = ("%.3f"):format(UIParent:GetScale()),
             new = choices[idx].text, value = mode,
             choices = choices, choiceIndex = idx,
-            enabled = true,
+            enabled = ns.Enabled("scale", "uiScale", true),
+            alreadySet = self:IsCurrent(mode),
             note = ("Screen %dx%d. Lower number = smaller UI and more of the world. The same number gives the same share of the screen at every resolution. Click the value to change it."):format(pw or 0, ph or 0),
         },
     }
+end
+
+function Scale:OnChoice(item)
+    item.alreadySet = self:IsCurrent(item.value)
 end
 
 function Scale:Backup()

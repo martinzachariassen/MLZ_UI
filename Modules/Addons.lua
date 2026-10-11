@@ -11,12 +11,19 @@ local function Loaded(folder)
     return C_AddOns.IsAddOnLoaded(folder)
 end
 
+-- A row sets one key (path/value) or several (set = { { path, value }, ... }).
+-- Parts() returns the list either way, so the code below only deals with lists.
+local function Parts(row)
+    if row.set then return row.set end
+    row._parts = row._parts or { { path = row.path, value = row.value } }
+    return row._parts
+end
+
 -- Walks `path` from the addon's root table. Returns the parent table and the last key,
 -- or nil if the root or an intermediate table is missing.
-local function Resolve(entry, row, create)
+local function Resolve(entry, row, path, create)
     local node = (row.root or entry.root)()
     if type(node) ~= "table" then return nil end
-    local path = row.path
     for i = 1, #path - 1 do
         local nextNode = node[path[i]]
         if nextNode == nil and create then
@@ -33,9 +40,12 @@ end
 local function Reason(entry, row)
     local node = (row.root or entry.root)()
     if type(node) ~= "table" then return "settings table not found (addon not initialised yet?)" end
-    for i = 1, #row.path - 1 do
-        node = node[row.path[i]]
-        if type(node) ~= "table" then return 'missing "' .. tostring(row.path[i]) .. '"' end
+    for _, part in ipairs(Parts(row)) do
+        local n = node
+        for i = 1, #part.path - 1 do
+            n = n[part.path[i]]
+            if type(n) ~= "table" then return 'missing "' .. tostring(part.path[i]) .. '"' end
+        end
     end
     return "unknown"
 end
@@ -60,6 +70,38 @@ local function Same(a, b)
     return true
 end
 
+-- Reads every part of a row. Returns { current values } or nil if any key can't be reached.
+local function Read(entry, row)
+    local values = {}
+    for i, part in ipairs(Parts(row)) do
+        local parent, key = Resolve(entry, row, part.path)
+        if not parent then return nil end
+        values[i] = { v = parent[key] }
+    end
+    return values
+end
+
+-- Text for the wizard: one value as is, several through row.show
+local function Format(row, get)
+    local parts = Parts(row)
+    if not row.set then return Show(get(1, parts[1])) end
+    local shown = {}
+    for i, part in ipairs(parts) do
+        local v = get(i, part)
+        if v == nil then return "default" end
+        shown[i] = Show(v)
+    end
+    if row.show then return row.show:format(unpack(shown)) end
+    return table.concat(shown, " ")
+end
+
+local function Matches(row, values)
+    for i, part in ipairs(Parts(row)) do
+        if not Same(values[i].v, part.value) then return false end
+    end
+    return true
+end
+
 local function Find(id)
     for _, entry in ipairs(ns.data.addons) do
         for _, row in ipairs(entry.rows) do
@@ -75,25 +117,29 @@ function Addons:Preview()
             for _, row in ipairs(entry.rows) do
                 local id = entry.addon .. ":" .. row.id
                 local item = { id = id, group = entry.title, label = row.label, note = row.desc }
-                local parent, key = Resolve(entry, row)
-                if not parent then
+                local values = Read(entry, row)
+                if not values then
                     item.old, item.new = "-", "not available"
                     item.enabled, item.unavailable = false, true
                 else
-                    local current = parent[key]
-                    item.old, item.new = Show(current), Show(row.value)
-                    item.value = row.value
+                    item.old = Format(row, function(i) return values[i].v end)
+                    item.new = Format(row, function(_, part) return part.value end)
                     item.enabled = ns.Enabled("addons", id, row.enabled ~= false)
-                    item.alreadySet = Same(current, row.value)
+                    item.alreadySet = Matches(row, values)
                 end
                 items[#items + 1] = item
             end
         end
     end
     if #items == 0 then
+        local names = {}
+        for _, entry in ipairs(ns.data.addons) do
+            local name = entry.title:gsub("%s*%(.-%)", "")
+            if names[#names] ~= name then names[#names + 1] = name end
+        end
         items[1] = { id = "none", group = "Other addons", label = "No supported addons loaded",
             old = "-", new = "-", enabled = false, unavailable = true,
-            note = "Install Prat, Auctionator, AtlasLoot, What's Training, Bagnon, RestedXP Guides or Deadly Boss Mods and run this step again." }
+            note = "Supported: " .. table.concat(names, ", ") .. ". Install one and run this step again." }
     end
     return items
 end
@@ -103,11 +149,15 @@ function Addons:Backup(items)
     for _, item in ipairs(items) do
         local entry, row = Find(item.id)
         if entry then
-            local parent, key = Resolve(entry, row)
-            if parent then
-                local current = parent[key]
-                snap[item.id] = { has = current ~= nil, value = current }
+            local parts = {}
+            for i, part in ipairs(Parts(row)) do
+                local parent, key = Resolve(entry, row, part.path)
+                if parent then
+                    local current = parent[key]
+                    parts[i] = { has = current ~= nil, value = type(current) == "table" and ns.CopyTable(current) or current }
+                end
             end
+            snap[item.id] = { parts = parts }
         end
     end
     return snap
@@ -118,10 +168,12 @@ function Addons:Apply(items)
     for _, item in ipairs(items) do
         local entry, row = Find(item.id)
         if entry and not item.unavailable then
-            local parent, key = Resolve(entry, row, true)
-            if parent then
-                parent[key] = type(row.value) == "table" and CopyTable(row.value) or row.value
-                changed = changed + 1
+            for _, part in ipairs(Parts(row)) do
+                local parent, key = Resolve(entry, row, part.path, true)
+                if parent then
+                    parent[key] = type(part.value) == "table" and ns.CopyTable(part.value) or part.value
+                    changed = changed + 1
+                end
             end
         end
     end
@@ -132,9 +184,16 @@ function Addons:Restore(snap)
     for id, old in pairs(snap) do
         local entry, row = Find(id)
         if entry then
-            local parent, key = Resolve(entry, row)
-            if parent then
-                if old.has then parent[key] = old.value else parent[key] = nil end
+            -- Older backups stored one { has, value } per row
+            local saved = old.parts or { old }
+            for i, part in ipairs(Parts(row)) do
+                local prev = saved[i]
+                if prev then
+                    local parent, key = Resolve(entry, row, part.path)
+                    if parent then
+                        if prev.has then parent[key] = prev.value else parent[key] = nil end
+                    end
+                end
             end
         end
     end
@@ -147,10 +206,10 @@ ns.AddCommand("addons", "shows which supported addons are loaded and which of th
         else
             local differ, total = 0, 0
             for _, row in ipairs(entry.rows) do
-                local parent, key = Resolve(entry, row)
-                if parent then
+                local values = Read(entry, row)
+                if values then
                     total = total + 1
-                    if not Same(parent[key], row.value) then differ = differ + 1 end
+                    if not Matches(row, values) then differ = differ + 1 end
                 else
                     ns.Print("  |cffff8800not available:|r " .. row.label .. " - " .. Reason(entry, row))
                 end

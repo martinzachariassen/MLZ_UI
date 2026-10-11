@@ -32,6 +32,18 @@ function W.Check(parent, label, onClick)
     return c
 end
 
+-- Window title in the frame template's own title bar (fallback: a centered line at the top)
+function W.SetTitle(frame, text)
+    local fs = frame.TitleText or (frame.TitleContainer and frame.TitleContainer.TitleText)
+    if not fs then
+        fs = W.Text(frame, "GameFontHighlight", nil, "CENTER")
+        fs:SetPoint("TOP", 0, -5)
+        frame.TitleText = fs
+    end
+    fs:SetText(text)
+    return fs
+end
+
 -- Scrollable list: a ScrollFrame with a content frame
 function W.ScrollArea(parent)
     local sf = CreateFrame("ScrollFrame", nil, parent, "UIPanelScrollFrameTemplate")
@@ -58,5 +70,5 @@ end
 -- Color codes
 W.C = {
     gold = "|cffffd100", grey = "|cff808080", red = "|cffff5555", green = "|cff55ff55",
-    blue = "|cff33ccff", white = "|cffffffff", r = "|r",
+    blue = "|cff33ccff", white = "|cffffffff", amber = "|cffffaa33", r = "|r",
 }

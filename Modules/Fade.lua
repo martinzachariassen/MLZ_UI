@@ -105,6 +105,21 @@ function Fade:ApplyChat()
     end
 end
 
+-- Undo ApplyChat. `alphas` = window alpha per chat frame (from a backup); without it Blizzard's default is used.
+function Fade:ResetChat(alphas)
+    if defaultTabAlpha then
+        CHAT_FRAME_TAB_NORMAL_NOMOUSE_ALPHA, CHAT_FRAME_TAB_SELECTED_NOMOUSE_ALPHA = defaultTabAlpha[1], defaultTabAlpha[2]
+    end
+    for i = 1, (NUM_CHAT_WINDOWS or 10) do
+        local cf = _G["ChatFrame" .. i]
+        if cf then
+            if cf.SetTimeVisible then cf:SetTimeVisible(120) end
+            local alpha = alphas and alphas[i] or (not alphas and (DEFAULT_CHATFRAME_ALPHA or 0.25))
+            if alpha and FCF_SetWindowAlpha then pcall(FCF_SetWindowAlpha, cf, alpha) end
+        end
+    end
+end
+
 local function ChatWindowAlphas()
     local t = {}
     if GetChatWindowInfo then
@@ -124,22 +139,26 @@ function Fade:Preview()
     local current = ns.db.fade or {}
     for _, row in ipairs(ns.data.fade) do
         local exists = #Frames(row) > 0
+        local isOn = current[row.id] and true or false
         local item = {
             id = row.id, label = row.label, group = "Hide until needed", note = row.desc,
-            old = current[row.id] and MODE_TEXT[row.mode] or "always visible",
+            toggle = true, isOn = isOn, offText = "always visible",
+            old = isOn and MODE_TEXT[row.mode] or "always visible",
             new = MODE_TEXT[row.mode] .. (row.alpha and (" (" .. math.floor(row.alpha * 100) .. "%)") or ""),
-            enabled = exists and ns.Enabled("fade", row.id, row.enabled),
+            enabled = exists and (isOn or ns.Enabled("fade", row.id, row.enabled)),
         }
         if not exists then
             item.unavailable, item.new, item.note = true, "does not exist", "Found none of: " .. table.concat(row.frames, ", ")
         end
         items[#items + 1] = item
     end
+    local chatOn = ns.db.chatTweaks and true or false
     items[#items + 1] = {
         id = "__chat", label = "Clean chat", group = "Chat",
-        old = ns.db.chatTweaks and "on" or "default",
+        toggle = true, isOn = chatOn, offText = "default",
+        old = chatOn and "on" or "default",
         new = ("fades after %ds, hidden tabs and background"):format(ns.data.chat.fadeAfter),
-        enabled = ns.Enabled("fade", "__chat", true),
+        enabled = chatOn or ns.Enabled("fade", "__chat", true),
         note = "Chat lines disappear after a while (scroll or hover to see them again). Tabs and background only show on mouseover.",
     }
     return items
@@ -153,34 +172,28 @@ function Fade:Backup()
     }
 end
 
+-- Only the rows that change come in here: ticked = turn on, unticked = turn off.
+-- Everything else in ns.db.fade is left as it is.
 function Fade:Apply(items)
-    ns.db.fade = {}
-    ns.db.chatTweaks = false
+    ns.db.fade = ns.db.fade or {}
     for _, item in ipairs(items) do
         if item.id == "__chat" then
-            ns.db.chatTweaks = true
+            local wasOn = ns.db.chatTweaks
+            ns.db.chatTweaks = item.enabled and true or false
+            if ns.db.chatTweaks then self:ApplyChat() elseif wasOn then self:ResetChat() end
         else
-            ns.db.fade[item.id] = true
+            ns.db.fade[item.id] = item.enabled or nil
         end
     end
     self:ResetAlpha()
-    if ns.db.chatTweaks then self:ApplyChat() end
-    self:Start()
+    if next(ns.db.fade) then self:Start() end
 end
 
 function Fade:Restore(snap)
     ns.db.fade = snap.fade or {}
     ns.db.chatTweaks = snap.chatTweaks
     self:ResetAlpha()
-    if not snap.chatTweaks then
-        if defaultTabAlpha then
-            CHAT_FRAME_TAB_NORMAL_NOMOUSE_ALPHA, CHAT_FRAME_TAB_SELECTED_NOMOUSE_ALPHA = defaultTabAlpha[1], defaultTabAlpha[2]
-        end
-        for i, alpha in pairs(snap.chatAlpha or {}) do
-            local cf = _G["ChatFrame" .. i]
-            if cf and FCF_SetWindowAlpha then pcall(FCF_SetWindowAlpha, cf, alpha) end
-        end
-    end
+    if snap.chatTweaks then self:ApplyChat() else self:ResetChat(snap.chatAlpha or {}) end
 end
 
 ------------------------------------------------------------------------

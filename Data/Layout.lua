@@ -15,7 +15,6 @@
 --                     [ bar 1          ]
 --   [party / raid    ]   (5 per row, growing upward from here)
 --   [bar 6, separate ]
---   [food/pots, auto ]
 --   [chat]            [ XP / rep, small]                    [meter][micro/bags]
 --
 -- Principles (inspired by ElvUI / Bartender4 / Dominos setups):
@@ -66,16 +65,15 @@ local SWING_GAP = 2                            -- gap between the swing timers
 -- Width 453 = the same width the game currently shows.
 local SWING = { Scale = 0, Opacity = 100, Width = 453, Height = 15, ShowBarTitle = 0, ShowTime = 0, Visibility = 1 }
 
--- Chat at bottom left, with two bars without hotkeys right above it (consumables + bar 6)
+-- Chat at bottom left, with bar 6 (no hotkeys) right above it
 local CHAT_Y = 40                              -- bottom edge of chat (room for the input box below)
 local CHAT_H = 170                             -- chat height
-local UTIL_Y = CHAT_Y + CHAT_H + 28            -- auto bar for consumables (above the chat tabs)
-local UTIL_BTN = 32                            -- button size in both bars above chat
-ns.data.utilBarPos = { point = "BOTTOMLEFT", x = 6, y = UTIL_Y, size = UTIL_BTN, spacing = PAD }
+local BAR6_Y = CHAT_Y + CHAT_H + 28            -- bottom edge of bar 6 (above the chat tabs)
+local BAR6_BTN = 32                            -- bar 6 button size in units (70 % icons)
 
 -- Party / raid frames: bottom left, directly above bar 6. 80 x 40 per frame, 5 per row = 400 wide (same as chat).
 local GROUP_W, GROUP_H, GROUP_ROW = 80, 40, 5
-local GROUP_Y = UTIL_Y + 2 * UTIL_BTN + 4 + 8  -- bar 6 sits at UTIL_Y + UTIL_BTN + 4 and is UTIL_BTN tall
+local GROUP_Y = BAR6_Y + BAR6_BTN + 8
 
 local MAIN_BAR = { Orientation = 0, NumRows = 1, NumIcons = 12, IconSize = ICON, IconPadding = PAD,
                    HideBarArt = 1, HideBarScrolling = 1, AlwaysShowButtons = 0 }
@@ -194,10 +192,10 @@ ns.data.layout = {
           settingEnum = "EditModeChatFrameSetting",
           rawSettings = { WidthHundreds = 4, WidthTensAndOnes = 0, HeightHundreds = 1, HeightTensAndOnes = 70 } },
 
-        -- Bar 6 above chat, right above the consumables auto bar. No hotkeys: drag in
+        -- Bar 6 right above the chat tabs. No hotkeys: drag in
         -- hearthstone, mount, professions etc. (70 % icons = 32 units, 12 buttons = about the chat width)
         { label = "Bar 6 (above chat)", system = "ActionBar", indexEnum = ABI, index = "ExtraBar1",
-          point = "BOTTOMLEFT", relPoint = "BOTTOMLEFT", x = 6, y = UTIL_Y + UTIL_BTN + 4, settingEnum = AB,
+          point = "BOTTOMLEFT", relPoint = "BOTTOMLEFT", x = 6, y = BAR6_Y, settingEnum = AB,
           settings = { Orientation = 0, NumRows = 1, NumIcons = 12, IconSize = 70, IconPadding = PAD, AlwaysShowButtons = 0 } },
 
         -- Right edge: bars 4-5 vertical (hidden until mouseover)

@@ -33,12 +33,13 @@ Instead of silently changing things, it opens an **installation wizard** that sh
 | **Settings (CVars)** | Auto loot, auto self-cast, cast on key down, camera distance, nameplate visibility, disable tutorials and more. Each one is optional. CVars that don't exist in your client are skipped. |
 | **Minimalism / fading** | Hides bars 4-5, micro menu, bags, chat buttons and XP bar until mouseover. Dims bars 2-3 out of combat. Damage meter only shows in a group. Uses `SetAlpha` only, so it causes **no taint** and works in combat. |
 | **Action button colors** | Red = out of range, blue = no mana/rage/energy, grey = unusable, like tullaRange. Short hotkey labels (`S1`, `C1`) and hidden macro names. |
-| **Nameplates** | Switches [Platynator](https://www.curseforge.com/wow/addons/platynator) settings by stance: Defensive Stance = tank, anything else = DPS. |
-| **Other addons** | Applies recommended settings to Prat, Auctionator, AtlasLoot, What's Training?, Bagnon and RestedXP Guides (see below). |
+| **Nameplates** | Imports your saved [Platynator](https://www.curseforge.com/wow/addons/platynator) profile and/or a clean minimal style, switched by stance: Defensive Stance = tank, anything else = DPS. |
+| **Other addons** | Applies recommended settings to Prat, Auctionator, AtlasLoot, What's Training?, Bagnon, RestedXP Guides, Deadly Boss Mods and Leatrix Plus/Maps (see below). |
+| **RestedXP column** | Optional: places the RXP guide, arrow, targets and items in one fixed column on the right edge (`Data/RXP.lua`). |
 | **Tweaks** | Minimap size slider, FPS counter, calmer combat text (small Arial Narrow numbers; the font needs a full game restart), hide the quest tracker or just its "All Objectives" line. |
 | **Backup / undo** | A stack of up to 5 backups. Every wizard run is reversible. |
 | **Export / import** | Share your choices as a string with `/mlz export` and `/mlz import`. |
-| **Health check** | Warns after login if an addon it configures is missing or not loaded. |
+| **Health check** | Warns after login if an addon it configures is installed but not loaded (e.g. switched off by mistake). `/mlz health` also lists supported addons you don't have. |
 
 ## Installation
 
@@ -67,6 +68,8 @@ Type `/mlz` in game for the full list. The commands:
 | `/mlz backups` | List saved backups |
 | `/mlz scale [auto \| 0.64 \| pixel1 …]` | Recalculate and reapply the UI scale |
 | `/mlz np tank \| dps \| auto \| off \| tidy \| save \| load \| export` | Control nameplate switching |
+| `/mlz np style` / `/mlz np style off` | Turn the clean nameplate style on/off |
+| `/mlz rxp` | Toggle the fixed RestedXP column (needs `/reload`) |
 | `/mlz fade` | Toggle all fading until next `/reload` |
 | `/mlz buttons` | Toggle action button coloring |
 | `/mlz fps` | Toggle the FPS counter |
@@ -89,11 +92,16 @@ MLZ UI **configures** these addons if they are installed and loaded. It does not
 | [AtlasLoot Classic](https://www.curseforge.com/wow/addons/atlasloot-classic-edition) | Optionally hide the minimap button |
 | [What's Training?](https://www.curseforge.com/wow/addons/whats-training) | Hide known weapon skills, show beside trainer window |
 | [Bagnon](https://www.curseforge.com/wow/addons/bagnon) | Bag and bank columns, darker background, softer item glow, no auto-open for crafting/socketing |
-| [RestedXP Guides](https://www.restedxp.com/) | Optionally guide window scale |
-| [Platynator](https://www.curseforge.com/wow/addons/platynator) | Tank/DPS nameplate presets, switched by stance |
+| [RestedXP Guides](https://www.restedxp.com/) | Lock frames, optional guide window scale, optional fixed column on the right (MLZ UI's own setting) |
+| [Deadly Boss Mods](https://www.curseforge.com/wow/addons/deadly-boss-mods) | Warnings at the top center, info/range frames and timer bars on the right, slimmer bars, no separate large bars |
+| [Leatrix Plus](https://www.curseforge.com/wow/addons/leatrix-plus-classic) | Auto-sell grey items, auto-repair, faster loot, hide minimap icon; optional quest automation, role confirm, no bag auto-open |
+| [Leatrix Maps](https://www.curseforge.com/wow/addons/leatrix-maps-classic) | Hide minimap icon |
+| [Platynator](https://www.curseforge.com/wow/addons/platynator) | Profile import, clean style, tank/DPS switched by stance |
 | BugGrabber | Only checked by the health check |
 
 Settings are read from each addon's own SavedVariables, so they depend on the version you have installed. Rows whose key doesn't exist are shown as "not available" and skipped.
+
+In the wizard, rows that are already on start ticked; untick one to turn it off. Rows that depend on another row (e.g. frame placements on the layout row, moved actions on their key) are greyed out when that row is unticked.
 
 ## What it uses and what it gives
 
@@ -115,7 +123,7 @@ MLZ_UI/
 ├── MLZ_UI.toc
 ├── Core.lua            namespace, SavedVariables, event bus, combat queue, slash commands
 ├── Probe.lua           client introspection for development
-├── Data/               what to apply (CVars, bindings, layout, fade, nameplates, addons)
+├── Data/               what to apply (CVars, bindings, layout, fade, nameplates, addons, RXP column)
 ├── Modules/            how to apply it (one module per area, all with Preview/Apply/Backup/Restore)
 └── UI/                 widgets and the installation wizard
 ```
@@ -141,6 +149,7 @@ Everything is meant to be edited. Open the file in `Data/`:
 | `Data/Fade.lua` | What fades, when, and how much |
 | `Data/Nameplates.lua` | Tank/DPS nameplate presets |
 | `Data/Addons.lua` | Settings applied to other addons |
+| `Data/RXP.lua` | Size and position of the fixed RestedXP column |
 
 ## Roadmap
 

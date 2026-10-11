@@ -239,13 +239,14 @@ function AB:Preview()
     local cur = ns.db.actionButtons
     local hasButtons = _G.ActionButton1 ~= nil
     for _, o in ipairs(OPTIONS) do
+        local isOn = (cur and cur[o.id]) and true or false
         local item = {
             id = o.id, label = o.label, group = "Action bars", note = o.desc,
-            old = (cur and cur[o.id]) and "on" or "default",
+            toggle = true, isOn = isOn, offText = "default",
+            old = isOn and "on" or "default",
             new = "on",
-            enabled = hasButtons and ns.Enabled("actionbuttons", o.id, true),
+            enabled = hasButtons and (isOn or ns.Enabled("actionbuttons", o.id, true)),
         }
-        if cur and cur[o.id] then item.alreadySet = true end
         if not hasButtons then item.unavailable, item.new = true, "no buttons found" end
         items[#items + 1] = item
     end
@@ -258,7 +259,7 @@ end
 
 function AB:Apply(items)
     local cfg = ns.CopyTable(ns.db.actionButtons) or {}
-    for _, item in ipairs(items) do cfg[item.id] = true end
+    for _, item in ipairs(items) do cfg[item.id] = item.enabled or nil end -- unticked = turn off
     ns.db.actionButtons = cfg
     self:Refresh()
 end

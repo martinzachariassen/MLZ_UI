@@ -285,11 +285,11 @@ function Nameplates:Preview()
     if not loaded then
         style.old, style.new, style.enabled, style.unavailable = "-", "Platynator not loaded", false, true
     else
-        local on = ns.db.nameplates and ns.db.nameplates.style
+        local on = (ns.db.nameplates and ns.db.nameplates.style) and true or false
         style.old, style.new = on and "on" or "off", "on"
-        style.alreadySet = on and true or false
+        style.toggle, style.isOn, style.offText = true, on, "off"
         style.styleOn = true
-        style.enabled = ns.Enabled("nameplates", "style", true)
+        style.enabled = on or ns.Enabled("nameplates", "style", true)
         style.note = "Minimal enemy nameplates: name and percent inside the bar, cast bar, only your debuffs. Follows Defensive Stance (tank) or DPS. Undo restores your old profile; /mlz np style off stops it."
     end
     items[#items + 1] = style
@@ -312,8 +312,8 @@ function Nameplates:Apply(items)
     for _, item in ipairs(items) do
         if item.styleOn then
             ns.db.nameplates = ns.db.nameplates or { auto = true }
-            ns.db.nameplates.style = true
-            ApplyStyle(current or "dps")
+            ns.db.nameplates.style = item.enabled and true or false -- unticked = stop applying it
+            if item.enabled then ApplyStyle(current or "dps") end
         end
     end
 end

@@ -1,7 +1,8 @@
 -- MLZ UI: Fixed column for RestedXP Guides
 -- Puts the arrow, active steps, party steps, active targets and active items in one column on the right
 -- side of the screen and locks them there (no dragging, not even with Alt). Position: Data/RXP.lua.
--- Turn off with /mlz rxp (then /reload), and the boxes are movable again.
+-- Opt-in: turned on in the wizard (Other addons > RestedXP Guides) or with /mlz rxp.
+-- Turning it off needs a /reload before the boxes are movable again.
 --
 -- RXP creates some of these boxes late (when a guide loads, or when the first target/item shows up), so
 -- a light poll adopts them as soon as they exist. Boxes that RXP moves or resizes itself are put back
@@ -12,7 +13,7 @@ local _, ns = ...
 local RXP = ns.RegisterModule({ key = "rxp", title = "RXP column" })
 
 local function Cfg() return ns.data.rxp end
-local function Enabled() return not (ns.db and ns.db.rxpColumn == false) end
+local function Enabled() return ns.db and ns.db.rxpColumn == true end
 
 local column
 local adopted = {}      -- [frame] = true
@@ -106,9 +107,9 @@ ns.On("DISPLAY_SIZE_CHANGED", MarkDirty)
 
 ns.AddCommand("rxp", "toggles the fixed RXP column on the right side on/off (needs /reload)", function()
     ns.db.rxpColumn = not Enabled()
-    ns.Print("RXP column:", Enabled() and "on" or "off", "- type /reload to apply.")
+    ns.Print("RXP column:", Enabled() and "on" or "off", Enabled() and "" or "- type /reload to make the boxes movable again.")
 end)
 
--- No wizard step: this works by itself once the module is loaded.
+-- No wizard step of its own: the on/off row lives in Data/Addons.lua (RestedXP Guides).
 function RXP:Preview() return {} end
 function RXP:Apply() end
