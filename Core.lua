@@ -132,8 +132,19 @@ local function ApplyDefaults(db, def)
     end
 end
 
+-- migrations[n] upgrades a database from version n-1 to n. Add new steps at the end and bump DB_VERSION.
+local migrations = {
+    -- [2] = function(db) ... end,
+}
+
 local function Migrate(db)
-    -- Future migrations: if db.dbVersion < 2 then ... end
+    for v = (db.dbVersion or 1) + 1, DB_VERSION do
+        local step = migrations[v]
+        if step then
+            local ok, err = pcall(step, db)
+            if not ok then ns.Print("|cffff4444Migration to v" .. v .. " failed:|r", err) end
+        end
+    end
     db.dbVersion = DB_VERSION
 end
 
@@ -156,6 +167,46 @@ ns.On("PLAYER_LOGIN", function()
         end)
     end
 end)
+
+------------------------------------------------------------------------
+-- Copy / paste window
+-- ns.ShowCopy(title, text)               shows text selected, ready for Ctrl+C
+-- ns.ShowCopy(title, "", function(s) end) shows an empty box with an Import button
+------------------------------------------------------------------------
+local copyFrame
+function ns.ShowCopy(title, text, onAccept)
+    if not copyFrame then
+        local f = CreateFrame("Frame", "MLZUICopyFrame", UIParent, "BasicFrameTemplateWithInset")
+        f:SetSize(520, 190)
+        f:SetPoint("CENTER")
+        f:SetFrameStrata("DIALOG")
+        tinsert(UISpecialFrames, "MLZUICopyFrame")
+        local box = CreateFrame("EditBox", nil, f, "InputBoxTemplate")
+        box:SetPoint("TOPLEFT", 16, -40)
+        box:SetPoint("BOTTOMRIGHT", -16, 48)
+        box:SetAutoFocus(true)
+        box:SetMaxLetters(0)
+        box:SetScript("OnEscapePressed", function() f:Hide() end)
+        f.box = box
+        local btn = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+        btn:SetSize(100, 24)
+        btn:SetPoint("BOTTOM", 0, 14)
+        btn:SetText("Import")
+        btn:SetScript("OnClick", function()
+            local fn = f.onAccept
+            f:Hide()
+            if fn then fn(strtrim(f.box:GetText())) end
+        end)
+        f.button = btn
+        copyFrame = f
+    end
+    copyFrame.TitleText:SetText(title or "MLZ UI")
+    copyFrame.onAccept = onAccept
+    copyFrame.button:SetShown(onAccept ~= nil)
+    copyFrame.box:SetText(text or "")
+    if onAccept then copyFrame.box:SetFocus() else copyFrame.box:HighlightText() end
+    copyFrame:Show()
+end
 
 ------------------------------------------------------------------------
 -- Slash commands

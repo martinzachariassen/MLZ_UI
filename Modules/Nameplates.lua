@@ -8,17 +8,6 @@ local _, ns = ...
 
 local DEFENSIVE_FORM = 2 -- Warrior: 1 = Battle, 2 = Defensive, 3 = Berserker
 
-local PRESETS = {
-    tank = {
-        not_target_alpha = 1,          -- all mobs fully visible so you can see threat
-        obscured_combat_alpha = 0.7,   -- mobs behind objects are still easy to see
-    },
-    dps = {
-        not_target_alpha = 0.75,       -- fades non-targets, focus on your target
-        obscured_combat_alpha = 0.4,
-    },
-}
-
 local current -- "tank" | "dps" | nil
 
 local function PlatynatorReady()
@@ -33,7 +22,7 @@ local function Set(mode, silent)
     -- Platynator prints a line per setting; mute it while we apply the preset
     local realPrint = print
     print = function() end
-    for name, value in pairs(PRESETS[mode]) do
+    for name, value in pairs(ns.data.nameplates.presets[mode]) do
         pcall(SlashCmdList.Platynator, "config " .. name .. " " .. value)
     end
     print = realPrint
@@ -145,28 +134,6 @@ local function Load()
     end
 end
 
-local copyFrame
-local function ShowCopy(text)
-    if not copyFrame then
-        local f = CreateFrame("Frame", "MLZUINameplateCopy", UIParent, "BasicFrameTemplateWithInset")
-        f:SetSize(520, 160)
-        f:SetPoint("CENTER")
-        f:SetFrameStrata("DIALOG")
-        f.TitleText:SetText("MLZ UI: Platynator profile (Ctrl+C to copy)")
-        local box = CreateFrame("EditBox", nil, f, "InputBoxTemplate")
-        box:SetPoint("TOPLEFT", 16, -40)
-        box:SetPoint("BOTTOMRIGHT", -16, 16)
-        box:SetAutoFocus(true)
-        box:SetMaxLetters(0)
-        box:SetScript("OnEscapePressed", function() f:Hide() end)
-        f.box = box
-        copyFrame = f
-    end
-    copyFrame.box:SetText(text)
-    copyFrame.box:HighlightText()
-    copyFrame:Show()
-end
-
 ns.AddCommand("np", "nameplates: tank | dps | auto | off | tidy | save | load | export", function(arg)
     arg = strlower(strtrim(arg or ""))
     ns.db.nameplates = ns.db.nameplates or { auto = true }
@@ -177,7 +144,7 @@ ns.AddCommand("np", "nameplates: tank | dps | auto | off | tidy | save | load | 
     elseif arg == "load" then
         Load()
     elseif arg == "export" then
-        if CanImport() then ShowCopy(ProfileString()) end
+        if CanImport() then ns.ShowCopy("MLZ UI: Platynator profile (Ctrl+C to copy)", ProfileString()) end
     elseif arg == "tank" or arg == "dps" then
         ns.db.nameplates.auto = false
         Set(arg)
@@ -195,3 +162,46 @@ ns.AddCommand("np", "nameplates: tank | dps | auto | off | tidy | save | load | 
         ns.Print("Use /mlz np tank, dps, auto, off, tidy, save, load or export.")
     end
 end)
+
+------------------------------------------------------------------------
+-- Wizard step: imports the profile string from Data/Nameplates.lua (if one is set)
+-- into the current Platynator profile. Without a string the step does nothing.
+------------------------------------------------------------------------
+local Nameplates = ns.RegisterModule({ key = "nameplates", title = "Nameplates (Platynator)" })
+
+function Nameplates:Preview()
+    local text = ns.data.nameplates.profileString
+    local item = { id = "profile", group = "Platynator", label = "Import MLZ profile" }
+    if not C_AddOns.IsAddOnLoaded("Platynator") then
+        item.old, item.new, item.enabled, item.unavailable = "-", "Platynator not loaded", false, true
+    elseif not text then
+        item.old, item.new, item.enabled, item.unavailable = "-", "no profile string saved", false, true
+        item.note = "Run /mlz np export in a game with your setup and paste the string into profileString in Data/Nameplates.lua."
+    else
+        item.old, item.new = "current profile", "MLZ profile"
+        item.value = text
+        item.enabled = ns.Enabled("nameplates", "profile", true)
+        item.note = "Replaces the settings of your current Platynator profile. Undo puts the old profile back."
+    end
+    return { item }
+end
+
+function Nameplates:Backup()
+    if not CanImport() then return {} end
+    return { profile = ProfileString() }
+end
+
+function Nameplates:Apply(items)
+    for _, item in ipairs(items) do
+        if item.value and CanImport() then
+            local ok, err = QuietImport(item.value, PLATYNATOR_CURRENT_PROFILE)
+            if not ok then error("Platynator import failed: " .. tostring(err)) end
+        end
+    end
+end
+
+function Nameplates:Restore(snap)
+    if snap.profile and CanImport() then
+        QuietImport(snap.profile, PLATYNATOR_CURRENT_PROFILE)
+    end
+end

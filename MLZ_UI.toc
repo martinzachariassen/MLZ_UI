@@ -15,6 +15,7 @@ Data\Layout.lua
 Data\Fade.lua
 Data\Consumables.lua
 Data\Nameplates.lua
+Data\Addons.lua
 
 Modules\Backup.lua
 Modules\Scale.lua
@@ -26,6 +27,9 @@ Modules\ActionButtons.lua
 Modules\Tweaks.lua
 Modules\Consumables.lua
 Modules\Nameplates.lua
+Modules\Addons.lua
+Modules\Health.lua
+Modules\Profile.lua
 
 UI\Widgets.lua
 UI\Installer.lua

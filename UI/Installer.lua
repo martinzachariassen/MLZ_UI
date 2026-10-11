@@ -8,7 +8,7 @@ local C = W.C
 local Installer = {}
 ns.Installer = Installer
 
-local APPLY_ORDER = { "scale", "settings", "layout", "bindings", "fade", "actionbuttons", "consumables", "tweaks" }
+local APPLY_ORDER = { "scale", "settings", "layout", "bindings", "fade", "actionbuttons", "consumables", "tweaks", "addons", "nameplates" }
 
 local PAGES = {
     { kind = "intro", title = "Welcome to MLZ UI" },
@@ -28,6 +28,10 @@ local PAGES = {
       text = "Above the chat you get two click-only bars: at the bottom an " .. C.gold .. "auto bar" .. C.r .. " that fills itself with the best food, drink, potions, bandages, healthstone etc. from your bags, and above it " .. C.gold .. "bar 6" .. C.r .. ", which you fill yourself (hearthstone, mount, professions). Bar 6 and the placement are set in the layout step." },
     { kind = "module", key = "tweaks", title = "8. Tweaks",
       text = "Smaller things that declutter the screen. Tip: " .. C.gold .. "/mlz map" .. C.r .. " gives a slider for the minimap size, " .. C.gold .. "/mlz tracker" .. C.r .. ' toggles the "All Objectives" line, and ' .. C.gold .. "/mlz quests" .. C.r .. " hides the whole quest tracker." },
+    { kind = "module", key = "addons", title = "9. Other addons",
+      text = "Settings for addons you already have installed (Prat, Auctionator, AtlasLoot, What's Training, RestedXP Guides). Addons that aren't loaded are skipped. Edit Data/Addons.lua to change the values. Some addons need a /reload to pick up the changes." },
+    { kind = "module", key = "nameplates", title = "10. Nameplates",
+      text = "Imports your saved Platynator profile (design, colors, threat) into the current profile. Skipped until a profile string is saved in Data/Nameplates.lua. Tank/DPS switching by stance is separate: /mlz np auto." },
     { kind = "summary", title = "Summary" },
     { kind = "done", title = "Done!" },
 }
