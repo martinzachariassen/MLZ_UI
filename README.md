@@ -36,7 +36,7 @@ Instead of silently changing things, it opens an **installation wizard** that sh
 | **Nameplates** | Imports your saved [Platynator](https://www.curseforge.com/wow/addons/platynator) profile and/or a clean minimal style, switched by stance: Defensive Stance = tank, anything else = DPS. |
 | **Other addons** | Applies recommended settings to Prat, Auctionator, AtlasLoot, What's Training?, Bagnon, RestedXP Guides, Deadly Boss Mods and Leatrix Plus/Maps (see below). |
 | **RestedXP column** | Optional: places the RXP guide, arrow, targets and items in one fixed column on the right edge (`Data/RXP.lua`). |
-| **Tweaks** | Minimap size slider, FPS counter, calmer combat text (small Arial Narrow numbers; the font needs a full game restart), hide the quest tracker or just its "All Objectives" line. |
+| **Tweaks** | Minimap size slider, FPS counter, calmer combat text (small Roboto Bold numbers; the font needs a full game restart), hide the quest tracker or just its "All Objectives" line. |
 | **Backup / undo** | A stack of up to 5 backups. Every wizard run is reversible. |
 | **Export / import** | Share your choices as a string with `/mlz export` and `/mlz import`. |
 | **Health check** | Warns after login if an addon it configures is installed but not loaded (e.g. switched off by mistake). `/mlz health` also lists supported addons you don't have. |

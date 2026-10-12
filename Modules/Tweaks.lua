@@ -16,7 +16,7 @@ local OPTIONS = {
     { id = "fps", label = "FPS counter in the bottom-right corner", group = "Info",
       desc = "Small text in the bottom-right corner: FPS (green/yellow/red) and ping in ms. Clicks pass through it. /mlz fps toggles it." },
     { id = "cleanCombatFont", label = "Clean combat text font", group = "Combat text",
-      desc = "Uses Arial Narrow for floating damage and healing numbers. Needs a full game restart (not just /reload) to take effect." },
+      desc = "Uses Roboto Bold for floating damage and healing numbers. Needs a full game restart (not just /reload) to take effect." },
 }
 
 local function Cfg() return ns.db and ns.db.tweaks end
@@ -323,7 +323,7 @@ end
 ns.On("ADDON_LOADED", function(_, name)
     if name ~= "MLZ_UI" then return end
     local c = Cfg()
-    if c and c.cleanCombatFont then _G.DAMAGE_TEXT_FONT = "Fonts\\ARIALN.TTF" end
+    if c and c.cleanCombatFont then _G.DAMAGE_TEXT_FONT = "Interface\\AddOns\\MLZ_UI\\Media\\Roboto-Bold.ttf" end
 end)
 
 ns.On("PLAYER_ENTERING_WORLD", function()
