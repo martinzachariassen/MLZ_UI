@@ -69,6 +69,7 @@ local function Switch(silent)
             local ok, err = pcall(C_EditMode.SetActiveLayout, #presets + i)
             if ok then
                 if not silent then ns.Print("Layout:", want) end
+                ns.FireState()
             else
                 ns.Print("|cffff4444Could not switch layout:|r", err)
             end
@@ -103,20 +104,48 @@ ns.On("PLAYER_REGEN_ENABLED", function()
     end
 end)
 
-ns.AddCommand("heal", "healer layouts: (status) | on | off | auto | build", function(arg)
+------------------------------------------------------------------------
+-- Public API (settings window, minimap menu, /mlz heal)
+------------------------------------------------------------------------
+local Healer = {}
+ns.Healer = Healer
+
+Healer.Role = Role
+Healer.IsHealer = IsHealer
+Healer.Wanted = WantedLayout
+
+-- "auto" | "on" | "off"
+function Healer.Force() return ns.db.healForce or "auto" end
+
+function Healer.SetForce(v)
+    ns.db.healForce = (v == "on" or v == "off") and v or nil
+    Switch(true)
+    ns.FireState()
+end
+
+-- Returns ok, message
+function Healer.Rebuild()
+    local ok, msg = Layout():RebuildVariants()
+    if ok then ns.MarkReload("healer layouts rebuilt") end
+    return ok, msg
+end
+
+function ns.HealerStatus()
+    return ("Role: %s   |   Healer: %s   |   Layout now: %s"):format(
+        tostring(Role() or "unknown"), IsHealer() and "yes" or "no", WantedLayout())
+end
+
+ns.AddCommand("heal","healer layouts: (status) | on | off | auto | build", function(arg)
     arg = strlower(strtrim(arg or ""))
     if arg == "on" or arg == "off" then
-        ns.db.healForce = arg
+        Healer.SetForce(arg)
         ns.Print("Healer layouts: you count as", arg == "on" and "a healer." or "NOT a healer.", "/mlz heal auto goes back to the spec.")
-        Switch()
     elseif arg == "auto" then
-        ns.db.healForce = nil
+        Healer.SetForce(nil)
         ns.Print("Healer layouts follow your spec.")
-        Switch()
     elseif arg == "build" then
-        local ok, msg = Layout():RebuildVariants()
+        local ok, msg = Healer.Rebuild()
         ns.Print(ok and "Healer layouts rebuilt:" or "|cffff4444Failed:|r", msg)
-        if ok then ns.needsReload = true end
     else
         ns.Print("Role:", tostring(Role()), "| healer:", IsHealer() and "yes" or "no",
             "| forced:", ns.db.healForce or "no (auto)", "| wanted layout:", WantedLayout())

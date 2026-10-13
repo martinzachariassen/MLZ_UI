@@ -1,10 +1,61 @@
--- MLZ UI: Small UI building blocks for the wizard
+-- MLZ UI: UI building blocks (flat, dark theme) for the settings window, the wizard and the minimap menu.
+-- Everything is drawn with plain color textures, so it looks the same on every client and does not
+-- depend on Blizzard templates that change between versions.
 
 local _, ns = ...
 
 local W = {}
 ns.W = W
 
+------------------------------------------------------------------------
+-- Theme
+------------------------------------------------------------------------
+W.T = {
+    bg        = { 0.071, 0.078, 0.094, 0.97 },
+    panel     = { 0.098, 0.110, 0.133, 1 },
+    card      = { 0.125, 0.141, 0.169, 1 },
+    hover     = { 0.165, 0.184, 0.220, 1 },
+    border    = { 0.192, 0.212, 0.251, 1 },
+    accent    = { 0.200, 0.627, 1.000, 1 },
+    green     = { 0.290, 0.820, 0.450, 1 },
+    amber     = { 1.000, 0.690, 0.250, 1 },
+    red       = { 1.000, 0.360, 0.360, 1 },
+    off       = { 0.300, 0.320, 0.360, 1 },
+    text      = { 0.930, 0.940, 0.960, 1 },
+    muted     = { 0.580, 0.610, 0.660, 1 },
+}
+local T = W.T
+
+-- Color codes for text
+W.C = {
+    gold = "|cffffd100", grey = "|cff8a909a", red = "|cffff5c5c", green = "|cff4ad173",
+    blue = "|cff33a0ff", white = "|cffffffff", amber = "|cffffb040", r = "|r",
+}
+
+------------------------------------------------------------------------
+-- Fonts: Roboto Bold (ships with MLZ UI) for headings and buttons, the game font for body text
+------------------------------------------------------------------------
+W.FONT = "Interface\\AddOns\\MLZ_UI\\Media\\Roboto-Bold.ttf"
+
+local function MakeFont(name, size, color)
+    local f = CreateFont(name)
+    f:SetFont(W.FONT, size, "")
+    if not f:GetFont() then f:SetFont(STANDARD_TEXT_FONT, size, "") end
+    f:SetTextColor(unpack(color or T.text))
+    f:SetShadowOffset(1, -1)
+    f:SetShadowColor(0, 0, 0, 0.7)
+    return f
+end
+
+MakeFont("MLZUI_FontTitle", 20)
+MakeFont("MLZUI_FontHead", 14)
+MakeFont("MLZUI_FontButton", 12)
+MakeFont("MLZUI_FontSmallBold", 11)
+MakeFont("MLZUI_FontAccent", 12, T.accent)
+
+------------------------------------------------------------------------
+-- Basic helpers
+------------------------------------------------------------------------
 function W.Text(parent, font, text, justify)
     local fs = parent:CreateFontString(nil, "OVERLAY", font or "GameFontHighlight")
     fs:SetJustifyH(justify or "LEFT")
@@ -13,26 +64,111 @@ function W.Text(parent, font, text, justify)
     return fs
 end
 
-function W.Button(parent, text, width, height, onClick)
-    local b = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
-    b:SetSize(width or 120, height or 24)
-    b:SetText(text)
-    if onClick then b:SetScript("OnClick", onClick) end
+-- A texture filling the frame with one color
+function W.Fill(frame, color, layer, sub)
+    local t = frame:CreateTexture(nil, layer or "BACKGROUND", nil, sub)
+    t:SetAllPoints()
+    t:SetColorTexture(unpack(color))
+    return t
+end
+
+-- 1px border made of four textures. Returns a table with :SetColor(color).
+function W.Border(frame, color)
+    local b = {}
+    local function Edge(p1, p2, horizontal)
+        local t = frame:CreateTexture(nil, "BORDER")
+        t:SetColorTexture(unpack(color or T.border))
+        t:SetPoint(p1)
+        t:SetPoint(p2)
+        if horizontal then t:SetHeight(1) else t:SetWidth(1) end
+        b[#b + 1] = t
+    end
+    Edge("TOPLEFT", "TOPRIGHT", true)
+    Edge("BOTTOMLEFT", "BOTTOMRIGHT", true)
+    Edge("TOPLEFT", "BOTTOMLEFT", false)
+    Edge("TOPRIGHT", "BOTTOMRIGHT", false)
+    function b:SetColor(c)
+        for _, t in ipairs(self) do t:SetColorTexture(unpack(c)) end
+    end
     return b
 end
 
-function W.Check(parent, label, onClick)
-    local c = CreateFrame("CheckButton", nil, parent, "UICheckButtonTemplate")
-    c:SetSize(24, 24)
-    if label then
-        c.label = W.Text(c, "GameFontNormal", label)
-        c.label:SetPoint("LEFT", c, "RIGHT", 2, 0)
-    end
-    if onClick then c:SetScript("OnClick", function(self) onClick(self, self:GetChecked() and true or false) end) end
-    return c
+-- Tooltip helper. text may be a function returning the text.
+function W.Tooltip(frame, title, text)
+    frame:SetScript("OnEnter", function(self)
+        local body = type(text) == "function" and text() or text
+        if not title and not body then return end
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        if title then GameTooltip:SetText(title, 1, 1, 1) end
+        if body then GameTooltip:AddLine(body, nil, nil, nil, true) end
+        GameTooltip:Show()
+    end)
+    frame:SetScript("OnLeave", function() GameTooltip:Hide() end)
 end
 
--- Window title in the frame template's own title bar (fallback: a centered line at the top)
+------------------------------------------------------------------------
+-- Window: dark frame with its own title bar (icon, title, version, close button)
+------------------------------------------------------------------------
+function W.Window(name, width, height, title)
+    local f = CreateFrame("Frame", name, UIParent)
+    f:SetSize(width, height)
+    f:SetPoint("CENTER")
+    f:SetFrameStrata("DIALOG")
+    f:SetToplevel(true)
+    f:SetClampedToScreen(true)
+    f:SetMovable(true)
+    f:EnableMouse(true)
+    f:Hide()
+    if name then tinsert(UISpecialFrames, name) end -- Esc closes
+
+    f.bg = W.Fill(f, T.bg)
+    f.border = W.Border(f, T.border)
+
+    local bar = CreateFrame("Frame", nil, f)
+    bar:SetPoint("TOPLEFT", 1, -1)
+    bar:SetPoint("TOPRIGHT", -1, -1)
+    bar:SetHeight(36)
+    W.Fill(bar, T.panel)
+    local line = bar:CreateTexture(nil, "BORDER")
+    line:SetColorTexture(unpack(T.border))
+    line:SetHeight(1)
+    line:SetPoint("BOTTOMLEFT")
+    line:SetPoint("BOTTOMRIGHT")
+    bar:EnableMouse(true)
+    bar:RegisterForDrag("LeftButton")
+    bar:SetScript("OnDragStart", function() f:StartMoving() end)
+    bar:SetScript("OnDragStop", function() f:StopMovingOrSizing() end)
+    f.titleBar = bar
+
+    local icon = bar:CreateTexture(nil, "ARTWORK")
+    icon:SetSize(20, 20)
+    icon:SetPoint("LEFT", 10, 0)
+    icon:SetTexture("Interface\\Icons\\INV_Misc_Gear_01")
+    icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+
+    f.TitleText = W.Text(bar, "MLZUI_FontHead", title or "MLZ UI")
+    f.TitleText:SetPoint("LEFT", icon, "RIGHT", 8, 0)
+    f.TitleText:SetWordWrap(false)
+
+    f.version = W.Text(bar, "GameFontDisableSmall", "v" .. (ns.version or ""))
+    f.version:SetPoint("LEFT", f.TitleText, "RIGHT", 8, -1)
+
+    local close = CreateFrame("Button", nil, bar)
+    close:SetSize(36, 36)
+    close:SetPoint("RIGHT", 0, 0)
+    close.hl = W.Fill(close, { 1, 0.3, 0.3, 0.15 }, "HIGHLIGHT")
+    close.x = W.Text(close, "MLZUI_FontHead", "X", "CENTER")
+    close.x:SetPoint("CENTER")
+    close.x:SetTextColor(unpack(T.muted))
+    close:SetScript("OnEnter", function(s) s.x:SetTextColor(unpack(T.red)) end)
+    close:SetScript("OnLeave", function(s) s.x:SetTextColor(unpack(T.muted)) end)
+    close:SetScript("OnClick", function() f:Hide() end)
+    f.closeButton = close
+
+    return f
+end
+
+-- Kept for older code: sets the window title
 function W.SetTitle(frame, text)
     local fs = frame.TitleText or (frame.TitleContainer and frame.TitleContainer.TitleText)
     if not fs then
@@ -44,31 +180,377 @@ function W.SetTitle(frame, text)
     return fs
 end
 
--- Scrollable list: a ScrollFrame with a content frame
+------------------------------------------------------------------------
+-- Card: a section box
+------------------------------------------------------------------------
+function W.Card(parent)
+    local c = CreateFrame("Frame", nil, parent)
+    c.bg = W.Fill(c, T.card)
+    c.border = W.Border(c, T.border)
+    return c
+end
+
+------------------------------------------------------------------------
+-- Button: flat, with styles "normal" | "primary" | "danger" | "subtle"
+------------------------------------------------------------------------
+local BUTTON_STYLES = {
+    normal  = { bg = { 0.17, 0.19, 0.23, 1 }, hover = { 0.22, 0.25, 0.30, 1 }, border = T.border, text = T.text },
+    primary = { bg = { 0.13, 0.45, 0.78, 1 }, hover = { 0.18, 0.54, 0.90, 1 }, border = { 0.25, 0.60, 0.95, 1 }, text = { 1, 1, 1, 1 } },
+    danger  = { bg = { 0.42, 0.14, 0.14, 1 }, hover = { 0.55, 0.18, 0.18, 1 }, border = { 0.65, 0.25, 0.25, 1 }, text = { 1, 0.9, 0.9, 1 } },
+    subtle  = { bg = { 0, 0, 0, 0 }, hover = { 1, 1, 1, 0.06 }, border = { 0, 0, 0, 0 }, text = T.muted },
+}
+
+function W.Button(parent, text, width, height, onClick, style)
+    local b = CreateFrame("Button", nil, parent)
+    b:SetSize(width or 120, height or 24)
+    b.bg = W.Fill(b, BUTTON_STYLES.normal.bg)
+    b.border = W.Border(b, T.border)
+    local fs = b:CreateFontString(nil, "OVERLAY", "MLZUI_FontButton")
+    fs:SetPoint("CENTER")
+    fs:SetWordWrap(false)
+    b:SetFontString(fs)
+    b.label = fs
+
+    function b:SetStyle(name)
+        self.style = BUTTON_STYLES[name] or BUTTON_STYLES.normal
+        self.bg:SetColorTexture(unpack(self.hovered and self.style.hover or self.style.bg))
+        self.border:SetColor(self.style.border)
+        fs:SetTextColor(unpack(self.style.text))
+    end
+    b:SetScript("OnEnter", function(self)
+        self.hovered = true
+        if self:IsEnabled() then self.bg:SetColorTexture(unpack(self.style.hover)) end
+        if self.tipTitle or self.tipText then
+            GameTooltip:SetOwner(self, "ANCHOR_TOP")
+            GameTooltip:SetText(self.tipTitle or self:GetText() or "", 1, 1, 1)
+            if self.tipText then GameTooltip:AddLine(self.tipText, nil, nil, nil, true) end
+            GameTooltip:Show()
+        end
+    end)
+    b:SetScript("OnLeave", function(self)
+        self.hovered = false
+        self.bg:SetColorTexture(unpack(self.style.bg))
+        GameTooltip:Hide()
+    end)
+    b:SetScript("OnDisable", function(self) self:SetAlpha(0.4) end)
+    b:SetScript("OnEnable", function(self) self:SetAlpha(1) end)
+    b:SetStyle(style)
+    b:SetText(text or "")
+    if onClick then b:SetScript("OnClick", onClick) end
+    return b
+end
+
+------------------------------------------------------------------------
+-- Check: flat square checkbox (CheckButton, so SetChecked/GetChecked/Click work as usual)
+------------------------------------------------------------------------
+function W.Check(parent, label, onClick)
+    local c = CreateFrame("CheckButton", nil, parent)
+    c:SetSize(18, 18)
+    c.bg = W.Fill(c, { 0.06, 0.07, 0.085, 1 })
+    c.border = W.Border(c, { 0.32, 0.35, 0.41, 1 })
+    local mark = c:CreateTexture(nil, "ARTWORK")
+    mark:SetPoint("TOPLEFT", 3, -3)
+    mark:SetPoint("BOTTOMRIGHT", -3, 3)
+    mark:SetColorTexture(unpack(T.accent))
+    c:SetCheckedTexture(mark)
+    local dis = c:CreateTexture(nil, "ARTWORK")
+    dis:SetPoint("TOPLEFT", 3, -3)
+    dis:SetPoint("BOTTOMRIGHT", -3, 3)
+    dis:SetColorTexture(unpack(T.off))
+    c:SetDisabledCheckedTexture(dis)
+    local hl = c:CreateTexture(nil, "HIGHLIGHT")
+    hl:SetAllPoints()
+    hl:SetColorTexture(1, 1, 1, 0.08)
+    c:SetScript("OnDisable", function(self) self.border:SetColor({ 0.2, 0.22, 0.26, 1 }) end)
+    c:SetScript("OnEnable", function(self) self.border:SetColor({ 0.32, 0.35, 0.41, 1 }) end)
+    if label then
+        c.label = W.Text(c, "GameFontHighlight", label)
+        c.label:SetPoint("LEFT", c, "RIGHT", 6, 0)
+    end
+    if onClick then c:SetScript("OnClick", function(self) onClick(self, self:GetChecked() and true or false) end) end
+    return c
+end
+
+------------------------------------------------------------------------
+-- Toggle: an on/off switch. onChange(self, on). Optional label to the right.
+-- SetChecked/GetChecked are aliases, so it can replace a checkbox.
+------------------------------------------------------------------------
+function W.Toggle(parent, onChange, label)
+    local t = CreateFrame("Button", nil, parent)
+    t:SetSize(40, 20)
+    t.bg = W.Fill(t, T.off)
+    t.border = W.Border(t, { 0, 0, 0, 0.35 })
+    t.knob = t:CreateTexture(nil, "ARTWORK")
+    t.knob:SetSize(16, 16)
+    t.knob:SetColorTexture(0.95, 0.96, 0.98, 1)
+    t.state = W.Text(t, "MLZUI_FontSmallBold", "", "CENTER")
+
+    function t:SetOn(on)
+        self.on = on and true or false
+        self.knob:ClearAllPoints()
+        self.state:ClearAllPoints()
+        if self.on then
+            self.bg:SetColorTexture(unpack(T.green))
+            self.knob:SetPoint("RIGHT", -2, 0)
+            self.state:SetPoint("LEFT", 5, 0)
+            self.state:SetText("ON")
+            self.state:SetTextColor(0.05, 0.2, 0.1)
+        else
+            self.bg:SetColorTexture(unpack(T.off))
+            self.knob:SetPoint("LEFT", 2, 0)
+            self.state:SetPoint("RIGHT", -4, 0)
+            self.state:SetText("OFF")
+            self.state:SetTextColor(0.7, 0.72, 0.76)
+        end
+    end
+    t.SetChecked = t.SetOn
+    function t:GetChecked() return self.on end
+
+    t:SetScript("OnClick", function(self)
+        self:SetOn(not self.on)
+        if onChange then onChange(self, self.on) end
+    end)
+    t:SetScript("OnEnter", function(self) self.border:SetColor(T.accent) end)
+    t:SetScript("OnLeave", function(self) self.border:SetColor({ 0, 0, 0, 0.35 }) end)
+    t:SetScript("OnDisable", function(self) self:SetAlpha(0.35) end)
+    t:SetScript("OnEnable", function(self) self:SetAlpha(1) end)
+
+    if label then
+        t.label = W.Text(t, "GameFontHighlight", label)
+        t.label:SetPoint("LEFT", t, "RIGHT", 8, 0)
+    end
+    t:SetOn(false)
+    return t
+end
+
+------------------------------------------------------------------------
+-- Segmented: a row of joined buttons, one selected. options = { { value = , text = }, ... }
+-- onSelect(value). :SetValue(value) marks the selected one.
+------------------------------------------------------------------------
+function W.Segmented(parent, options, onSelect, segWidth)
+    local s = CreateFrame("Frame", nil, parent)
+    segWidth = segWidth or 70
+    s:SetSize(segWidth * #options, 22)
+    W.Fill(s, { 0.06, 0.07, 0.085, 1 })
+    W.Border(s, T.border)
+    s.buttons = {}
+    for i, o in ipairs(options) do
+        local b = CreateFrame("Button", nil, s)
+        b:SetSize(segWidth - 2, 18)
+        b:SetPoint("LEFT", 1 + (i - 1) * segWidth + (i > 1 and 1 or 0), 0)
+        b.sel = W.Fill(b, T.accent)
+        b.sel:Hide()
+        b.hl = W.Fill(b, { 1, 1, 1, 0.07 }, "HIGHLIGHT")
+        b.text = W.Text(b, "MLZUI_FontButton", o.text, "CENTER")
+        b.text:SetPoint("CENTER")
+        b.value = o.value
+        b:SetScript("OnClick", function()
+            s:SetValue(o.value)
+            if onSelect then onSelect(o.value) end
+        end)
+        if o.tip then W.Tooltip(b, o.text, o.tip) end
+        if i > 1 then
+            local sep = s:CreateTexture(nil, "BORDER")
+            sep:SetColorTexture(unpack(T.border))
+            sep:SetSize(1, 22)
+            sep:SetPoint("LEFT", (i - 1) * segWidth, 0)
+        end
+        s.buttons[i] = b
+    end
+    function s:SetValue(v)
+        self.value = v
+        for _, b in ipairs(self.buttons) do
+            local on = b.value == v
+            b.sel:SetShown(on)
+            b.text:SetTextColor(unpack(on and { 1, 1, 1, 1 } or T.muted))
+        end
+    end
+    function s:SetActive(on)
+        for _, b in ipairs(self.buttons) do b:SetEnabled(on) end
+        self:SetAlpha(on and 1 or 0.4)
+    end
+    return s
+end
+
+------------------------------------------------------------------------
+-- Stepper: "<  value  >" for longer lists. options = { { value = , text = }, ... }
+------------------------------------------------------------------------
+function W.Stepper(parent, width, options, onSelect)
+    local s = CreateFrame("Frame", nil, parent)
+    s:SetSize(width, 22)
+    W.Fill(s, { 0.06, 0.07, 0.085, 1 })
+    W.Border(s, T.border)
+    s.text = W.Text(s, "MLZUI_FontButton", "", "CENTER")
+    s.text:SetPoint("LEFT", 24, 0)
+    s.text:SetPoint("RIGHT", -24, 0)
+    s.text:SetWordWrap(false)
+    s.options = options
+    local function Arrow(dir)
+        local b = CreateFrame("Button", nil, s)
+        b:SetSize(22, 20)
+        b:SetPoint(dir < 0 and "LEFT" or "RIGHT", dir < 0 and 1 or -1, 0)
+        b.hl = W.Fill(b, { 1, 1, 1, 0.08 }, "HIGHLIGHT")
+        b.t = W.Text(b, "MLZUI_FontHead", dir < 0 and "<" or ">", "CENTER")
+        b.t:SetPoint("CENTER")
+        b.t:SetTextColor(unpack(T.accent))
+        b:SetScript("OnClick", function()
+            local idx = 1
+            for i, o in ipairs(s.options) do if o.value == s.value then idx = i end end
+            idx = (idx - 1 + dir) % #s.options + 1
+            s:SetValue(s.options[idx].value)
+            if onSelect then onSelect(s.value) end
+        end)
+        return b
+    end
+    Arrow(-1)
+    Arrow(1)
+    function s:SetValue(v)
+        self.value = v
+        local text = tostring(v)
+        for _, o in ipairs(self.options) do if o.value == v then text = o.text end end
+        self.text:SetText(text)
+    end
+    return s
+end
+
+------------------------------------------------------------------------
+-- Slider: flat horizontal slider with a value label.
+-- onChange(value) while dragging (preview), onCommit(value) when the mouse is released.
+------------------------------------------------------------------------
+function W.Slider(parent, width, minV, maxV, step, fmt, onChange, onCommit)
+    local holder = CreateFrame("Frame", nil, parent)
+    holder:SetSize(width, 22)
+    local s = CreateFrame("Slider", nil, holder)
+    s:SetOrientation("HORIZONTAL")
+    s:SetPoint("LEFT", 0, 0)
+    s:SetPoint("RIGHT", -52, 0)
+    s:SetHeight(16)
+    s:SetMinMaxValues(minV, maxV)
+    s:SetValueStep(step)
+    if s.SetObeyStepOnDrag then s:SetObeyStepOnDrag(true) end
+    s:EnableMouse(true)
+    local track = s:CreateTexture(nil, "BACKGROUND")
+    track:SetColorTexture(0.06, 0.07, 0.085, 1)
+    track:SetPoint("LEFT")
+    track:SetPoint("RIGHT")
+    track:SetHeight(6)
+    local fill = s:CreateTexture(nil, "BORDER")
+    fill:SetColorTexture(unpack(T.accent))
+    fill:SetPoint("LEFT", track, "LEFT")
+    fill:SetHeight(6)
+    local thumb = s:CreateTexture(nil, "OVERLAY")
+    thumb:SetColorTexture(0.95, 0.96, 0.98, 1)
+    thumb:SetSize(10, 16)
+    s:SetThumbTexture(thumb)
+    holder.value = W.Text(holder, "MLZUI_FontButton", "", "RIGHT")
+    holder.value:SetPoint("RIGHT", 0, 0)
+    holder.value:SetWidth(46)
+
+    local function Round(v) return math.floor(v / step + 0.5) * step end
+    local function Show(v)
+        holder.value:SetText(fmt and fmt:format(v) or tostring(v))
+        local w = s:GetWidth()
+        if w and w > 0 then fill:SetWidth(math.max(1, (v - minV) / (maxV - minV) * w)) end
+    end
+    s:SetScript("OnValueChanged", function(_, v)
+        v = Round(v)
+        Show(v)
+        if not holder.quiet and onChange then onChange(v) end
+    end)
+    s:SetScript("OnMouseUp", function()
+        if onCommit then onCommit(Round(s:GetValue())) end
+    end)
+    s:SetScript("OnSizeChanged", function() Show(Round(s:GetValue())) end)
+    function holder:SetValue(v)
+        self.quiet = true
+        s:SetValue(v)
+        self.quiet = false
+        Show(Round(v))
+    end
+    function holder:GetValue() return Round(s:GetValue()) end
+    holder.slider = s
+    return holder
+end
+
+------------------------------------------------------------------------
+-- Badge: colored square + short text. :Set(state, text), state = "on" | "off" | "warn" | "bad" | "info"
+------------------------------------------------------------------------
+local BADGE = {
+    on = { T.green, "On" }, off = { T.off, "Off" }, warn = { T.amber, "Check" },
+    bad = { T.red, "Problem" }, info = { T.accent, "" }, na = { T.off, "Not available" },
+}
+W.BADGE = BADGE
+
+function W.Badge(parent)
+    local b = CreateFrame("Frame", nil, parent)
+    b:SetSize(120, 16)
+    b.dot = b:CreateTexture(nil, "ARTWORK")
+    b.dot:SetSize(8, 8)
+    b.text = W.Text(b, "MLZUI_FontSmallBold", "", "RIGHT")
+    b.text:SetPoint("RIGHT", 0, 0)
+    b.dot:SetPoint("RIGHT", b.text, "LEFT", -6, 0)
+    function b:Set(state, text)
+        local s = BADGE[state] or BADGE.info
+        self.dot:SetColorTexture(unpack(s[1]))
+        self.text:SetText(text or s[2])
+        self.text:SetTextColor(unpack(state == "off" and T.muted or state == "na" and T.muted or s[1]))
+    end
+    b:Set("off")
+    return b
+end
+
+------------------------------------------------------------------------
+-- Scroll area: ScrollFrame + content frame + thin scrollbar + mouse wheel
+------------------------------------------------------------------------
 function W.ScrollArea(parent)
-    local sf = CreateFrame("ScrollFrame", nil, parent, "UIPanelScrollFrameTemplate")
+    local sf = CreateFrame("ScrollFrame", nil, parent)
     local content = CreateFrame("Frame", nil, sf)
     content:SetSize(1, 1)
     sf:SetScrollChild(content)
-    sf:SetScript("OnSizeChanged", function(self, w) content:SetWidth(w) end)
     sf.content = content
+
+    local bar = CreateFrame("Slider", nil, sf)
+    bar:SetWidth(5)
+    bar:SetPoint("TOPLEFT", sf, "TOPRIGHT", 6, 0)
+    bar:SetPoint("BOTTOMLEFT", sf, "BOTTOMRIGHT", 6, 0)
+    bar:SetOrientation("VERTICAL")
+    bar:SetMinMaxValues(0, 0)
+    bar:SetValueStep(1)
+    bar:EnableMouse(true)
+    W.Fill(bar, { 1, 1, 1, 0.04 })
+    local thumb = bar:CreateTexture(nil, "OVERLAY")
+    thumb:SetColorTexture(0.40, 0.44, 0.50, 0.9)
+    thumb:SetSize(5, 40)
+    bar:SetThumbTexture(thumb)
+    bar:Hide()
+    bar:SetScript("OnValueChanged", function(_, v)
+        if not sf.syncing then sf:SetVerticalScroll(v) end
+    end)
+    sf.bar = bar
+
+    local function Update()
+        local h, ch = sf:GetHeight() or 0, content:GetHeight() or 0
+        local max = math.max(0, ch - h)
+        bar:SetMinMaxValues(0, max)
+        bar:SetShown(max > 1)
+        if h > 0 and ch > 0 then thumb:SetHeight(math.max(24, h * h / math.max(h, ch))) end
+        if sf:GetVerticalScroll() > max then sf:SetVerticalScroll(max) end
+    end
+    sf.UpdateScroll = Update
+    sf:SetScript("OnScrollRangeChanged", Update)
+    sf:SetScript("OnVerticalScroll", function(self, offset)
+        self.syncing = true
+        bar:SetValue(offset)
+        self.syncing = false
+    end)
+    sf:SetScript("OnSizeChanged", function(_, w)
+        if w and w > 0 then content:SetWidth(w) end
+        Update()
+    end)
+    sf:EnableMouseWheel(true)
+    sf:SetScript("OnMouseWheel", function(self, delta)
+        local _, max = bar:GetMinMaxValues()
+        self:SetVerticalScroll(math.max(0, math.min(max, self:GetVerticalScroll() - delta * 50)))
+    end)
     return sf
 end
-
--- Tooltip helper
-function W.Tooltip(frame, title, text)
-    frame:SetScript("OnEnter", function(self)
-        if not title and not text then return end
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        if title then GameTooltip:SetText(title, 1, 1, 1) end
-        if text then GameTooltip:AddLine(text, nil, nil, nil, true) end
-        GameTooltip:Show()
-    end)
-    frame:SetScript("OnLeave", function() GameTooltip:Hide() end)
-end
-
--- Color codes
-W.C = {
-    gold = "|cffffd100", grey = "|cff808080", red = "|cffff5555", green = "|cff55ff55",
-    blue = "|cff33ccff", white = "|cffffffff", amber = "|cffffaa33", r = "|r",
-}

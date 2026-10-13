@@ -47,6 +47,8 @@ local HasActionFn = CAB.HasAction or HasAction
 local IsUsableFn = CAB.IsUsableAction or IsUsableAction
 local InRangeFn = CAB.IsActionInRange or IsActionInRange
 
+AB.options = OPTIONS -- read by the settings window
+
 local function Cfg() return ns.db and ns.db.actionButtons end
 
 local function Buttons()
@@ -279,6 +281,19 @@ ns.On("UPDATE_BINDINGS", function()
     if not (cfg and cfg.hotkeys and buttons) then return end
     for _, b in ipairs(buttons) do FixHotkey(b) end
 end)
+
+-- Public API (settings window)
+function AB:IsOn(id) return (ns.db.actionButtons and ns.db.actionButtons[id]) and true or false end
+
+function AB:Set(id, on)
+    ns.db.actionButtons = ns.db.actionButtons or {}
+    local was = ns.db.actionButtons[id] and true or false
+    ns.db.actionButtons[id] = on and true or nil
+    self:Refresh()
+    -- Blizzard only redraws the hotkey text when bindings change, so turning short hotkeys off needs a reload
+    if id == "hotkeys" and was and not on then ns.MarkReload("hotkey text") end
+    ns.FireState()
+end
 
 ns.AddCommand("buttons", "toggles action button coloring on/off (range/mana/unusable)", function()
     local cfg = Cfg()

@@ -40,6 +40,7 @@ local function Set(mode, silent)
     if changed and ns.db and ns.db.nameplates and (ns.db.nameplates.style or ns.db.nameplates.threat ~= false) then
         ApplyStyle(mode, silent)
     end
+    if changed then ns.FireState() end
     return true
 end
 
@@ -58,6 +59,9 @@ local function Auto()
     local mode = IsTankForm() and "tank" or (IsInGroup() and "dps" or "solo")
     if mode ~= current then Set(mode) end
 end
+
+-- For the settings window
+function ns.NameplateMode() return current end
 
 ns.On("PLAYER_ENTERING_WORLD", function()
     ns.db.nameplates = ns.db.nameplates or { auto = true }
@@ -269,42 +273,89 @@ local function Load()
     end
 end
 
-ns.AddCommand("np", "nameplates: tank | dps | solo | auto | off | threat | tidy | style | save | load | export", function(arg)
-    arg = strlower(strtrim(arg or ""))
+------------------------------------------------------------------------
+-- Public API (used by the settings window, the minimap menu and /mlz np). Quiet: no chat output.
+------------------------------------------------------------------------
+local NP = {}
+ns.NP = NP
+
+local function DB()
     ns.db.nameplates = ns.db.nameplates or { auto = true }
-    if arg == "style" then
-        ns.db.nameplates.style = true
-        ApplyStyle(current or "dps")
-        ns.Print("Clean style is on and follows tank/DPS/solo. /mlz np style off stops it, /mlz np load restores your old profile.")
-    elseif arg == "style off" then
-        ns.db.nameplates.style = false
-        ns.Print("Clean style will no longer be applied. /mlz np load restores your saved profile.")
-    elseif arg == "tidy" then
-        Tidy()
-    elseif arg == "save" then
-        Save()
-    elseif arg == "load" then
-        Load()
-    elseif arg == "export" then
-        if CanImport() then ns.ShowCopy("MLZ UI: Platynator profile (Ctrl+C to copy)", ProfileString()) end
-    elseif arg == "threat off" then
-        ns.db.nameplates.threat = false
-        ns.Print("Threat colors will no longer be changed per mode. /mlz np load restores your saved profile.")
-    elseif arg == "threat" or arg == "threat on" then
-        ns.db.nameplates.threat = true
-        ApplyStyle(current or "solo")
-        ns.Print("Threat colors follow the mode (tank / dps / solo).")
-    elseif arg == "tank" or arg == "dps" or arg == "solo" then
-        ns.db.nameplates.auto = false
-        Set(arg)
-        ns.Print("Auto stance switching is off. Use /mlz np auto to turn it back on.")
-    elseif arg == "auto" then
-        ns.db.nameplates.auto = true
+    return ns.db.nameplates
+end
+
+function NP.Ready() return PlatynatorReady() and true or false end
+function NP.Mode() return current end
+function NP.Auto() return DB().auto and true or false end
+function NP.Style() return DB().style and true or false end
+function NP.Threat() return DB().threat ~= false end
+function NP.HasSnapshot() return DB().snapshot ~= nil end
+
+function NP.SetAuto(on)
+    DB().auto = on and true or false
+    if on then
         current = nil
         Auto()
+    end
+    ns.FireState()
+end
+
+function NP.SetMode(mode)
+    DB().auto = false
+    Set(mode, true)
+    ns.FireState()
+end
+
+function NP.SetStyle(on)
+    DB().style = on and true or false
+    if on then ApplyStyle(current or "dps", true) end
+    ns.FireState()
+end
+
+function NP.SetThreat(on)
+    DB().threat = on and true or false
+    if on then ApplyStyle(current or "solo", true) end
+    ns.FireState()
+end
+
+function NP.Save() Save(); ns.FireState() end
+function NP.Load() Load() end
+function NP.Tidy() Tidy() end
+function NP.Export()
+    if CanImport() then ns.ShowCopy("MLZ UI: Platynator profile (Ctrl+C to copy)", ProfileString()) end
+end
+
+ns.AddCommand("np", "nameplates: tank | dps | solo | auto | off | threat | tidy | style | save | load | export", function(arg)
+    arg = strlower(strtrim(arg or ""))
+    DB()
+    if arg == "style" then
+        NP.SetStyle(true)
+        ns.Print("Clean style is on and follows tank/DPS/solo.")
+    elseif arg == "style off" then
+        NP.SetStyle(false)
+        ns.Print("Clean style will no longer be applied. Restore your saved profile in the settings (/mlz) if you want the old look back.")
+    elseif arg == "tidy" then
+        NP.Tidy()
+    elseif arg == "save" then
+        NP.Save()
+    elseif arg == "load" then
+        NP.Load()
+    elseif arg == "export" then
+        NP.Export()
+    elseif arg == "threat off" then
+        NP.SetThreat(false)
+        ns.Print("Threat colors will no longer be changed per mode.")
+    elseif arg == "threat" or arg == "threat on" then
+        NP.SetThreat(true)
+        ns.Print("Threat colors follow the mode (tank / dps / solo).")
+    elseif arg == "tank" or arg == "dps" or arg == "solo" then
+        NP.SetMode(arg)
+        ns.Print("Nameplates:", arg, "(automatic switching is off).")
+    elseif arg == "auto" then
+        NP.SetAuto(true)
         ns.Print("Nameplates follow your role: Defensive Stance / Bear Form = tank, otherwise DPS in a group and SOLO alone.")
     elseif arg == "off" then
-        ns.db.nameplates.auto = false
+        NP.SetAuto(false)
         ns.Print("Auto stance switching is off.")
     else
         ns.Print("Nameplates:", current or "unknown", "| auto:", ns.db.nameplates.auto and "on" or "off")

@@ -5,7 +5,7 @@ local ADDON, ns = ...
 MLZUI = ns -- global for /dump MLZUI during development
 
 ns.name = "MLZ UI"
-ns.version = "0.5.0"
+ns.version = "0.6.0"
 ns.modules = {}       -- registered modules, in load order (see MLZ_UI.toc), also indexed by key
 ns.data = {}          -- data tables (Data/*.lua)
 
@@ -51,6 +51,39 @@ end
 function ns.Try(f, ...)
     if type(f) ~= "function" then return false, "not a function" end
     return pcall(f, ...)
+end
+
+------------------------------------------------------------------------
+-- State changes: modules call ns.FireState() after changing something, so the settings window,
+-- its footer and the minimap tooltip can redraw. ns.MarkReload(reason) also flags that a /reload is needed.
+------------------------------------------------------------------------
+local stateListeners = {}
+local firing = false
+
+function ns.OnState(fn)
+    stateListeners[#stateListeners + 1] = fn
+end
+
+function ns.FireState()
+    if firing then return end
+    firing = true
+    for _, fn in ipairs(stateListeners) do
+        local ok, err = pcall(fn)
+        if not ok then ns.Debug("state listener:", err) end
+    end
+    firing = false
+end
+
+ns.reloadReasons = {}
+function ns.MarkReload(reason)
+    ns.needsReload = true
+    if reason then
+        for _, r in ipairs(ns.reloadReasons) do
+            if r == reason then reason = nil break end
+        end
+        if reason then ns.reloadReasons[#ns.reloadReasons + 1] = reason end
+    end
+    ns.FireState()
 end
 
 ------------------------------------------------------------------------
@@ -157,7 +190,7 @@ end)
 
 ns.On("PLAYER_LOGIN", function()
     if ns.db.debug or not ns.db.installed then
-        ns.Print("loaded (v" .. ns.version .. "). Type |cffffff00/mlz|r for help.")
+        ns.Print("loaded (v" .. ns.version .. "). Type |cffffff00/mlz|r or click the minimap button to open the settings.")
     end
     C_Timer.After(5, function()
         if ns.RunProbe then pcall(ns.RunProbe, true) end
@@ -177,28 +210,34 @@ end)
 local copyFrame
 function ns.ShowCopy(title, text, onAccept)
     if not copyFrame then
-        local f = CreateFrame("Frame", "MLZUICopyFrame", UIParent, "BasicFrameTemplateWithInset")
-        f:SetSize(520, 190)
-        f:SetPoint("CENTER")
-        f:SetFrameStrata("DIALOG")
-        tinsert(UISpecialFrames, "MLZUICopyFrame")
-        local box = CreateFrame("EditBox", nil, f, "InputBoxTemplate")
-        box:SetPoint("TOPLEFT", 16, -40)
-        box:SetPoint("BOTTOMRIGHT", -16, 48)
+        local W = ns.W
+        local f = W.Window("MLZUICopyFrame", 540, 160, "MLZ UI")
+        f:SetFrameStrata("FULLSCREEN_DIALOG")
+        local hint = W.Text(f, "GameFontDisableSmall", "Ctrl+A selects everything, Ctrl+C copies, Ctrl+V pastes.")
+        hint:SetPoint("TOPLEFT", 16, -48)
+        local holder = CreateFrame("Frame", nil, f)
+        holder:SetPoint("TOPLEFT", 16, -68)
+        holder:SetPoint("TOPRIGHT", -16, -68)
+        holder:SetHeight(28)
+        W.Fill(holder, { 0.05, 0.055, 0.07, 1 })
+        W.Border(holder, W.T.border)
+        local box = CreateFrame("EditBox", nil, holder)
+        box:SetPoint("TOPLEFT", 8, 0)
+        box:SetPoint("BOTTOMRIGHT", -8, 0)
+        box:SetFontObject(ChatFontNormal)
         box:SetAutoFocus(true)
         box:SetMaxLetters(0)
         box:SetScript("OnEscapePressed", function() f:Hide() end)
         f.box = box
-        local btn = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
-        btn:SetSize(100, 24)
-        btn:SetPoint("BOTTOM", 0, 14)
-        btn:SetText("Import")
-        btn:SetScript("OnClick", function()
+        local btn = W.Button(f, "Import", 110, 26, function()
             local fn = f.onAccept
             f:Hide()
             if fn then fn(strtrim(f.box:GetText())) end
-        end)
+        end, "primary")
+        btn:SetPoint("BOTTOMRIGHT", -16, 14)
         f.button = btn
+        local close = W.Button(f, "Close", 90, 26, function() f:Hide() end)
+        close:SetPoint("BOTTOMLEFT", 16, 14)
         copyFrame = f
     end
     copyFrame.TitleText:SetText(title or "MLZ UI")
@@ -218,10 +257,22 @@ function ns.AddCommand(name, help, fn)
     commands[name] = { help = help, fn = fn }
 end
 
+-- Everything else is controlled from the settings window (/mlz); the other commands still
+-- work but are not listed.
+local LISTED = { install = true, undo = true, debug = true, probe = true }
+
+-- Runs a command from code (used by the settings window)
+function ns.RunCommand(name, arg)
+    local c = commands[name]
+    if c then return c.fn(arg or "") end
+end
+
 local function ShowHelp()
-    ns.Print("commands:")
+    ns.Print("Type |cffffff00/mlz|r to open the settings window. Commands:")
     local names = {}
-    for name in pairs(commands) do names[#names + 1] = name end
+    for name in pairs(commands) do
+        if LISTED[name] then names[#names + 1] = name end
+    end
     table.sort(names)
     for _, name in ipairs(names) do
         DEFAULT_CHAT_FRAME:AddMessage("  |cffffff00/mlz " .. name .. "|r  " .. commands[name].help)
@@ -238,7 +289,11 @@ SlashCmdList.MLZUI = function(msg)
     msg = strtrim(msg or "")
     local cmd, rest = msg:match("^(%S+)%s*(.-)$")
     cmd = cmd and cmd:lower()
-    if not cmd or not commands[cmd] then
+    if not cmd then
+        if ns.Settings then ns.Settings:Toggle() else ShowHelp() end
+        return
+    end
+    if cmd == "help" or not commands[cmd] then
         ShowHelp()
         return
     end

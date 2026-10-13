@@ -204,13 +204,49 @@ ns.On("PLAYER_ENTERING_WORLD", function()
     if ns.db.fade and next(ns.db.fade) then Fade:Start() end
 end)
 
-ns.AddCommand("fade", "temporarily toggles all fading on/off (until next /reload)", function()
-    ns.fadePaused = not ns.fadePaused
-    if ns.fadePaused then
-        Fade:ResetAlpha()
-        ns.Print("Fading off. Type /mlz fade again to turn it on.")
-    else
-        Fade:Start()
-        ns.Print("Fading on.")
+------------------------------------------------------------------------
+-- Public API (settings window, minimap menu)
+------------------------------------------------------------------------
+function Fade:Exists(row) return #Frames(row) > 0 end
+
+function Fade:IsOn(id) return (ns.db.fade and ns.db.fade[id]) and true or false end
+
+function Fade:SetRow(id, on)
+    ns.db.fade = ns.db.fade or {}
+    ns.db.fade[id] = on and true or nil
+    self:ResetAlpha()
+    if next(ns.db.fade) then self:Start() end
+    ns.FireState()
+end
+
+function Fade:SetPaused(paused)
+    paused = paused and true or false
+    if (ns.fadePaused and true or false) == paused then return end
+    ns.fadePaused = paused
+    if paused then self:ResetAlpha() else self:Start() end
+    ns.FireState()
+end
+
+function Fade:SetChat(on)
+    local was = ns.db.chatTweaks
+    ns.db.chatTweaks = on and true or false
+    if on then self:ApplyChat() elseif was then self:ResetChat() end
+    ns.FireState()
+end
+
+-- Returns how many rows are on, and how many exist in this client
+function Fade:CountOn()
+    local on, total = 0, 0
+    for _, row in ipairs(ns.data.fade) do
+        if #Frames(row) > 0 then
+            total = total + 1
+            if self:IsOn(row.id) then on = on + 1 end
+        end
     end
+    return on, total
+end
+
+ns.AddCommand("fade", "temporarily toggles all fading on/off (until next /reload)", function()
+    Fade:SetPaused(not ns.fadePaused)
+    ns.Print(ns.fadePaused and "Fading paused until you reload or turn it back on." or "Fading on.")
 end)

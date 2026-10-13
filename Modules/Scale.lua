@@ -156,11 +156,31 @@ ns.On("PLAYER_ENTERING_WORLD", Reapply)
 ns.On("DISPLAY_SIZE_CHANGED", Reapply)
 ns.On("UI_SCALE_CHANGED", Reapply)
 
-ns.AddCommand("scale", "recalculates and reapplies the scale (optional: auto, 0.64, 0.57, pixel1 ...)", function(arg)
-    if arg and arg ~= "" then ns.db.scale.mode = arg:lower() end
+------------------------------------------------------------------------
+-- Public API (settings window)
+------------------------------------------------------------------------
+Scale.MODES = MODES
+
+function Scale:ModeText(mode) return ModeText(mode or "auto") end
+
+function Scale:Mode() return ns.db.scale.mode or "auto" end
+
+function Scale:IsApplied() return ns.db.scale.applied and true or false end
+
+-- Saves and applies a mode (waits for combat to end). onDone runs after it is applied.
+function Scale:SetMode(mode, onDone)
+    ns.db.scale.mode = mode or "auto"
     ns.db.scale.applied = true
     ns.RunOutOfCombat(function()
         Scale:ApplyScale(ns.db.scale.mode)
-        ns.Print(("Scale set to %.3f (%s)."):format(Scale:Compute(ns.db.scale.mode), ModeText(ns.db.scale.mode)))
+        ns.FireState()
+        if onDone then onDone() end
     end, "scaling")
+end
+
+ns.AddCommand("scale", "recalculates and reapplies the scale (optional: auto, 0.64, 0.57, pixel1 ...)", function(arg)
+    local mode = (arg and arg ~= "") and arg:lower() or ns.db.scale.mode
+    Scale:SetMode(mode, function()
+        ns.Print(("Scale set to %.3f (%s)."):format(Scale:Compute(ns.db.scale.mode), ModeText(ns.db.scale.mode)))
+    end)
 end)

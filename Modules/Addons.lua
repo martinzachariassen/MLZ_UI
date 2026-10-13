@@ -199,23 +199,37 @@ function Addons:Restore(snap)
     end
 end
 
-ns.AddCommand("addons", "shows which supported addons are loaded and which of their settings differ", function()
+-- One entry per addon in Data/Addons.lua:
+-- { title, addon, desc, loaded, differ, total, rows = #rows, missing = { "label - reason", ... } }
+function Addons:Summary()
+    local list = {}
     for _, entry in ipairs(ns.data.addons) do
-        if not Loaded(entry.addon) then
-            ns.Print(entry.title .. ": |cff888888not loaded|r")
-        else
-            local differ, total = 0, 0
+        local s = { title = entry.title, addon = entry.addon, loaded = Loaded(entry.addon) and true or false,
+            differ = 0, total = 0, rows = #entry.rows, missing = {} }
+        if s.loaded then
             for _, row in ipairs(entry.rows) do
-                local values = Read(entry, row)
-                if values then
-                    total = total + 1
-                    if not Matches(row, values) then differ = differ + 1 end
+                local ok, values = pcall(Read, entry, row)
+                if ok and values then
+                    s.total = s.total + 1
+                    if not Matches(row, values) then s.differ = s.differ + 1 end
                 else
-                    ns.Print("  |cffff8800not available:|r " .. row.label .. " - " .. Reason(entry, row))
+                    s.missing[#s.missing + 1] = row.label .. " - " .. (ok and Reason(entry, row) or tostring(values))
                 end
             end
-            ns.Print(("%s: |cff44ff44loaded|r, %d of %d settings differ from MLZ UI"):format(entry.title, differ, total))
+        end
+        list[#list + 1] = s
+    end
+    return list
+end
+
+ns.AddCommand("addons", "shows which supported addons are loaded and which of their settings differ", function()
+    for _, s in ipairs(Addons:Summary()) do
+        if not s.loaded then
+            ns.Print(s.title .. ": |cff888888not loaded|r")
+        else
+            for _, m in ipairs(s.missing) do ns.Print("  |cffff8800not available:|r " .. m) end
+            ns.Print(("%s: |cff44ff44loaded|r, %d of %d settings differ from MLZ UI"):format(s.title, s.differ, s.total))
         end
     end
-    ns.Print("Run |cffffff00/mlz install|r and go to the last step to change them.")
+    ns.Print("Open the settings (/mlz) or run |cffffff00/mlz install|r to change them.")
 end)

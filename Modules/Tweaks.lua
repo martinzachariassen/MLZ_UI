@@ -1,6 +1,6 @@
 -- MLZ UI: Tweaks
 --   * Hide the "All Objectives" line at the top of the quest tracker, or the whole tracker
---   * /mlz map: slider for the minimap size (saved in the Edit Mode layout)
+--   * Minimap size (slider in the settings window, saved in the Edit Mode layout)
 --
 -- Only changes alpha/scale on unprotected Blizzard frames, so it is safe and causes no taint.
 
@@ -18,6 +18,8 @@ local OPTIONS = {
     { id = "cleanCombatFont", label = "Clean combat text font", group = "Combat text",
       desc = "Uses Roboto Bold for floating damage and healing numbers. Needs a full game restart (not just /reload) to take effect." },
 }
+
+Tweaks.options = OPTIONS -- read by the settings window
 
 local function Cfg() return ns.db and ns.db.tweaks end
 
@@ -150,17 +152,27 @@ function Tweaks:Refresh()
     pcall(Fps)
 end
 
-ns.AddCommand("fps", "shows/hides the FPS counter in the bottom right", function()
+-- Public API (settings window)
+function Tweaks:IsOn(id) return (ns.db.tweaks and ns.db.tweaks[id]) and true or false end
+
+function Tweaks:Set(id, on)
     ns.db.tweaks = ns.db.tweaks or {}
-    ns.db.tweaks.fps = not ns.db.tweaks.fps
-    Tweaks:Refresh()
-    ns.Print("FPS counter:", ns.db.tweaks.fps and "on" or "off")
+    ns.db.tweaks[id] = on and true or nil
+    self:Refresh()
+    if id == "cleanCombatFont" then ns.MarkReload("combat font (needs a full game restart)") end
+    ns.FireState()
+end
+
+ns.AddCommand("fps", "shows/hides the FPS counter in the bottom right", function()
+    Tweaks:Set("fps", not Tweaks:IsOn("fps"))
+    ns.Print("FPS counter:", Tweaks:IsOn("fps") and "on" or "off")
 end)
 
 ------------------------------------------------------------------------
 -- Minimap size (/mlz map)
 ------------------------------------------------------------------------
 local MAP_MIN, MAP_MAX, MAP_STEP = 50, 200, 10
+Tweaks.MAP_MIN, Tweaks.MAP_MAX, Tweaks.MAP_STEP, Tweaks.MAP_DEFAULT = MAP_MIN, MAP_MAX, MAP_STEP, 130
 
 local function MapSize()
     local ov = ns.db.overrides
@@ -175,103 +187,41 @@ local function PreviewMap(size)
     if cluster then pcall(cluster.SetScale, cluster, size / 100) end
 end
 
-local function SaveMap(size)
+-- Saves the size in MLZUIDB and in the Edit Mode layout. quiet = no chat line on success.
+-- Returns ok, error message.
+local function SaveMap(size, quiet)
     size = math.max(MAP_MIN, math.min(MAP_MAX, math.floor(size / MAP_STEP + 0.5) * MAP_STEP))
     ns.db.overrides = ns.db.overrides or {}
     ns.db.overrides.minimapSize = size
     PreviewMap(size)
     local ok, err = ns.modules.layout:UpdateOne("minimap", "Size", size)
     if ok then
-        ns.Print("Minimap size:", size .. "%. Saved in the Edit Mode layout.")
+        if not quiet then ns.Print("Minimap size:", size .. "%. Saved in the Edit Mode layout.") end
     else
         ns.Print("Minimap set to", size .. "% for now, but it was not saved in the layout:", tostring(err),
-            "(it will be used the next time you run the layout step in /mlz install)")
+            "(it will be used the next time you run the layout step in the setup wizard)")
     end
+    ns.FireState()
+    return ok, err
 end
 
-local mapFrame
-local function OpenMapSlider()
-    if not mapFrame then
-        local f = CreateFrame("Frame", "MLZUI_MapSize", UIParent, "BasicFrameTemplateWithInset")
-        f:SetSize(300, 130)
-        f:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -240, -60)
-        f:SetFrameStrata("DIALOG")
-        f:SetMovable(true)
-        f:EnableMouse(true)
-        f:RegisterForDrag("LeftButton")
-        f:SetScript("OnDragStart", f.StartMoving)
-        f:SetScript("OnDragStop", f.StopMovingOrSizing)
-        ns.W.SetTitle(f, "MLZ UI: Minimap size")
-        tinsert(UISpecialFrames, "MLZUI_MapSize") -- ESC closes (and reverts, see OnHide)
+Tweaks.MapSize = MapSize
+Tweaks.PreviewMap = PreviewMap
+Tweaks.SaveMap = SaveMap
 
-        local s = CreateFrame("Slider", nil, f)
-        s:SetOrientation("HORIZONTAL")
-        s:SetSize(240, 18)
-        s:SetPoint("TOP", 0, -50)
-        s:SetMinMaxValues(MAP_MIN, MAP_MAX)
-        s:SetValueStep(MAP_STEP)
-        if s.SetObeyStepOnDrag then s:SetObeyStepOnDrag(true) end
-        s:EnableMouse(true)
-        local track = s:CreateTexture(nil, "BACKGROUND")
-        track:SetColorTexture(0, 0, 0, 0.6)
-        track:SetPoint("LEFT")
-        track:SetPoint("RIGHT")
-        track:SetHeight(6)
-        s:SetThumbTexture("Interface\\Buttons\\UI-SliderBar-Button-Horizontal")
-        local low = ns.W.Text(s, "GameFontDisableSmall", MAP_MIN .. "%")
-        low:SetPoint("TOPLEFT", s, "BOTTOMLEFT", 0, -2)
-        local high = ns.W.Text(s, "GameFontDisableSmall", MAP_MAX .. "%", "RIGHT")
-        high:SetPoint("TOPRIGHT", s, "BOTTOMRIGHT", 0, -2)
-        f.value = ns.W.Text(f, "GameFontNormal", "", "CENTER")
-        f.value:SetPoint("BOTTOM", s, "TOP", 0, 4)
-        s:SetScript("OnValueChanged", function(_, v)
-            v = math.floor(v / MAP_STEP + 0.5) * MAP_STEP
-            f.value:SetText(v .. "%")
-            f.current = v
-            PreviewMap(v)
-        end)
-        f.slider = s
-
-        local save = ns.W.Button(f, "Save", 90, 22, function()
-            f.saved = true
-            SaveMap(f.current)
-            f:Hide()
-        end)
-        save:SetPoint("BOTTOMRIGHT", -12, 10)
-        local reset = ns.W.Button(f, "Default (130%)", 120, 22, function() s:SetValue(130) end)
-        reset:SetPoint("BOTTOMLEFT", 12, 10)
-
-        -- Closed without saving: revert to how it was
-        f:SetScript("OnHide", function()
-            if not f.saved and f.original then PreviewMap(f.original) end
-        end)
-        mapFrame = f
-    end
-    mapFrame.saved = false
-    mapFrame.original = MapSize()
-    mapFrame.slider:SetValue(mapFrame.original)
-    mapFrame.value:SetText(mapFrame.original .. "%")
-    mapFrame.current = mapFrame.original
-    mapFrame:Show()
-end
-
-ns.AddCommand("map", "changes the minimap size (slider, or e.g. /mlz map 120)", function(arg)
+ns.AddCommand("map", "changes the minimap size (opens the settings, or e.g. /mlz map 120)", function(arg)
     local n = tonumber(arg)
-    if n then SaveMap(n) else OpenMapSlider() end
+    if n then SaveMap(n) elseif ns.Settings then ns.Settings:Open("layout") end
 end)
 
 ns.AddCommand("quests", "hides/shows the entire quest tracker", function()
-    ns.db.tweaks = ns.db.tweaks or {}
-    ns.db.tweaks.trackerHide = not ns.db.tweaks.trackerHide
-    Tweaks:Refresh()
-    ns.Print("Quest tracker:", ns.db.tweaks.trackerHide and "hidden" or "shown")
+    Tweaks:Set("trackerHide", not Tweaks:IsOn("trackerHide"))
+    ns.Print("Quest tracker:", Tweaks:IsOn("trackerHide") and "hidden" or "shown")
 end)
 
 ns.AddCommand("tracker", 'hides/shows the "All Objectives" line in the quest tracker', function()
-    ns.db.tweaks = ns.db.tweaks or {}
-    ns.db.tweaks.trackerHeader = not ns.db.tweaks.trackerHeader
-    Tweaks:Refresh()
-    ns.Print('"All Objectives" line:', ns.db.tweaks.trackerHeader and "hidden" or "shown")
+    Tweaks:Set("trackerHeader", not Tweaks:IsOn("trackerHeader"))
+    ns.Print('"All Objectives" line:', Tweaks:IsOn("trackerHeader") and "hidden" or "shown")
 end)
 
 ------------------------------------------------------------------------

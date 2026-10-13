@@ -58,27 +58,37 @@ Check `## Interface: 16001` in [`MLZ_UI.toc`](MLZ_UI.toc) matches your client. I
 
 ## Usage
 
-Type `/mlz` in game for the full list. The commands:
+Click the **minimap button** (the gear) or type `/mlz` to open the **control center**. It is a dark, flat window with a sidebar of pages. Every setting is a row with a short description, a hover tooltip and a switch, segmented button or slider. Changes apply at once without chat spam. When something can't be used on your setup (for example Platynator is not loaded), the row says why instead of showing a dead control.
+
+| Page | What you see and change |
+|---|---|
+| Overview | One status card per area (on / off / needs attention), a banner if setup or a reload is pending, and quick actions |
+| Layout & scale | UI scale mode, active Edit Mode layout, minimap size slider, pet bar position |
+| Nameplates | Automatic tank/DPS/solo switching, mode, clean style, threat colors, save/restore the Platynator profile |
+| Healer | Healer detection (auto / always / never), current and wanted layout, rebuild the healer layouts |
+| Minimalism | What fades until hover (one switch per frame), pause fading, clean chat |
+| Action bars & UI | Action button colors and hotkeys, quest tracker, FPS counter, combat text |
+| Other addons | Which supported addons are loaded and how many settings differ |
+| Profiles & backup | Export/import your choices, list of backups, undo the last setup |
+| About & help | How it works, show/hide the minimap button, commands, debug |
+
+The footer always shows whether a **reload is needed** and why, with a Reload UI button.
+
+**Minimap button:** left-click opens or closes the control center. Right-click opens a quick menu (nameplate mode, healer detection, pause fading, FPS, reload). Shift-click reloads the UI. Drag it to move it around the minimap. The tooltip shows a live summary of what is on. It turns amber-dotted when a reload is needed. Hide it under *About & help*, and bring it back with `/mlz minimap`. On clients with the addon compartment, MLZ UI is listed there too.
+
+The **setup wizard** uses the same look: a clickable progress strip of the steps at the top, *Now > Will become* columns (a green arrow means the row will change), and a switch to turn a whole step on or off.
+
+Only a few commands are listed (`/mlz help`):
 
 | Command | Description |
 |---|---|
+| `/mlz` | Open the control center |
 | `/mlz install` | Open the installation wizard |
 | `/mlz undo` | Undo the last wizard run |
-| `/mlz backups` | List saved backups |
-| `/mlz scale [auto \| 0.64 \| pixel1 …]` | Recalculate and reapply the UI scale |
-| `/mlz np tank \| dps \| solo \| threat \| auto \| off \| tidy \| save \| load \| export` | Control nameplate switching |
-| `/mlz heal` / `on` / `off` / `auto` / `build` | Healer layouts: status, force healer on/off, follow the spec, rebuild the layouts |
-| `/mlz np style` / `/mlz np style off` | Turn the clean nameplate style on/off |
-| `/mlz fade` | Toggle all fading until next `/reload` |
-| `/mlz buttons` | Toggle action button coloring |
-| `/mlz fps` | Toggle the FPS counter |
-| `/mlz map [size]` | Change minimap size |
-| `/mlz quests` / `/mlz tracker` | Hide/show the quest tracker / its header line |
-| `/mlz addons` | Show which supported addons are loaded and which settings differ |
-| `/mlz health` | Check that supported addons are installed and loaded |
-| `/mlz export` / `/mlz import` | Share or restore your choices |
 | `/mlz debug` | Toggle debug output |
 | `/mlz probe` | Collect client info into SavedVariables (for development) |
+
+The older commands (`/mlz np`, `heal`, `fade`, `buttons`, `fps`, `map`, ...) still work but are no longer listed.
 
 ## Supported addons
 
@@ -124,7 +134,8 @@ MLZ_UI/
 ├── Probe.lua           client introspection for development
 ├── Data/               what to apply (CVars, bindings, layout, fade, nameplates, addons)
 ├── Modules/            how to apply it (one module per area, all with Preview/Apply/Backup/Restore)
-└── UI/                 widgets and the installation wizard
+├── Media/              Roboto font for headings
+└── UI/                 flat widget kit, setup wizard, control center, minimap button
 ```
 
 Each module registers itself with `ns.RegisterModule` and implements:

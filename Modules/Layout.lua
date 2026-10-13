@@ -366,7 +366,7 @@ function Layout:Apply(items)
     ok, err = pcall(C_EditMode.SetActiveLayout, #presets + idx)
     if not ok then ns.Print("|cffff4444SetActiveLayout failed:|r", err) end
     ns.Debug("layout saved, frames moved:", moved)
-    ns.needsReload = true
+    ns.MarkReload("Edit Mode layout changed")
 end
 
 -- Changes a single setting (in display units, e.g. 120 %) in the MLZ UI layout and saves.
@@ -394,37 +394,79 @@ function Layout:UpdateOne(id, name, value)
     return false, name .. " is not present on the system"
 end
 
--- /mlz pet save: remembers where the pet bar sits in the active Edit Mode layout, so installing
--- the layout again puts it back there. /mlz pet reset goes back to the position in Data/Layout.lua.
+-- Pet bar position: remembers where the pet bar sits in the active Edit Mode layout, so installing
+-- the layout again puts it back there. Reset goes back to the position in Data/Layout.lua.
 local function PetSpec()
     for _, sp in ipairs(ns.data.layout.frames) do if sp.id == "petbar" then return sp end end
 end
 
+Layout.AnchorText = AnchorText
+
+-- Returns the anchor table of the pet bar in the active layout, or nil, reason
+function Layout:PetNow()
+    if not Available() then return nil, "Edit Mode API not available" end
+    local spec = PetSpec()
+    if not spec then return nil, "no pet bar in the layout data" end
+    local _, _, active = self:GetInfo()
+    if not active then return nil, "no active layout" end
+    local sys, why = FindSystem(active, spec)
+    if not sys then return nil, why end
+    if not sys.anchorInfo then return nil, "the pet bar has no position yet" end
+    return sys.anchorInfo
+end
+
+function Layout:PetSaved() return ns.db.overrides and ns.db.overrides.petBar end
+
+-- Returns ok, text (the saved position, or why it failed)
+function Layout:PetSave()
+    local a, why = self:PetNow()
+    if not a then return false, why end
+    ns.db.overrides = ns.db.overrides or {}
+    ns.db.overrides.petBar = {
+        point = a.point, relativeTo = a.relativeTo or "UIParent", relativePoint = a.relativePoint,
+        offsetX = a.offsetX, offsetY = a.offsetY,
+    }
+    ns.FireState()
+    return true, AnchorText(a)
+end
+
+function Layout:PetReset()
+    if ns.db.overrides then ns.db.overrides.petBar = nil end
+    ns.FireState()
+end
+
+-- Name of the active Edit Mode layout, and whether it is one of the MLZ layouts
+function Layout:ActiveName()
+    if not Available() then return nil, false end
+    local _, _, active = self:GetInfo()
+    local name = active and active.layoutName
+    if not name then return nil, false end
+    if name == ns.data.layout.name then return name, true end
+    for _, v in ipairs(self:VariantNames()) do if v == name then return name, true end end
+    return name, false
+end
+
+-- True when the MLZ UI layout has been created
+function Layout:Exists()
+    if not Available() then return false end
+    local raw = self:GetInfo()
+    if not raw then return false end
+    return FindByName(raw.layouts, ns.data.layout.name) ~= nil
+end
+
 ns.AddCommand("pet", "pet bar position: save (remember where you put it) | reset | show", function(arg)
     arg = strlower(strtrim(arg or ""))
-    ns.db.overrides = ns.db.overrides or {}
     if arg == "reset" then
-        ns.db.overrides.petBar = nil
+        Layout:PetReset()
         ns.Print("Pet bar goes back to the default position next time the layout is applied.")
-        return
-    end
-    if not Available() then ns.Print("Edit Mode API not available.") return end
-    if arg == "save" or arg == "show" then
-        local _, _, active = Layout:GetInfo()
-        local sys, why
-        if active then sys, why = FindSystem(active, PetSpec()) else why = "no active layout" end
-        if not sys then ns.Print("Could not find the pet bar in the active layout:", why) return end
-        local a = sys.anchorInfo
-        if arg == "show" then
-            ns.Print("Pet bar now:", AnchorText(a), "| saved:", ns.db.overrides.petBar and AnchorText(ns.db.overrides.petBar) or "none")
-            return
-        end
-        if not a then ns.Print("The pet bar has no position yet.") return end
-        ns.db.overrides.petBar = {
-            point = a.point, relativeTo = a.relativeTo or "UIParent", relativePoint = a.relativePoint,
-            offsetX = a.offsetX, offsetY = a.offsetY,
-        }
-        ns.Print("Saved the pet bar position:", AnchorText(a))
+    elseif arg == "save" then
+        local ok, text = Layout:PetSave()
+        ns.Print(ok and "Saved the pet bar position:" or "Could not save the pet bar position:", text)
+    elseif arg == "show" then
+        local a, why = Layout:PetNow()
+        local saved = Layout:PetSaved()
+        ns.Print("Pet bar now:", a and AnchorText(a) or ("? (" .. tostring(why) .. ")"),
+            "| saved:", saved and AnchorText(saved) or "none")
     else
         ns.Print("Use /mlz pet save (after dragging the bar in Edit Mode and saving), /mlz pet show or /mlz pet reset.")
     end
@@ -449,5 +491,5 @@ function Layout:Restore(snap)
     raw.activeLayout = snap.activeLayout
     pcall(C_EditMode.SaveLayouts, raw)
     pcall(C_EditMode.SetActiveLayout, snap.activeLayout)
-    ns.needsReload = true
+    ns.MarkReload("Edit Mode layout changed")
 end

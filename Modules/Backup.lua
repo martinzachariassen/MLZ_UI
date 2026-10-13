@@ -48,6 +48,7 @@ function Backup:Undo()
         end
         ns.Print("Restored backup from", entry.time .. ". Type |cffffff00/reload|r to finish.")
         if #list == 0 then ns.db.installed = false end
+        ns.MarkReload("setup undone")
     end, "undo")
 end
 
