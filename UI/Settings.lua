@@ -89,7 +89,25 @@ local NP_OPTIONS = { { value = "auto", text = "Auto", tip = "Follows your role: 
 for _, m in ipairs(ns.NP.MODES) do NP_OPTIONS[#NP_OPTIONS + 1] = { value = m, text = MODE_TEXT[m] } end
 local function GetNPChoice() return ns.NP.Auto() and "auto" or (ns.NP.Mode() or "dps") end
 local function SetNPChoice(v) if v == "auto" then ns.NP.SetAuto(true) else ns.NP.SetMode(v) end end
-local function NPNotReady() if not ns.NP.Ready() then return "Platynator is not loaded" end end -- row "avail" check
+-- row "avail" checks: nil when the row can be used, otherwise the reason
+local function NPNotReady() return ns.NP.NotReady() end
+local function MLZOnly()
+    if ns.NP.Engine() ~= "mlz" then return "Only for MLZ nameplates" end
+    return ns.NP.NotReady()
+end
+local function PlatyOnly()
+    if ns.NP.Engine() ~= "platynator" then return "Only for Platynator" end
+    return ns.NP.NotReady()
+end
+local ENGINE_OPTIONS = {
+    { value = "mlz", text = "MLZ" }, { value = "platynator", text = "Platynator" }, { value = "off", text = "Off" },
+}
+local ENGINE_TIP = "MLZ: MLZ UI draws its own flat nameplates.\nPlatynator: Platynator draws the plates and MLZ UI drives its settings.\n"
+    .. "Off: Blizzard's own nameplates, left alone.\nMLZ and Platynator can't both draw: pick Platynator while it is loaded."
+local SIZE_OPTIONS = {
+    { value = 0.8, text = "80%" }, { value = 0.9, text = "90%" }, { value = 1, text = "100%" },
+    { value = 1.1, text = "110%" }, { value = 1.2, text = "120%" }, { value = 1.35, text = "135%" },
+}
 
 ------------------------------------------------------------------------
 -- Status summary: one entry per area. Used by the overview page and the minimap tooltip.
@@ -128,13 +146,18 @@ end
 
 SECTIONS[#SECTIONS + 1] = function(Add)
     local NP = ns.NP
+    local engine = NP.Engine()
+    if engine == "off" then
+        Add("nameplates", "Nameplates", "off", "Off", "Blizzard's own nameplates")
+        return
+    end
     if not NP.Ready() then
-        Add("nameplates", "Nameplates", "na", "Not loaded", "Platynator is not loaded")
+        Add("nameplates", "Nameplates", "warn", "Check", NP.NotReady())
         return
     end
     local mode = MODE_TEXT[NP.Mode() or ""]
-    local parts = { NP.Auto() and ("Auto: " .. (NP.Reason() or "-")) or "Chosen by you" }
-    if NP.Style() then parts[#parts + 1] = "clean style" end
+    local parts = { NP.ENGINE_TEXT[engine], NP.Auto() and ("Auto: " .. (NP.Reason() or "-")) or "Chosen by you" }
+    if engine == "platynator" and NP.Style() then parts[#parts + 1] = "clean style" end
     if NP.Threat() then parts[#parts + 1] = "threat colors" end
     if NP.LastError() then
         Add("nameplates", "Nameplates", "warn", mode or "Check", NP.LastError())
@@ -705,15 +728,20 @@ PAGES[#PAGES + 1] = { key = "nameplates", title = "Nameplates", icon = "Interfac
     local NP = ns.NP
     p:Title("Nameplates", "Nameplates that follow your role. Changes show at once.")
 
-    p:Card("Right now")
-    p:Status("Platynator", function()
-        if NP.Ready() and NP.LastError() then return C.amber .. "Something needs a look: hover here." .. C.r end
-        return "MLZ UI changes your Platynator profile through Platynator's own import."
+    p:Card("Engine", "Who draws your nameplates. Modes, threat colors and the PvP tweak work with both MLZ and Platynator.")
+    p:Choice("Nameplates drawn by", "Switching applies at once, no reload.", ENGINE_OPTIONS, NP.Engine, NP.SetEngine, 80, { tip = ENGINE_TIP })
+    p:Status("Right now", function()
+        local e = NP.Engine()
+        if NP.LastError() then return C.amber .. "Something needs a look: hover here." .. C.r end
+        if e == "mlz" then return "MLZ UI draws the plates. Blizzard's own plate is only made invisible." end
+        if e == "platynator" then return "MLZ UI changes your Platynator profile through Platynator's own import." end
+        return "Blizzard's own nameplates. MLZ UI leaves them alone."
     end, function()
-        if not NP.Ready() then return "na", "Not loaded" end
+        if NP.Engine() == "off" then return "off", "Off" end
+        if not NP.Ready() then return "warn", NP.NotReady() end
         if NP.LastError() then return "warn", "Check" end
         return "on", "Working"
-    end, { tip = function() return NP.Ready() and NP.LastError() or nil end })
+    end, { tip = function() return NP.LastError() end })
     p:Value("Mode on your nameplates", function()
         if NP.Auto() then return "Picked automatically: " .. (NP.Reason() or "-") .. "." end
         local m, why = NP.Suggested()
@@ -735,23 +763,38 @@ PAGES[#PAGES + 1] = { key = "nameplates", title = "Nameplates", icon = "Interfac
     p:Card("Options")
     p:Toggle("Friendly names for healers", "In Healer mode friendly players get a name above their head, but it can't be clicked, so it never steals a click.",
         NP.HealerFriends, NP.SetHealerFriends, { avail = NPNotReady })
-    p:Toggle("Clean nameplate style", "Minimal enemy nameplates: name and percent in the bar, cast bar, crowd control and only your own debuffs.",
-        NP.Style, NP.SetStyle, { avail = NPNotReady,
-        tip = "Built from your own enemy design, so your font and colors stay. Everything it removes is remembered: turning it off puts it back." })
     p:Toggle("Threat colors per role", "Tank: red = a mob is not on you. DPS: red = a mob is on you. Off for healers and when solo.",
         NP.Threat, NP.SetThreat, { avail = NPNotReady,
-        tip = "Changes the threat color rule of your enemy design. Turning it off puts your own rule back." })
-    p:Toggle("PvP tweak", "In battlegrounds and arenas: every enemy fully visible, enemy buffs shown, no threat colors.",
+        tip = "Tank: blue = securely on you, orange = aggro is changing hands, red = a mob is on someone else, teal = on the other tank. "
+            .. "DPS: orange = you are close to pulling aggro, red = the mob is on you." })
+    p:Toggle("PvP tweak", "In battlegrounds and arenas: every enemy fully visible, no threat colors.",
         NP.PvP, NP.SetPvP, { avail = NPNotReady })
 
-    p:Card("Your Platynator profile", "MLZ UI saves a copy of your profile before it changes anything. Restore puts that copy back.")
+    p:Card("What MLZ nameplates show", "Kept calm on purpose: extra details only show when they matter.")
+    local function ShowToggle(key, label, desc, tip)
+        p:Toggle(label, desc, function() return NP.Show(key) end, function(on) NP.SetShow(key, on) end,
+            { avail = MLZOnly, tip = tip })
+    end
+    ShowToggle("healthText", "Health percent", "Inside the bar, on your target and on mobs that are hurt.")
+    ShowToggle("castBar", "Cast bar", "Under the health bar. Blue can be interrupted, grey can't.")
+    ShowToggle("quest", "Quest marker", "A yellow ! next to mobs you still need for a quest.",
+        "Read from the mob's tooltip and remembered per mob, so it costs nothing in a fight.")
+    ShowToggle("debuffs", "Your debuffs", "Only your own, with time left. On your target, or on every mob in Tank mode.")
+    ShowToggle("level", "Level", "Only when it is 3 or more levels from yours, or ??. Elite and rare marks always show.")
+    p:Step("Size", "Width and text size of the plates. Your target is a bit bigger on top of this.", SIZE_OPTIONS, 140,
+        NP.Size, NP.SetSize, { avail = MLZOnly })
+
+    p:Card("Platynator", "MLZ UI saves a copy of your Platynator profile before it changes anything. Restore puts that copy back.")
+    p:Toggle("Clean nameplate style", "Minimal enemy nameplates: name and percent in the bar, cast bar, crowd control and only your own debuffs.",
+        NP.Style, NP.SetStyle, { avail = PlatyOnly,
+        tip = "Built from your own enemy design, so your font and colors stay. Everything it removes is remembered: turning it off puts it back." })
     p:Value("Saved copy", nil, function() return NP.HasSnapshot() and "Yes" or (C.grey .. "None yet" .. C.r) end)
     p:Buttons({
-        { text = "Save profile", fn = NP.Save, width = 130, refresh = function(b) b:SetEnabled(NP.Ready()) end,
+        { text = "Save profile", fn = NP.Save, width = 130, refresh = function(b) b:SetEnabled(NP.PlatyReady()) end,
           tip = "Replaces the saved copy with your profile as it is now." },
-        { text = "Restore saved", fn = NP.Load, width = 130, refresh = function(b) b:SetEnabled(NP.Ready() and NP.HasSnapshot()) end,
+        { text = "Restore saved", fn = NP.Load, width = 130, refresh = function(b) b:SetEnabled(NP.PlatyReady() and NP.HasSnapshot()) end,
           tip = "Puts the saved copy back and turns the clean style and threat colors off." },
-        { text = "Export", fn = NP.Export, width = 100, style = "subtle", refresh = function(b) b:SetEnabled(NP.Ready()) end },
+        { text = "Export", fn = NP.Export, width = 100, style = "subtle", refresh = function(b) b:SetEnabled(NP.PlatyReady()) end },
     })
 end }
 

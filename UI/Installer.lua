@@ -42,7 +42,7 @@ local PAGES = {
     { kind = "module", key = "addons", title = "Other addons",
       text = "Settings for supported addons that are installed and loaded; the rest are skipped. Some addons only pick up the changes after a reload; the last page tells you if that is the case." },
     { kind = "module", key = "nameplates", title = "Nameplates",
-      text = "Turns on the clean MLZ style for Platynator, which follows your role: tank, healer, DPS or solo. Threat colors and the PvP option are in the settings window (" .. C.gold .. "/mlz" .. C.r .. ")." },
+      text = "Flat, calm nameplates that follow your role: tank, healer, DPS or solo. If Platynator is loaded, MLZ UI drives it instead. What the plates show and how big they are is in the settings window (" .. C.gold .. "/mlz" .. C.r .. ")." },
     { kind = "summary", title = "Review" },
     { kind = "done", title = "All set" },
 }

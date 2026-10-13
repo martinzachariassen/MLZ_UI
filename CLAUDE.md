@@ -6,7 +6,7 @@ Guidance for working on MLZ UI. Read this before you change code, UI or copy. Fo
 
 MLZ UI is a World of Warcraft Classic addon (`## Interface: 16001`, Lua 5.1). It turns the default Blizzard UI into a clean, minimal setup through one guided wizard and a control center (`/mlz`).
 
-**Philosophy: configure, never replace.** We set up Edit Mode, CVars, keybinds and other addons the player already has. We do not build replacement unit frames or action bars. Every change is previewed as *now → will become*, backed up first and undoable with `/mlz undo`.
+**Philosophy: configure, never replace.** We set up Edit Mode, CVars, keybinds and other addons the player already has. We do not build replacement unit frames or action bars. The one exception is nameplates (`Modules/Plates.lua`): our own frames on top of Blizzard's plate, with Platynator as an optional engine. Every change is previewed as *now → will become*, backed up first and undoable with `/mlz undo`.
 
 The target player wants a calm, good-looking UI without learning a big suite like ElvUI. If a feature needs a manual to understand, it is not done yet.
 
@@ -22,7 +22,7 @@ The target player wants a calm, good-looking UI without learning a big suite lik
 
 These are not up for debate. Breaking one is a bug.
 
-1. **No taint.** On protected frames (action bars, unit frames, Edit Mode systems) only use `SetAlpha` and hooks that don't call protected functions. Never `Hide()`, `SetPoint()` or reparent them from addon code. Anything that is blocked in combat (bindings, Edit Mode, CVars that need it) goes through `ns.RunOutOfCombat(fn, label)`.
+1. **No taint.** On protected frames (action bars, unit frames, Edit Mode systems) only use `SetAlpha` and hooks that don't call protected functions. Never `Hide()`, `SetPoint()` or reparent them from addon code. Nameplates follow the same rule: Blizzard's `nameplate.UnitFrame` is only set to alpha 0 (and back to 1), our frames are children of the nameplate, and forbidden plates are skipped. Anything that is blocked in combat (bindings, Edit Mode, CVars that need it) goes through `ns.RunOutOfCombat(fn, label)`.
 2. **No libraries.** No Ace3, LibStub, LibDataBroker or embeds. Plain Lua and the WoW API only.
 3. **Feature-detect every API.** Classic clients differ. Use fallbacks like `local Container = C_Container or {}` (see `Modules/Vendor.lua`), `ns.TryOn` for events that may not exist and `ns.Try` for calls that may fail. If something is missing, show the feature as unavailable with a reason. Don't error.
 4. **Everything is undoable.** If the wizard changes it, `:Backup` captures it and `:Restore` puts it back. If a change can't be undone, it doesn't ship.
@@ -36,7 +36,7 @@ These are not up for debate. Breaking one is a bug.
 - 4 spaces, no tabs. Keep lines readable (about 120 characters).
 - File header: `-- MLZ UI: <Area>` followed by 1–4 comment lines on what the file does and where the player finds it.
 - Section banners with `----` lines for long files.
-- `local` everything. The only globals are `MLZUIDB`, `MLZUI` and named font objects (`MLZUI_Font*`).
+- `local` everything. The only globals are `MLZUIDB`, `MLZUI`, named font objects (`MLZUI_Font*`) and `MLZUIScanTooltip` (quest scan on clients without `C_TooltipInfo`).
 - Upvalue hot globals at the top (`local GetTime = GetTime`) only where it matters (OnUpdate, frequent events).
 - Comments in English, short, explaining *why*, not *what*.
 - Module tables are PascalCase (`local Tweaks = ns.RegisterModule(...)`), locals are camelCase, constants are UPPER_CASE.

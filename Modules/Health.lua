@@ -5,9 +5,10 @@
 
 local _, ns = ...
 
--- Addons that are expected besides the ones listed in Data/Addons.lua
+-- Addons that are expected besides the ones listed in Data/Addons.lua.
+-- `when` = only expected while it returns true (Platynator only matters as the nameplate engine).
 local EXTRA = {
-    { addon = "Platynator", title = "Platynator" },
+    { addon = "Platynator", title = "Platynator", when = function() return ns.NP and ns.NP.Engine() == "platynator" end },
     { addon = "!BugGrabber", title = "BugGrabber" },
 }
 
@@ -31,7 +32,9 @@ local function Problems(onlyInstalled)
         list[#list + 1] = { title = title, installed = exists }
     end
     for _, entry in ipairs(ns.data.addons) do Check(entry.addon, entry.title) end
-    for _, entry in ipairs(EXTRA) do Check(entry.addon, entry.title) end
+    for _, entry in ipairs(EXTRA) do
+        if not entry.when or entry.when() then Check(entry.addon, entry.title) end
+    end
     return list
 end
 

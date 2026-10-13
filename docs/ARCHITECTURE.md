@@ -19,7 +19,7 @@ MLZ_UI/
 ├── Modules/              HOW to set it (one feature per file)
 │   ├── Backup.lua        Backup stack, apply order, undo (loads first)
 │   ├── Scale.lua  Settings.lua  Bindings.lua  Layout.lua  Healer.lua
-│   ├── Fade.lua  ActionButtons.lua  Tweaks.lua  Nameplates.lua  Addons.lua
+│   ├── Fade.lua  ActionButtons.lua  Tweaks.lua  Plates.lua  Nameplates.lua  Addons.lua
 │   └── Health.lua  Vendor.lua  ManaTick.lua  Interrupt.lua  Profile.lua
 ├── UI/
 │   ├── Widgets.lua       Theme tokens (W.T, W.C), fonts and every widget
@@ -75,7 +75,7 @@ Rules:
 - `Restore` must work on a snapshot from an older version of the addon, or skip it safely.
 - Anything that touches protected frames or bindings goes through `ns.RunOutOfCombat`.
 
-Feature-only modules (`Vendor`, `ManaTick`, `Interrupt`, `Health`) don't register. They hook events through `ns.On` and expose a small table on `ns` (e.g. `ns.Vendor`) for the control center.
+Feature-only modules (`Vendor`, `ManaTick`, `Interrupt`, `Health`, `Plates`) don't register. They hook events through `ns.On` and expose a small table on `ns` (e.g. `ns.Vendor`) for the control center.
 
 ## Apply and undo flow
 
@@ -116,6 +116,16 @@ Use these before writing your own.
 | `ns.ShowCopy(title, text, onAccept)` | Copy/paste dialog (export, import, probe). |
 | `ns.Print(...)` · `ns.Debug(...)` | Chat output. `Debug` only prints with `/mlz debug` on. |
 | `ns.CopyTable(t)` | Deep copy for snapshots. |
+
+## Nameplates
+
+`Modules/Nameplates.lua` is the brain: it picks the mode from your role and owns the wizard step. The engine (`MLZUIDB.nameplates.engine`) decides who draws:
+
+- `mlz`: `Modules/Plates.lua` draws its own frames as children of each nameplate. Blizzard's `UnitFrame` only gets alpha 0, forbidden plates are skipped, and everything is event driven with one `OnUpdate` for cast bars and debuff timers. Nothing is registered while another engine is picked.
+- `platynator`: the profile import path described at the top of `Modules/Nameplates.lua`.
+- `off`: Blizzard's plates, untouched.
+
+The only game setting MLZ nameplates change is `nameplateShowFriends` (plus friendly click-through) in Healer mode. The old value is kept in `nameplates.friendsBase` and put back when you leave Healer mode or switch engines.
 
 ## SavedVariables
 

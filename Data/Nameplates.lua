@@ -1,5 +1,6 @@
--- MLZ UI: Nameplate data (Platynator)
--- Edit freely. The logic lives in Modules/Nameplates.lua.
+-- MLZ UI: Nameplate data
+-- Edit freely. Modes and threat are shared by both engines: MLZ nameplates (Modules/Plates.lua,
+-- see `plates` at the bottom) and Platynator (Modules/Nameplates.lua, `presets` and `style`).
 
 local _, ns = ...
 
@@ -85,4 +86,40 @@ ns.data.nameplates = {
     -- inside the addon folder. Get it with /mlz np export. The wizard can import it, and
     -- /mlz np load uses it if no copy is saved in-game. Leave as nil if you don't want that.
     profileString = nil,
+
+    -- MLZ nameplates (our own engine, Modules/Plates.lua). Flat and calm, in the MLZ UI palette.
+    plates = {
+        width = 128,          -- health bar size at size 100%
+        height = 10,
+        castHeight = 8,
+        nameSize = 10,
+        iconSize = 18,        -- debuff icons
+        debuffLimit = 6,
+        levelDiff = 3,        -- show the level only when it differs this much from yours (or is ??)
+
+        -- per mode: alpha of plates you don't target (only while you have a target), target scale,
+        -- and whether your debuffs show on every mob or only on your target
+        modes = {
+            tank   = { nonTarget = 1,   targetScale = 1.15, debuffsAll = true },
+            healer = { nonTarget = 0.6, targetScale = 1,    debuffsAll = false },
+            dps    = { nonTarget = 0.8, targetScale = 1.1,  debuffsAll = false },
+            solo   = { nonTarget = 0.9, targetScale = 1.1,  debuffsAll = false },
+        },
+        pvp = { nonTarget = 1 },
+
+        colors = {
+            hostile  = { 0.85, 0.27, 0.27 },
+            neutral  = { 0.95, 0.70, 0.25 },
+            friendly = { 0.29, 0.78, 0.45 },
+            tapped   = { 0.50, 0.52, 0.56 },
+            -- threat (see `threat` above for which colors each mode uses)
+            warning    = { 1.00, 0.20, 0.20 },
+            transition = { 1.00, 0.55, 0.15 },
+            safe       = { 0.20, 0.55, 1.00 },
+            offtank    = { 0.20, 0.80, 0.75 },
+            cast       = { 0.20, 0.63, 1.00 },   -- interruptible: accent blue
+            castLocked = { 0.45, 0.47, 0.52 },   -- can't be interrupted
+            quest      = { 1.00, 0.82, 0.00 },
+        },
+    },
 }

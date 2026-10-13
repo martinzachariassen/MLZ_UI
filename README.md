@@ -59,11 +59,12 @@ MLZ UI sets up the **Blizzard UI you already have** (Edit Mode, CVars, keybinds 
 - Minimalism: bars, bags and menus fade until you hover, and bars dim out of combat
 - Action buttons colored by range, mana and usability, with short hotkey labels
 - Role detection (talents, spec, group or your choice) that drives the layouts and nameplates
+- Our own flat nameplates: health, cast bar, quest marker, your debuffs and threat colors per role
 - Auto-repair, sell greys, a mana tick bar and an interrupt announce
 
 **Ecosystem**
 - Recommended settings for Prat, Bagnon, Auctionator, DBM, Leatrix and more
-- Platynator nameplate modes per role, plus an optional clean style
+- Optional: Platynator as the nameplate engine, with modes per role and a clean style
 - Role profiles, export/import strings and a health check for missing addons
 
 ## Quick start
@@ -87,7 +88,7 @@ MLZ UI sets up the **Blizzard UI you already have** (Edit Mode, CVars, keybinds 
 | `/mlz install` | Open the setup wizard |
 | `/mlz undo` | Undo the last wizard run |
 | `/mlz role tank\|healer\|dps\|auto` | Set your role for this character |
-| `/mlz np auto\|tank\|healer\|dps\|solo` | Nameplate mode (also `style`, `threat`, `pvp`, `friends`, `save`, `load`, `export`) |
+| `/mlz np auto\|tank\|healer\|dps\|solo` | Nameplate mode (also `engine mlz\|platynator\|off`, `style`, `threat`, `pvp`, `friends`, `save`, `load`, `export`) |
 | `/mlz export` · `/mlz import` | Share your choices as a string |
 | `/mlz health` | Check which supported addons are installed and loaded |
 | `/mlz help` | List every command |
@@ -98,7 +99,7 @@ MLZ UI **configures** these addons when they are installed and loaded. It does n
 
 | Addon | What gets set |
 |---|---|
-| [Platynator](https://www.curseforge.com/wow/addons/platynator) | Role-based modes, clean style, threat colors, PvP tweak, profile save/restore |
+| [Platynator](https://www.curseforge.com/wow/addons/platynator) (optional) | Only when picked as the nameplate engine: role-based modes, clean style, threat colors, PvP tweak, profile save/restore |
 | [Prat 3.0](https://www.curseforge.com/wow/addons/prat-3-0) | Timestamps, hidden chat buttons, scroll speed, fade time |
 | [Bagnon](https://www.curseforge.com/wow/addons/bagnon) | Columns, darker background, softer item glow, fewer auto-opens |
 | [Deadly Boss Mods](https://www.curseforge.com/wow/addons/deadly-boss-mods) | Warnings top center, timers and info frames on the right, slimmer bars |
@@ -121,7 +122,7 @@ Settings that don't exist in your installed version are shown as *not available*
 | **Settings (CVars)** | Each CVar is optional. CVars your client doesn't have are skipped. |
 | **Minimalism** | Bars 4-5, micro menu, bags, chat buttons and XP bar hidden until hover. Bars 2-3 dimmed out of combat. Damage meter only in a group. |
 | **Action buttons** | Red = out of range, blue = no resource, grey = unusable. Short hotkeys (`S1`, `C1`) and hidden macro names. Stance, pet and bonus bars included. |
-| **Nameplates** | Tank / Healer / DPS / Solo picked from your role. Healer: unclickable friendly names, dimmed enemies. Tank: bigger target. Applies at once, no `/reload`. |
+| **Nameplates** | MLZ nameplates (or Platynator). Tank / Healer / DPS / Solo picked from your role. Healer: unclickable friendly names, dimmed enemies. Tank: bigger target, your debuffs on every mob. Quest marker, cast bar, level only when it matters. Applies at once, no `/reload`. |
 | **Quality of life** | Auto-repair (guild money first), sell greys (hold Shift to skip), mana tick / 5-second rule bar (energy tick for rogues and cats), interrupt announce. |
 | **Role profiles** | Nameplates, fading, tick bar and interrupt announce saved per role, loaded automatically when your role changes. |
 | **Tweaks** | Minimap size, FPS counter, calmer combat text (Roboto Bold), hide the quest tracker or its header. |
@@ -137,7 +138,7 @@ Settings that don't exist in your installed version are shown as *not available*
 |---|---|
 | Overview | One status line per area, and a banner only when setup or a reload is pending |
 | Layout & scale | Scale mode, screen layout (Edit Mode), minimap size, pet bar position |
-| Nameplates | Current mode and why, mode picker, friendly names, clean style, threat colors, PvP tweak, profile save/restore |
+| Nameplates | Engine (MLZ, Platynator or off), current mode and why, mode picker, friendly names, threat colors, PvP tweak, what the plates show, size, Platynator profile save/restore |
 | Role & healing | Your role and where it comes from, healer layouts now and for your role, rebuild healer layouts |
 | Minimalism | One switch per faded frame, pause fading, clean chat |
 | Action bars & UI | Button colors and hotkeys, quest tracker, FPS counter, combat text |
@@ -161,7 +162,7 @@ Everything the wizard offers is defined in `Data/`:
 | [`Data/Bindings.lua`](Data/Bindings.lua) | Movement setups, base keys, layers, stance and pet keys |
 | [`Data/Layout.lua`](Data/Layout.lua) | Edit Mode frame positions |
 | [`Data/Fade.lua`](Data/Fade.lua) | What fades, when and how much |
-| [`Data/Nameplates.lua`](Data/Nameplates.lua) | Nameplate presets, PvP tweak, threat colors |
+| [`Data/Nameplates.lua`](Data/Nameplates.lua) | Nameplate modes, PvP tweak, threat colors, MLZ nameplate sizes and colors |
 | [`Data/Addons.lua`](Data/Addons.lua) | Settings applied to other addons |
 
 </details>

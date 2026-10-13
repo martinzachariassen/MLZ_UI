@@ -9,7 +9,7 @@ ns.version = "0.7.0"
 ns.modules = {}       -- registered modules, in load order (see MLZ_UI.toc), also indexed by key
 ns.data = {}          -- data tables (Data/*.lua)
 
-local DB_VERSION = 3
+local DB_VERSION = 4
 
 ------------------------------------------------------------------------
 -- Output
@@ -402,6 +402,15 @@ local migrations = {
             db.nameplates.threat = true
         end
         if db.installed then db.wizardSeen = true end
+    end,
+    -- v4: nameplates got an engine (MLZ, Platynator or off). Keep Platynator for everyone who
+    -- already had MLZ UI driving it, so nothing changes without asking. New keys: nameplates.show,
+    -- nameplates.size, nameplates.friendsBase (all optional).
+    [4] = function(db)
+        local np = db.nameplates
+        if type(np) == "table" and np.engine == nil and (np.lastKey or np.snapshot or np.style) then
+            np.engine = "platynator"
+        end
     end,
 }
 

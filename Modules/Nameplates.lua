@@ -1,6 +1,9 @@
--- MLZ UI: Nameplates (Platynator)
--- Four modes (tank / healer / DPS / solo) that follow your role, plus an optional clean style,
--- optional threat colors and an optional PvP tweak. See Data/Nameplates.lua for the values.
+-- MLZ UI: Nameplates
+-- Four modes (tank / healer / DPS / solo) that follow your role, optional threat colors and an
+-- optional PvP tweak. See Data/Nameplates.lua for the values. Two engines draw the plates:
+--   mlz         our own nameplates (Modules/Plates.lua), the default
+--   platynator  Platynator, driven through its profile import (the rest of this file)
+--   off         Blizzard's plates, MLZ UI doesn't touch nameplates
 --
 -- How changes reach Platynator: MLZ builds a copy of your current Platynator profile with the
 -- changes in it and imports that copy into the same profile through Platynator.API.ImportString.
@@ -33,7 +36,27 @@ local function DB()
     return ns.db.nameplates
 end
 
-local function Ready()
+local ENGINES = { mlz = true, platynator = true, off = true }
+NP.ENGINE_TEXT = { mlz = "MLZ", platynator = "Platynator", off = "Blizzard" }
+
+local function Engine()
+    local e = DB().engine
+    return ENGINES[e] and e or "off"
+end
+
+local SHOW_DEFAULTS = { healthText = true, castBar = true, quest = true, debuffs = true, level = true }
+
+local function Show()
+    local db = DB()
+    db.show = db.show or {}
+    local out = {}
+    for k, v in pairs(SHOW_DEFAULTS) do
+        if db.show[k] == nil then out[k] = v else out[k] = db.show[k] and true or false end
+    end
+    return out
+end
+
+local function PlatyReady()
     if not ns.IsAddOnLoaded("Platynator") then return false end
     if not (Platynator and Platynator.API and Platynator.API.ImportString) then return false end
     if not (C_EncodingUtil and C_EncodingUtil.SerializeCBOR and C_EncodingUtil.CompressString) then return false end
@@ -44,6 +67,22 @@ end
 local function CurrentProfile()
     return PLATYNATOR_CONFIG.Profiles[PLATYNATOR_CURRENT_PROFILE]
 end
+
+-- nil when the chosen engine can work, otherwise the reason (shown in amber in the settings window)
+local function NotReady()
+    local e = Engine()
+    if e == "off" then return "Nameplates are off" end
+    if e == "platynator" then
+        if not PlatyReady() then return "Platynator is not loaded" end
+        return nil
+    end
+    local ok, why = ns.Plates.Available()
+    if not ok then return why end
+    if ns.IsAddOnLoaded("Platynator") then return "Platynator is loaded too" end
+    return nil
+end
+
+local function Ready() return NotReady() == nil end
 
 local function Encode(tbl)
     return "PLATY!1!" .. C_EncodingUtil.EncodeBase64(C_EncodingUtil.CompressString(C_EncodingUtil.SerializeCBOR(tbl)))
@@ -345,6 +384,7 @@ end
 local NOTES = {
     builtin = "Your enemy design is one of Platynator's built-in designs, which can't be changed. Make a copy of it in /platy and assign it to enemies to use the clean style or threat colors.",
     missing = "The enemy design was not found in the current Platynator profile, so the clean style and threat colors are not applied.",
+    conflict = "Platynator is loaded too and draws its own nameplates. Pick Platynator as the engine, or turn Platynator off in the AddOns list.",
 }
 
 -- In combat: only the simple top-level numbers, through Platynator's own /platy config
@@ -364,11 +404,33 @@ local function Refresh(force)
     local db = DB()
     local mode, why = Decide()
     currentReason = why
-    if not Ready() then
+    local engine = Engine()
+    local inPvP = db.pvp and InPvP() or false
+
+    -- MLZ nameplates: our own frames, safe to change at any time (also in combat)
+    local mlzOn = engine == "mlz" and Ready()
+    ns.Plates.Configure(mlzOn, {
+        mode = mode, pvp = inPvP, threat = db.threat, friends = db.healerFriends ~= false,
+        show = Show(), size = db.size or 1,
+    })
+    if engine == "off" then
+        current, lastError = nil, nil
+        return true
+    end
+    if engine == "mlz" then
+        if not mlzOn then
+            current = nil
+            lastError = ns.IsAddOnLoaded("Platynator") and NOTES.conflict or ns.Plates.LastError()
+            return false
+        end
+        current, lastError = mode, ns.Plates.LastError()
+        return lastError == nil
+    end
+
+    if not PlatyReady() then
         current, lastError = nil, "Platynator is not loaded."
         return false
     end
-    local inPvP = db.pvp and InPvP() or false
     if InCombatLockdown() then
         if mode ~= current then
             ApplyInCombat(mode, inPvP)
@@ -416,7 +478,7 @@ local function ScheduleRefresh()
     scheduled = true
     C_Timer.After(0.5, function()
         scheduled = false
-        if ns.db and ns.db.installed then
+        if ns.db and (ns.db.installed or (ns.db.nameplates and ns.db.nameplates.engine)) then
             Refresh()
             ns.FireState()
         end
@@ -437,7 +499,7 @@ end)
 -- Save / restore / export
 ------------------------------------------------------------------------
 local function CanImport(quiet)
-    if not Ready() then
+    if not PlatyReady() then
         if not quiet then ns.Print("Platynator (or its import API) is not available.") end
         return false
     end
@@ -478,6 +540,11 @@ end
 -- Public API (settings window, minimap menu, /mlz np). Quiet: no chat output.
 ------------------------------------------------------------------------
 function NP.Ready() return Ready() end
+function NP.NotReady() return NotReady() end
+function NP.PlatyReady() return PlatyReady() end
+function NP.Engine() return Engine() end
+function NP.Show(key) return Show()[key] end
+function NP.Size() return DB().size or 1 end
 function NP.Mode() return current end
 function NP.Reason() return currentReason end
 function NP.LastError() return lastError end
@@ -522,6 +589,25 @@ function NP.SetPvP(on) DB().pvp = on and true or false; Changed() end
 function NP.SetHealerFriends(on) DB().healerFriends = on and true or false; Changed() end
 function NP.Apply() Refresh(true); ns.FireState() end
 
+function NP.SetEngine(e)
+    if not ENGINES[e] then return end
+    local db = DB()
+    db.engine = e
+    db.lastKey = nil
+    Changed()
+end
+function NP.SetShow(key, on)
+    if SHOW_DEFAULTS[key] == nil then return end
+    local db = DB()
+    db.show = db.show or {}
+    db.show[key] = on and true or false
+    Changed()
+end
+function NP.SetSize(v)
+    DB().size = tonumber(v) or 1
+    Changed()
+end
+
 function NP.Save() Save(); ns.FireState() end
 function NP.Load() Load(); ns.FireState() end
 function NP.Export()
@@ -530,12 +616,19 @@ end
 
 local function OnOff(v) return v and "|cff44ff44on|r" or "|cff888888off|r" end
 
-ns.AddCommand("np", "nameplates: auto | tank | healer | dps | solo | style [off] | threat [off] | pvp [off] | save | load | export", function(arg)
+ns.AddCommand("np", "nameplates: auto | tank | healer | dps | solo | engine mlz/platynator/off | style [off] | threat [off] | pvp [off] | save | load | export", function(arg)
     arg = strlower(strtrim(arg or ""))
     DB()
     local word, rest = arg:match("^(%S*)%s*(.-)$")
     local off = rest == "off"
-    if word == "style" then
+    if word == "engine" then
+        if not ENGINES[rest] then
+            ns.Print("Nameplate engine:", NP.ENGINE_TEXT[Engine()], "(use /mlz np engine mlz, platynator or off).")
+            return
+        end
+        NP.SetEngine(rest)
+        ns.Print("Nameplate engine:", NP.ENGINE_TEXT[rest] .. ".", NotReady() and ("|cffffb040" .. NotReady() .. ".|r") or "")
+    elseif word == "style" then
         NP.SetStyle(not off)
         ns.Print("Clean style:", OnOff(not off))
     elseif word == "threat" then
@@ -563,69 +656,87 @@ ns.AddCommand("np", "nameplates: auto | tank | healer | dps | solo | style [off]
         NP.SetAuto(false)
         ns.Print("Automatic switching is off; the mode stays", NP.MODE_TEXT[DB().mode] or "as it is", ".")
     else
-        if not Ready() then ns.Print("Platynator is not loaded.") return end
-        ns.Print(("Nameplates: %s (%s), automatic %s, style %s, threat %s, PvP %s"):format(
-            NP.MODE_TEXT[current or ""] or "unknown", currentReason or "-", OnOff(NP.Auto()),
-            OnOff(NP.Style()), OnOff(NP.Threat()), OnOff(NP.PvP())))
+        if NotReady() then ns.Print("Nameplates (" .. NP.ENGINE_TEXT[Engine()] .. "):", NotReady() .. ".") return end
+        ns.Print(("Nameplates (%s): %s (%s), automatic %s, threat %s, PvP %s"):format(
+            NP.ENGINE_TEXT[Engine()], NP.MODE_TEXT[current or ""] or "unknown", currentReason or "-",
+            OnOff(NP.Auto()), OnOff(NP.Threat()), OnOff(NP.PvP())))
         if lastError then ns.Print("|cffff8800Note:|r", lastError) end
-        ns.Print("Use /mlz np auto, tank, healer, dps, solo, style, threat, pvp, friends (add 'off' to turn off), save, load or export.")
+        ns.Print("Use /mlz np auto, tank, healer, dps, solo, engine, style, threat, pvp, friends (add 'off' to turn off), save, load or export.")
     end
 end)
 
 ------------------------------------------------------------------------
 -- Wizard step
 ------------------------------------------------------------------------
-local Nameplates = ns.RegisterModule({ key = "nameplates", title = "Nameplates (Platynator)" })
+local Nameplates = ns.RegisterModule({ key = "nameplates", title = "Nameplates" })
 
 function Nameplates:Preview()
-    local text = D().profileString
     local items = {}
-    local loaded = Ready()
     local db = DB()
+    local engine = Engine()
+    local platy = PlatyReady()
 
-    local profile = { id = "profile", group = "Platynator", label = "Import MLZ profile" }
-    if not loaded then
-        profile.old, profile.new, profile.enabled, profile.unavailable = "-", "Platynator not loaded", false, true
-    elseif not text then
-        profile.old, profile.new, profile.enabled, profile.unavailable = "-", "no saved profile", false, true
-        profile.note = "No Platynator profile is saved in MLZ UI yet, so there is nothing to import. The clean style below works without one."
+    -- Engine: Platynator when it is loaded (two engines would draw two plates), otherwise ours
+    local row = { id = "engine", group = "Nameplates", old = NP.ENGINE_TEXT[engine] }
+    if platy then
+        row.label, row.new, row.engine = "Nameplates drawn by", "Platynator", "platynator"
+        row.note = "Platynator is loaded, so MLZ UI drives it: modes per role, clean style and threat colors. "
+            .. "To use MLZ nameplates instead, turn Platynator off and pick MLZ in the settings window."
     else
-        profile.old, profile.new = "current profile", "MLZ profile"
-        profile.value = text
-        profile.enabled = ns.Enabled("nameplates", "profile", true)
-        profile.note = "Replaces the settings of your current Platynator profile. Undo puts the old profile back."
+        row.label, row.new, row.engine = "MLZ nameplates", "MLZ", "mlz"
+        row.note = "Flat nameplates that follow your role: name, health, cast bar, quest marker and your own debuffs. "
+            .. "Blizzard's own plate is only made invisible, so turning this off brings it straight back."
+        local ok, why = ns.Plates.Available()
+        if not ok then row.new, row.unavailable, row.enabled = why, true, false end
     end
-    items[#items + 1] = profile
+    if not row.unavailable then
+        row.alreadySet = engine == row.engine
+        row.enabled = ns.Enabled("nameplates", "engine", true)
+    end
+    items[#items + 1] = row
 
-    local function ToggleRow(id, label, on, default, note)
-        local row = { id = id, group = "Platynator", label = label, flag = id }
-        if not loaded then
-            row.old, row.new, row.enabled, row.unavailable = "-", "Platynator not loaded", false, true
+    if platy then
+        local text = D().profileString
+        local profile = { id = "profile", group = "Platynator", label = "Import MLZ profile", requires = "engine" }
+        if not text then
+            profile.old, profile.new, profile.enabled, profile.unavailable = "-", "no saved profile", false, true
+            profile.note = "No Platynator profile is saved in MLZ UI yet, so there is nothing to import. The clean style below works without one."
         else
-            row.old, row.new = on and "on" or "off", "on"
-            row.toggle, row.isOn, row.offText = true, on, "off"
-            row.enabled = on or ns.Enabled("nameplates", id, default)
-            row.note = note
+            profile.old, profile.new = "current profile", "MLZ profile"
+            profile.value = text
+            profile.enabled = ns.Enabled("nameplates", "profile", true)
+            profile.note = "Replaces the settings of your current Platynator profile. Undo puts the old profile back."
         end
-        items[#items + 1] = row
+        items[#items + 1] = profile
+        local on = db.style and true or false
+        items[#items + 1] = { id = "style", group = "Platynator", label = "Clean nameplate style", flag = "style",
+            requires = "engine", old = on and "on" or "off", new = "on", toggle = true, isOn = on, offText = "off",
+            enabled = on or ns.Enabled("nameplates", "style", true),
+            note = "Minimal enemy nameplates: name and percent inside the bar, cast bar, crowd control and only your own debuffs. Everything removed is remembered, so turning it off puts it back." }
     end
-    ToggleRow("style", "Clean nameplate style", db.style and true or false, true,
-        "Minimal enemy nameplates: name and percent inside the bar, cast bar, crowd control and only your own debuffs. Everything removed is remembered, so turning it off puts it back.")
-    ToggleRow("threat", "Threat colors per role", db.threat and true or false, false,
-        "Colors the enemy health bar by threat: as tank, red = a mob is not on you; as DPS, red = a mob is on you. Off for healers and when solo. Off until you turn it on.")
+
+    local threat = db.threat and true or false
+    items[#items + 1] = { id = "threat", group = "Nameplates", label = "Threat colors per role", flag = "threat",
+        old = threat and "on" or "off", new = "on", toggle = true, isOn = threat, offText = "off",
+        enabled = threat or ns.Enabled("nameplates", "threat", false),
+        note = "Colors the enemy health bar by threat: as tank, red = a mob is not on you; as DPS, red = a mob is on you. Off for healers and when solo." }
     return items
 end
 
 function Nameplates:Backup()
     local db = DB()
     local snap = { style = db.style and true or false, threat = db.threat and true or false,
-        stash = db.stash and ns.CopyTable(db.stash) or nil, hasStash = true }
+        stash = db.stash and ns.CopyTable(db.stash) or nil, hasStash = true,
+        engine = db.engine, hasEngine = true }
     if CanImport(true) then snap.profile = ProfileString() end
     return snap
 end
 
 function Nameplates:Apply(items)
     local db = DB()
+    for _, item in ipairs(items) do
+        if item.engine then db.engine = item.engine end
+    end
     for _, item in ipairs(items) do
         if item.value and CanImport() then
             if not db.snapshot then db.snapshot = ProfileString() end -- your profile, before the import
@@ -646,8 +757,11 @@ function Nameplates:Restore(snap)
     db.style = snap.style and true or false
     db.threat = snap.threat and true or false
     if snap.hasStash then db.stash = snap.stash end
+    if snap.hasEngine then db.engine = snap.engine end
     if snap.profile and CanImport(true) then ImportProfileString(snap.profile) end
     -- the restored profile is exactly what these flags produced; apply again on the next change
     db.lastKey = nil
     current = nil
+    -- MLZ nameplates follow the restored engine at once (off brings Blizzard's plates back)
+    if Engine() ~= "platynator" then Refresh(true) else ns.Plates.Configure(false) end
 end
