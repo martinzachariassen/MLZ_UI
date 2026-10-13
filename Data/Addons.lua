@@ -118,8 +118,6 @@ ns.data.addons = {
               path = { "windowScale" }, value = 1.1, enabled = false },
             { id = "lock_frames", label = "Lock frames", desc = "Locks the guide window against dragging.",
               path = { "lockFrames" }, value = true },
-            { id = "column", label = "Fixed column on the right", desc = "MLZ UI places the guide, arrow, targets and items in one column on the right edge (see Data/RXP.lua). Needs /reload; when off, the boxes are movable again after /reload.",
-              root = function() return ns.db end, path = { "rxpColumn" }, value = true },
         },
     },
     -- Deadly Boss Mods. Positions are in UIParent units (same as the Edit Mode layout, 1200 units tall).

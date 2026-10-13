@@ -14,7 +14,6 @@ Data\Bindings.lua
 Data\Layout.lua
 Data\Fade.lua
 Data\Nameplates.lua
-Data\RXP.lua
 Data\Addons.lua
 
 Modules\Backup.lua
@@ -22,10 +21,10 @@ Modules\Scale.lua
 Modules\Settings.lua
 Modules\Bindings.lua
 Modules\Layout.lua
+Modules\Healer.lua
 Modules\Fade.lua
 Modules\ActionButtons.lua
 Modules\Tweaks.lua
-Modules\RXP.lua
 Modules\Nameplates.lua
 Modules\Addons.lua
 Modules\Health.lua

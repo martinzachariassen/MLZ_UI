@@ -134,10 +134,6 @@ end
 
 -- migrations[n] upgrades a database from version n-1 to n. Add new steps at the end and bump DB_VERSION.
 local migrations = {
-    -- v2: the RXP column became opt-in (a row in the wizard). Keep it on for existing installs.
-    [2] = function(db)
-        if db.installed and db.rxpColumn == nil then db.rxpColumn = true end
-    end,
 }
 
 local function Migrate(db)

@@ -140,6 +140,14 @@ function Layout:Preview()
         id = "__bars", label = "Show action bars", group = "Setup",
         old = "", new = "Bar " .. table.concat(data.showBars, ", "), enabled = ns.Enabled("layout", "__bars", true),
     }
+    if data.healer then
+        local names = table.concat(self:VariantNames(), ", ")
+        items[#items + 1] = {
+            id = "__heal", label = "Healer layouts", group = "Setup", requires = "__layout",
+            old = "", new = names, enabled = ns.Enabled("layout", "__heal", true),
+            note = "Two extra layouts (dungeon and raid) with the group frames in the middle of the screen and the swing timers hidden. They switch automatically when you heal (see /mlz heal).",
+        }
+    end
     for i, spec in ipairs(data.frames) do
         local sys, err = FindSystem(active, spec)
         local item = {
@@ -149,6 +157,8 @@ function Layout:Preview()
                   or (AnchorText({ point = spec.point, relativeTo = spec.relTo, offsetX = spec.x, offsetY = spec.y }) .. SizeText(spec)),
             enabled = sys ~= nil and ns.Enabled("layout", "frame" .. i, true),
         }
+        local own = spec.anchorOverride and ns.db.overrides and ns.db.overrides[spec.anchorOverride]
+        if own then item.new = AnchorText(own) .. SizeText(spec) .. "  (your saved position)" end
         if not sys then
             item.unavailable = true
             item.new = "skipped"
@@ -168,6 +178,11 @@ function Layout:Backup()
     local _, existing = FindByName(raw.layouts, ns.data.layout.name)
     snap.hadLayout = existing ~= nil
     snap.layoutCopy = existing and ns.CopyTable(existing) or nil
+    snap.variants = {}
+    for _, name in ipairs(self:VariantNames()) do
+        local _, l = FindByName(raw.layouts, name)
+        snap.variants[name] = l and ns.CopyTable(l) or false
+    end
     return snap
 end
 
@@ -185,37 +200,8 @@ local function ShowBars(list)
     end
 end
 
-function Layout:Apply(items)
-    local data = ns.data.layout
-    local doLayout, doBars = false, false
-    local specs = {}
-    for _, item in ipairs(items) do
-        if item.id == "__layout" then doLayout = true
-        elseif item.id == "__bars" then doBars = true
-        elseif item.spec then specs[#specs + 1] = item.spec end
-    end
-
-    if doBars then ShowBars(data.showBars) end
-    if not doLayout or not Available() then return end
-
-    local raw, presets, active = self:GetInfo()
-    if not raw or not active then ns.Print("|cffff4444Could not read Edit Mode layouts.|r") return end
-
-    local idx, target = FindByName(raw.layouts, data.name)
-    if not target then
-        local max = Constants and Constants.EditModeConsts and Constants.EditModeConsts.EditModeMaxLayoutsPerType
-        if max and #raw.layouts >= max then
-            ns.Print("|cffff4444Too many Edit Mode layouts (max " .. max .. "). Delete one in Edit Mode and try again.|r")
-            return
-        end
-        target = ns.CopyTable(active)
-        target.layoutName = data.name
-        target.layoutType = Enum.EditModeLayoutType and Enum.EditModeLayoutType.Account or target.layoutType
-        target.isPreset, target.isModified = nil, nil
-        table.insert(raw.layouts, target)
-        idx = #raw.layouts
-    end
-
+-- Writes the given frame specs (anchor + settings) into one layout table. Returns number moved, log.
+function Layout:WriteSpecs(target, specs)
     local moved = 0
     local log = {}
     local function SetSetting(sys, spec, name, value, convert)
@@ -241,7 +227,11 @@ function Layout:Apply(items)
         local sys = FindSystem(target, spec)
         if sys then
             if not spec.keepAnchor then
-                sys.anchorInfo = {
+                local own = spec.anchorOverride and ns.db.overrides and ns.db.overrides[spec.anchorOverride]
+                sys.anchorInfo = own and {
+                    point = own.point, relativeTo = own.relativeTo, relativePoint = own.relativePoint,
+                    offsetX = own.offsetX, offsetY = own.offsetY,
+                } or {
                     point = spec.point, relativeTo = spec.relTo or "UIParent", relativePoint = spec.relPoint,
                     offsetX = spec.x, offsetY = spec.y,
                 }
@@ -260,6 +250,114 @@ function Layout:Apply(items)
             moved = moved + 1
         end
     end
+    return moved, log
+end
+
+------------------------------------------------------------------------
+-- Healer layouts: extra Edit Mode layouts that are copies of the main layout with a few frames changed
+-- (see ns.data.layout.healer). Modules/Healer.lua switches between them.
+------------------------------------------------------------------------
+local function VariantSpecs(variant)
+    local list = {}
+    for _, base in ipairs(ns.data.layout.frames) do
+        local o = variant.frames[base.label]
+        if o then
+            local spec = ns.CopyTable(base)
+            for k, v in pairs(o) do
+                if k == "settings" or k == "rawSettings" then
+                    spec[k] = spec[k] or {}
+                    for kk, vv in pairs(v) do spec[k][kk] = vv end
+                else
+                    spec[k] = v
+                end
+            end
+            list[#list + 1] = spec
+        end
+    end
+    return list
+end
+
+-- baseLayout = the finished main layout table. Adds or refreshes one layout per variant in raw.layouts.
+function Layout:BuildVariants(raw, baseLayout)
+    local h = ns.data.layout.healer
+    if not h then return 0 end
+    local built = 0
+    for _, v in ipairs(h.variants) do
+        local copy = ns.CopyTable(baseLayout)
+        copy.layoutName = v.name
+        copy.isPreset, copy.isModified = nil, nil
+        local idx = FindByName(raw.layouts, v.name)
+        if idx then
+            copy.layoutType = raw.layouts[idx].layoutType
+            raw.layouts[idx] = copy
+        else
+            local max = Constants and Constants.EditModeConsts and Constants.EditModeConsts.EditModeMaxLayoutsPerType
+            if max and #raw.layouts >= max then
+                ns.Print("|cffff4444Too many Edit Mode layouts (max " .. max .. "), skipped " .. v.name .. ".|r")
+                break
+            end
+            table.insert(raw.layouts, copy)
+        end
+        self:WriteSpecs(copy, VariantSpecs(v))
+        built = built + 1
+    end
+    return built
+end
+
+-- Rebuilds the healer layouts from the saved main layout. Returns ok, message.
+function Layout:RebuildVariants()
+    if not Available() then return false, "Edit Mode API missing" end
+    local raw = self:GetInfo()
+    if not raw then return false, "could not read layouts" end
+    local _, base = FindByName(raw.layouts, ns.data.layout.name)
+    if not base then return false, "The MLZ UI layout does not exist yet (run /mlz install)" end
+    local n = self:BuildVariants(raw, base)
+    local ok, err = pcall(C_EditMode.SaveLayouts, raw)
+    if not ok then return false, tostring(err) end
+    return true, n .. " healer layout(s) written"
+end
+
+function Layout:VariantNames()
+    local names = {}
+    local h = ns.data.layout.healer
+    for _, v in ipairs(h and h.variants or {}) do names[#names + 1] = v.name end
+    return names
+end
+
+function Layout:Apply(items)
+    local data = ns.data.layout
+    local doLayout, doBars, doHeal = false, false, false
+    local specs = {}
+    for _, item in ipairs(items) do
+        if item.id == "__layout" then doLayout = true
+        elseif item.id == "__bars" then doBars = true
+        elseif item.id == "__heal" then doHeal = true
+        elseif item.spec then specs[#specs + 1] = item.spec end
+    end
+
+    if doBars then ShowBars(data.showBars) end
+    if not doLayout or not Available() then return end
+
+    local raw, presets, active = self:GetInfo()
+    if not raw or not active then ns.Print("|cffff4444Could not read Edit Mode layouts.|r") return end
+
+    local idx, target = FindByName(raw.layouts, data.name)
+    if not target then
+        local max = Constants and Constants.EditModeConsts and Constants.EditModeConsts.EditModeMaxLayoutsPerType
+        if max and #raw.layouts >= max then
+            ns.Print("|cffff4444Too many Edit Mode layouts (max " .. max .. "). Delete one in Edit Mode and try again.|r")
+            return
+        end
+        target = ns.CopyTable(active)
+        target.layoutName = data.name
+        target.layoutType = Enum.EditModeLayoutType and Enum.EditModeLayoutType.Account or target.layoutType
+        target.isPreset, target.isModified = nil, nil
+        table.insert(raw.layouts, target)
+        idx = #raw.layouts
+    end
+
+    local moved, log = self:WriteSpecs(target, specs)
+    if doHeal then self:BuildVariants(raw, target) end
     ns.db.layoutLog = log -- ends up in SavedVariables, so we can check the conversion after /reload
 
     raw.activeLayout = #presets + idx
@@ -296,11 +394,52 @@ function Layout:UpdateOne(id, name, value)
     return false, name .. " is not present on the system"
 end
 
+-- /mlz pet save: remembers where the pet bar sits in the active Edit Mode layout, so installing
+-- the layout again puts it back there. /mlz pet reset goes back to the position in Data/Layout.lua.
+local function PetSpec()
+    for _, sp in ipairs(ns.data.layout.frames) do if sp.id == "petbar" then return sp end end
+end
+
+ns.AddCommand("pet", "pet bar position: save (remember where you put it) | reset | show", function(arg)
+    arg = strlower(strtrim(arg or ""))
+    ns.db.overrides = ns.db.overrides or {}
+    if arg == "reset" then
+        ns.db.overrides.petBar = nil
+        ns.Print("Pet bar goes back to the default position next time the layout is applied.")
+        return
+    end
+    if not Available() then ns.Print("Edit Mode API not available.") return end
+    if arg == "save" or arg == "show" then
+        local _, _, active = Layout:GetInfo()
+        local sys, why
+        if active then sys, why = FindSystem(active, PetSpec()) else why = "no active layout" end
+        if not sys then ns.Print("Could not find the pet bar in the active layout:", why) return end
+        local a = sys.anchorInfo
+        if arg == "show" then
+            ns.Print("Pet bar now:", AnchorText(a), "| saved:", ns.db.overrides.petBar and AnchorText(ns.db.overrides.petBar) or "none")
+            return
+        end
+        if not a then ns.Print("The pet bar has no position yet.") return end
+        ns.db.overrides.petBar = {
+            point = a.point, relativeTo = a.relativeTo or "UIParent", relativePoint = a.relativePoint,
+            offsetX = a.offsetX, offsetY = a.offsetY,
+        }
+        ns.Print("Saved the pet bar position:", AnchorText(a))
+    else
+        ns.Print("Use /mlz pet save (after dragging the bar in Edit Mode and saving), /mlz pet show or /mlz pet reset.")
+    end
+end)
+
 function Layout:Restore(snap)
     if snap.barToggles and SetActionBarToggles then pcall(SetActionBarToggles, unpack(snap.barToggles)) end
     if not snap.activeLayout or not Available() then return end
     local raw = self:GetInfo()
     if not raw then return end
+    for name, copy in pairs(snap.variants or {}) do
+        local vi = FindByName(raw.layouts, name)
+        if vi and copy then raw.layouts[vi] = copy
+        elseif vi then table.remove(raw.layouts, vi) end
+    end
     local idx = FindByName(raw.layouts, ns.data.layout.name)
     if snap.hadLayout and snap.layoutCopy then
         if idx then raw.layouts[idx] = snap.layoutCopy end

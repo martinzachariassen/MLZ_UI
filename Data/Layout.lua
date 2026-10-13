@@ -8,7 +8,7 @@
 --                                                                    [bar4][bar5]
 --          [focus]               [swing ranged]                       (mouseover)
 --                                [swing main  ]
---                     [stance]   [swing off   ]   [pet]
+--                [stance]        [swing off   ]        [pet]
 --                                [  cast bar  ]
 --          [player]   [ bar 3  (Ctrl)  ]   [target]
 --                     [ bar 2  (Shift) ]
@@ -64,6 +64,13 @@ local SWING_GAP = 2                            -- gap between the swing timers
 -- Swing timer settings are stored raw (width/height in units before scale, Scale in steps)
 -- Width 453 = the same width the game currently shows.
 local SWING = { Scale = 0, Opacity = 100, Width = 453, Height = 15, ShowBarTitle = 0, ShowTime = 0, Visibility = 1 }
+
+-- Healer layouts: copies of the main layout where the group frames sit in the middle of the screen, right above
+-- the cast bar, and the swing timers are hidden (a healer has no use for them; that is also where the room comes from).
+-- Player and target keep their place left and right of the bars, so your own character stays in view.
+-- The group frames are anchored by their bottom edge in the center and grow upward.
+local HEAL_Y = CAST_Y + 34                     -- bottom edge of the group frames (the cast time text hangs under the cast bar)
+local SWING_HIDDEN = { Visibility = 2 }        -- 0 = always, 1 = in combat, 2 = hidden
 
 -- Chat at bottom left, with bar 6 (no hotkeys) right above it
 local CHAT_Y = 40                              -- bottom edge of chat (room for the input box below)
@@ -125,11 +132,15 @@ ns.data.layout = {
 
         -- Stance on the left and pet on the right, in line with off hand and with the edges of the stack.
         -- Anchored to the center of the off hand bar, so x = half the stack width no matter how wide the bar is.
+        -- The bars hang OUTSIDE the swing timers (which are as wide as the stack): stance grows to the left
+        -- of the left edge, pet (10 buttons, ~290 wide: warlock, hunter, ...) grows to the right of the right edge.
+        -- Anchoring the other way round made them grow inward and cover the swing timers.
         { label = "Stance bar", system = "ActionBar", indexEnum = ABI, index = "StanceBar",
-          point = "BOTTOMLEFT", relPoint = "BOTTOM", relTo = "SwingTimerOffHandFrame", x = -HALF, y = 0,
+          point = "BOTTOMRIGHT", relPoint = "BOTTOM", relTo = "SwingTimerOffHandFrame", x = -(HALF + GAP), y = 0,
           settingEnum = AB, settings = SMALL_BAR },
-        { label = "Pet bar", system = "ActionBar", indexEnum = ABI, index = "PetActionBar",
-          point = "BOTTOMRIGHT", relPoint = "BOTTOM", relTo = "SwingTimerOffHandFrame", x = HALF, y = 0,
+        -- Your own placement wins: drag it in Edit Mode, then /mlz pet save (stored in MLZUIDB.overrides.petBar).
+        { id = "petbar", anchorOverride = "petBar", label = "Pet bar", system = "ActionBar", indexEnum = ABI, index = "PetActionBar",
+          point = "BOTTOMLEFT", relPoint = "BOTTOM", relTo = "SwingTimerOffHandFrame", x = HALF + GAP, y = 0,
           settingEnum = AB, settings = SMALL_BAR },
 
         -- XP / rep: small, at the very bottom below the stack
@@ -213,5 +224,34 @@ ns.data.layout = {
           settingEnum = "EditModeMicroMenuSetting", settings = { Size = 70 } },
         { label = "Damage meter", system = "DamageMeter",
           point = "BOTTOMRIGHT", relPoint = "BOTTOMRIGHT", x = -80, y = 80 },
+    },
+
+    -- Variants for Modules/Healer.lua. `frames` lists the frames that differ from the main layout, by label
+    -- (same labels as in `frames` above); settings are merged over the main layout's settings.
+    healer = {
+        variants = {
+            -- Dungeon (party of 5): one wide row, big frames, easy to read dispels and debuffs
+            {
+                name = "MLZ UI Heal Dungeon", kind = "party",
+                frames = {
+                    ["Party"] = { point = "BOTTOM", relPoint = "BOTTOM", x = 0, y = HEAL_Y,
+                                  settings = { FrameWidth = 110, FrameHeight = 55, BuffIconSize = 60 } },
+                    ["Swing timer off hand"]   = { rawSettings = SWING_HIDDEN },
+                    ["Swing timer main hand"]  = { rawSettings = SWING_HIDDEN },
+                    ["Swing timer ranged"]     = { rawSettings = SWING_HIDDEN },
+                },
+            },
+            -- Raid: 5 per row = as wide as the action bars (450); 25 players = 5 rows, tanks first, then healers, then dps
+            {
+                name = "MLZ UI Heal Raid", kind = "raid",
+                frames = {
+                    ["Raid"] = { point = "BOTTOM", relPoint = "BOTTOM", x = 0, y = HEAL_Y,
+                                 settings = { FrameWidth = 90, FrameHeight = 45, BuffIconSize = 55 } },
+                    ["Swing timer off hand"]   = { rawSettings = SWING_HIDDEN },
+                    ["Swing timer main hand"]  = { rawSettings = SWING_HIDDEN },
+                    ["Swing timer ranged"]     = { rawSettings = SWING_HIDDEN },
+                },
+            },
+        },
     },
 }

@@ -1,14 +1,19 @@
 -- MLZ UI: Nameplates (Platynator tank/DPS)
--- Switches a few Platynator settings depending on stance: Defensive Stance = tank, all others = DPS.
+-- Switches a few Platynator settings depending on stance: Warrior Defensive Stance / Druid Bear Form = tank,
+-- everything else = DPS in a group, SOLO when alone.
 -- Platynator has no public profile API, so this goes through its own slash command
 -- (/platy config <name> <value>), which only handles simple values (numbers, text, on/off).
--- Everything else (designs, colors, threat) stays the same in both modes.
+-- The threat colors on the enemy health bar are tuned per mode (see ns.data.nameplates.threat).
+-- Everything else in your designs stays as you made it.
 
 local _, ns = ...
 
 local DEFENSIVE_FORM = 2 -- Warrior: 1 = Battle, 2 = Defensive, 3 = Berserker
 
-local current -- "tank" | "dps" | nil
+-- Druid: Bear Form (5) and Dire Bear Form (8) = tank; every other form or no form = DPS
+local BEAR_FORM_IDS = { [5] = true, [8] = true }
+
+local current -- "tank" | "dps" | "solo" | nil
 local ApplyStyle -- defined below
 
 local function PlatynatorReady()
@@ -28,18 +33,30 @@ local function Set(mode, silent)
     end
     print = realPrint
     if current ~= mode and not silent then
-        ns.Print("Nameplates:", mode == "tank" and "|cff4da6ffTANK|r" or "|cffffd100DPS|r")
+        ns.Print("Nameplates:", mode == "tank" and "|cff4da6ffTANK|r" or mode == "solo" and "|cff66dd66SOLO|r" or "|cffffd100DPS|r")
     end
     local changed = current ~= mode
     current = mode
-    if changed and ns.db and ns.db.nameplates and ns.db.nameplates.style then ApplyStyle(mode, silent) end
+    if changed and ns.db and ns.db.nameplates and (ns.db.nameplates.style or ns.db.nameplates.threat ~= false) then
+        ApplyStyle(mode, silent)
+    end
     return true
+end
+
+local function IsTankForm()
+    local class = UnitClassBase and UnitClassBase("player")
+    if class == "WARRIOR" then return GetShapeshiftForm() == DEFENSIVE_FORM end
+    if class == "DRUID" then
+        local id = GetShapeshiftFormID and GetShapeshiftFormID()
+        return BEAR_FORM_IDS[id] and true or false
+    end
+    return false
 end
 
 local function Auto()
     if not (ns.db and ns.db.nameplates and ns.db.nameplates.auto) then return end
-    if UnitClassBase and UnitClassBase("player") ~= "WARRIOR" then return end
-    Set(GetShapeshiftForm() == DEFENSIVE_FORM and "tank" or "dps")
+    local mode = IsTankForm() and "tank" or (IsInGroup() and "dps" or "solo")
+    if mode ~= current then Set(mode) end
 end
 
 ns.On("PLAYER_ENTERING_WORLD", function()
@@ -47,6 +64,7 @@ ns.On("PLAYER_ENTERING_WORLD", function()
     C_Timer.After(1, Auto)
 end)
 ns.On("UPDATE_SHAPESHIFT_FORM", Auto)
+ns.On("GROUP_ROSTER_UPDATE", Auto)
 
 ------------------------------------------------------------------------
 -- Design tidy, save/restore and export
@@ -119,6 +137,23 @@ end
 ------------------------------------------------------------------------
 -- Clean style (/mlz np style). Edits a copy of the enemy design and imports it under the same name.
 ------------------------------------------------------------------------
+-- Threat colors per mode: edits the "threat" rule of the enemy health bar in place (never removes it).
+local function TuneThreat(design, mode)
+    local t = ns.data.nameplates.threat and ns.data.nameplates.threat[mode]
+    if not t then return end
+    for _, b in ipairs(design.bars or {}) do
+        if b.kind == "health" then
+            for _, c in ipairs(b.autoColors or {}) do
+                if c.kind == "threat" then
+                    c.enabled = c.enabled or {}
+                    for k, v in pairs(t.enabled) do c.enabled[k] = v end
+                    c.tanksOnly = t.tanksOnly
+                end
+            end
+        end
+    end
+end
+
 local function BuildStyled(design, mode)
     local st = ns.data.nameplates.style
     design = ns.CopyTable(design)
@@ -139,7 +174,7 @@ local function BuildStyled(design, mode)
             if b.kind == "health" and b.autoColors then
                 local colors = {}
                 for _, c in ipairs(b.autoColors) do
-                    if not st.dropColors[mode][c.kind] then colors[#colors + 1] = c end
+                    if not st.dropColors[c.kind] then colors[#colors + 1] = c end
                 end
                 b.autoColors = colors
             end
@@ -163,6 +198,16 @@ local function BuildStyled(design, mode)
         design.auras = auras
     end
 
+    TuneThreat(design, mode)
+
+    design.addon, design.kind = "Platynator", "style"
+    return design
+end
+
+-- Only the threat colors, for people who don't use the clean style
+local function BuildThreatOnly(design, mode)
+    design = ns.CopyTable(design)
+    TuneThreat(design, mode)
     design.addon, design.kind = "Platynator", "style"
     return design
 end
@@ -182,12 +227,16 @@ ApplyStyle = function(mode, silent)
     end
     -- Keep a way back: save the profile once before the first restyle
     if not ns.db.nameplates.snapshot then ns.db.nameplates.snapshot = ProfileString() end
-    local ok, err = QuietImport(Encode(BuildStyled(design, mode)), name)
+    local full = ns.db.nameplates.style
+    if not full and ns.db.nameplates.threat == false then return false end
+    local ok, err = QuietImport(Encode((full and BuildStyled or BuildThreatOnly)(design, mode)), name)
     if not ok then
         ns.Print("|cffff4444Style import failed:|r", err)
         return false
     end
-    if not silent then ns.Print("Clean nameplate style applied (" .. mode .. ").") end
+    if not silent then
+        ns.Print(full and "Clean nameplate style applied (" or "Threat colors set (", mode .. ").")
+    end
     return true
 end
 
@@ -220,13 +269,13 @@ local function Load()
     end
 end
 
-ns.AddCommand("np", "nameplates: tank | dps | auto | off | tidy | style | save | load | export", function(arg)
+ns.AddCommand("np", "nameplates: tank | dps | solo | auto | off | threat | tidy | style | save | load | export", function(arg)
     arg = strlower(strtrim(arg or ""))
     ns.db.nameplates = ns.db.nameplates or { auto = true }
     if arg == "style" then
         ns.db.nameplates.style = true
         ApplyStyle(current or "dps")
-        ns.Print("Clean style is on and follows tank/DPS. /mlz np style off stops it, /mlz np load restores your old profile.")
+        ns.Print("Clean style is on and follows tank/DPS/solo. /mlz np style off stops it, /mlz np load restores your old profile.")
     elseif arg == "style off" then
         ns.db.nameplates.style = false
         ns.Print("Clean style will no longer be applied. /mlz np load restores your saved profile.")
@@ -238,7 +287,14 @@ ns.AddCommand("np", "nameplates: tank | dps | auto | off | tidy | style | save |
         Load()
     elseif arg == "export" then
         if CanImport() then ns.ShowCopy("MLZ UI: Platynator profile (Ctrl+C to copy)", ProfileString()) end
-    elseif arg == "tank" or arg == "dps" then
+    elseif arg == "threat off" then
+        ns.db.nameplates.threat = false
+        ns.Print("Threat colors will no longer be changed per mode. /mlz np load restores your saved profile.")
+    elseif arg == "threat" or arg == "threat on" then
+        ns.db.nameplates.threat = true
+        ApplyStyle(current or "solo")
+        ns.Print("Threat colors follow the mode (tank / dps / solo).")
+    elseif arg == "tank" or arg == "dps" or arg == "solo" then
         ns.db.nameplates.auto = false
         Set(arg)
         ns.Print("Auto stance switching is off. Use /mlz np auto to turn it back on.")
@@ -246,13 +302,13 @@ ns.AddCommand("np", "nameplates: tank | dps | auto | off | tidy | style | save |
         ns.db.nameplates.auto = true
         current = nil
         Auto()
-        ns.Print("Nameplates follow stance (Defensive = tank, otherwise DPS).")
+        ns.Print("Nameplates follow your role: Defensive Stance / Bear Form = tank, otherwise DPS in a group and SOLO alone.")
     elseif arg == "off" then
         ns.db.nameplates.auto = false
         ns.Print("Auto stance switching is off.")
     else
         ns.Print("Nameplates:", current or "unknown", "| auto:", ns.db.nameplates.auto and "on" or "off")
-        ns.Print("Use /mlz np tank, dps, auto, off, tidy, save, load or export.")
+        ns.Print("Use /mlz np tank, dps, solo, auto, off, threat, tidy, save, load or export.")
     end
 end)
 
@@ -281,7 +337,7 @@ function Nameplates:Preview()
     end
     items[#items + 1] = profile
 
-    local style = { id = "style", group = "Platynator", label = "Clean nameplate style (tank / DPS)" }
+    local style = { id = "style", group = "Platynator", label = "Clean nameplate style (tank / DPS / solo)" }
     if not loaded then
         style.old, style.new, style.enabled, style.unavailable = "-", "Platynator not loaded", false, true
     else
@@ -290,7 +346,7 @@ function Nameplates:Preview()
         style.toggle, style.isOn, style.offText = true, on, "off"
         style.styleOn = true
         style.enabled = on or ns.Enabled("nameplates", "style", true)
-        style.note = "Minimal enemy nameplates: name and percent inside the bar, cast bar, only your debuffs. Follows Defensive Stance (tank) or DPS. Undo restores your old profile; /mlz np style off stops it."
+        style.note = "Minimal enemy nameplates: name and percent inside the bar, cast bar, only your debuffs. Follows your role: tank, DPS in a group, solo alone. Undo restores your old profile; /mlz np style off stops it."
     end
     items[#items + 1] = style
     return items
