@@ -21,12 +21,10 @@ local function M(key) return ns.modules[key] end
 local ROLE_TEXT = ns.ROLE_TEXT
 local MODE_TEXT = ns.NP.MODE_TEXT
 local SOURCE_TEXT = { forced = "set by you", class = "class", spec = "spec", talents = "talents", group = "group role", unknown = "unknown" }
-local FADE_MODE = {
-    mouseover = "Hidden until mouseover",
-    combat = "Dimmed out of combat",
-    hideInCombat = "Hidden in combat",
-    group = "Hidden when solo",
-}
+local function FadeModeText(mode)
+    local t = ns.modules.fade.MODE_TEXT[mode] or tostring(mode)
+    return t:sub(1, 1):upper() .. t:sub(2)
+end
 local AB_SHORT = { range = "range", mana = "mana", unusable = "unusable", hotkeys = "short keys", macroNames = "no macro names" }
 local TW_SHORT = { trackerHeader = "no tracker header", trackerHide = "tracker hidden", fps = "FPS counter", cleanCombatFont = "combat font" }
 
@@ -61,17 +59,37 @@ local ROLE_OPTIONS = {
 }
 local function GetRoleChoice() return ns.GetRoleForce() or "auto" end
 local function SetRoleChoice(v) ns.SetRoleForce(v ~= "auto" and v or nil) end
-local function RoleDesc()
+-- "Healer (talents)": your role and where it came from
+function S.RoleText()
     local role, source = ns.Role()
-    return ("Decides the healer layouts and the nameplate mode. Detected now: %s (%s)."):format(
-        ROLE_TEXT[role or ""] or "unknown", SOURCE_TEXT[source] or tostring(source))
+    return (ROLE_TEXT[role or ""] or "Unknown") .. " (" .. (SOURCE_TEXT[source] or tostring(source)) .. ")"
+end
+local function RoleDesc()
+    return "Decides the healer layouts and the nameplate mode. Detected now: " .. S.RoleText() .. "."
+end
+
+-- "Reload needed: addon settings", or nil when nothing waits for a reload
+function S.ReloadText()
+    if not ns.needsReload then return nil end
+    local why = ns.reloadReasons or {}
+    return "Reload needed" .. (#why > 0 and (": " .. table.concat(why, ", ")) or "")
+end
+
+-- Runs fn now, or after combat with a footer note. what = "the minimap size is saved".
+function S.QueueOrNotify(fn, label, what)
+    if InCombatLockdown() then
+        ns.RunOutOfCombat(fn, label, true)
+        S:Notify("In combat: " .. what .. " when combat ends.", "warn")
+        return false
+    end
+    return true
 end
 
 local NP_OPTIONS = { { value = "auto", text = "Auto", tip = "Follows your role: tank, healer or DPS in a group, solo when alone." } }
 for _, m in ipairs(ns.NP.MODES) do NP_OPTIONS[#NP_OPTIONS + 1] = { value = m, text = MODE_TEXT[m] } end
 local function GetNPChoice() return ns.NP.Auto() and "auto" or (ns.NP.Mode() or "dps") end
 local function SetNPChoice(v) if v == "auto" then ns.NP.SetAuto(true) else ns.NP.SetMode(v) end end
-local function NPNotReady() if not ns.NP.Ready() then return "Platynator is not loaded" end end
+local function NPNotReady() if not ns.NP.Ready() then return "Platynator is not loaded" end end -- row "avail" check
 
 ------------------------------------------------------------------------
 -- Status summary: one entry per area. Used by the overview page and the minimap tooltip.
@@ -84,7 +102,7 @@ SECTIONS[#SECTIONS + 1] = function(Add)
     if sc:IsApplied() then
         Add("layout", "UI scale", "on", ("%.2f"):format(UIParent:GetScale()), sc:ModeText(sc:Mode()))
     else
-        Add("layout", "UI scale", "off", "Blizzard", ("Not managed by MLZ UI (now %.2f)"):format(UIParent:GetScale()))
+        Add("layout", "UI scale", "off", "Blizzard", ("Blizzard's own scale (now %.2f)"):format(UIParent:GetScale()))
     end
 end
 
@@ -92,28 +110,26 @@ SECTIONS[#SECTIONS + 1] = function(Add)
     local lay = M("layout")
     local name, ours = lay:ActiveName()
     if ours then
-        Add("layout", "Edit Mode layout", "on", "Active", name)
+        Add("layout", "Screen layout", "on", "Active", name)
     elseif name then
-        Add("layout", "Edit Mode layout", "warn", "Other layout",
-            '"' .. name .. '" is active' .. (lay:Exists() and ". The MLZ UI layout is saved." or ". MLZ UI layout not created."))
+        Add("layout", "Screen layout", "warn", "Other layout",
+            '"' .. name .. '" is active' .. (lay:Exists() and ". The MLZ UI layout is saved." or ". The MLZ UI layout is not made yet."))
     else
-        Add("layout", "Edit Mode layout", "na", "Not available", "Edit Mode is not available in this client")
+        Add("layout", "Screen layout", "na", "Not available", "Edit Mode is not available in this client")
     end
 end
 
 SECTIONS[#SECTIONS + 1] = function(Add)
     local H = ns.Healer
-    local role, source = ns.Role()
-    local how = "Role: " .. (ROLE_TEXT[role or ""] or "unknown") .. " (" .. (SOURCE_TEXT[source] or tostring(source)) .. ")"
-    local healer = H.IsHealer()
-    Add("healer", "Role & healer layouts", healer and "on" or "off", ROLE_TEXT[role or ""] or "Unknown",
-        how .. ". Layout: " .. tostring(H.Wanted()))
+    local role = ns.Role()
+    Add("healer", "Role & healing", H.IsHealer() and "on" or "off", ROLE_TEXT[role or ""] or "Unknown",
+        "Role: " .. S.RoleText() .. ". Layout: " .. tostring(H.Wanted()))
 end
 
 SECTIONS[#SECTIONS + 1] = function(Add)
     local NP = ns.NP
     if not NP.Ready() then
-        Add("nameplates", "Nameplates", "na", "Not loaded", "Platynator is not loaded, so modes are not used")
+        Add("nameplates", "Nameplates", "na", "Not loaded", "Platynator is not loaded")
         return
     end
     local mode = MODE_TEXT[NP.Mode() or ""]
@@ -132,7 +148,7 @@ SECTIONS[#SECTIONS + 1] = function(Add)
     local on, total = fade:CountOn()
     local chat = ns.db.chatTweaks and ", clean chat" or ""
     if ns.fadePaused then
-        Add("fade", "Minimalism", "warn", "Paused", ("%d of %d frames faded, paused until reload%s"):format(on, total, chat))
+        Add("fade", "Minimalism", "warn", "Paused", ("%d of %d frames, paused for now%s"):format(on, total, chat))
     else
         Add("fade", "Minimalism", on > 0 and "on" or "off", on > 0 and (on .. " of " .. total) or "Off",
             ("%d of %d frames hidden until needed%s"):format(on, total, chat))
@@ -156,7 +172,7 @@ SECTIONS[#SECTIONS + 1] = function(Add)
         if tw:IsOn(o.id) then names[#names + 1] = TW_SHORT[o.id] or o.id end
     end
     local map = tw.MapSize and tw.MapSize()
-    Add("buttons", "Interface tweaks", #names > 0 and "on" or "off", #names > 0 and (#names .. " on") or "Off",
+    Add("buttons", "Interface", #names > 0 and "on" or "off", #names > 0 and (#names .. " on") or "Off",
         (#names > 0 and ("On: " .. table.concat(names, ", ")) or "Nothing changed") .. (map and (". Minimap " .. map .. "%") or ""))
 end
 
@@ -181,11 +197,15 @@ SECTIONS[#SECTIONS + 1] = function(Add)
             if s.differ > 0 then differ = differ + 1 end
         end
     end
-    if loaded == 0 then
+    local off = ns.HealthOff and ns.HealthOff() or {}
+    if #off > 0 then
+        Add("addons", "Other addons", "warn", #off .. " switched off",
+            "Installed but switched off in the addon list: " .. table.concat(off, ", "))
+    elseif loaded == 0 then
         Add("addons", "Other addons", "off", "None loaded", #list .. " supported addons, none of them loaded")
     else
         Add("addons", "Other addons", differ > 0 and "warn" or "on", loaded .. " of " .. #list,
-            loaded .. " loaded, " .. (differ > 0 and (differ .. " with settings that differ from MLZ UI") or "all settings match MLZ UI"))
+            loaded .. " loaded, " .. (differ > 0 and (differ .. " set up differently than MLZ UI suggests") or "all set up the MLZ UI way"))
     end
 end
 
@@ -257,7 +277,7 @@ function Page:Card(title, subtitle)
     local c = W.Card(self.content)
     c:SetPoint("TOPLEFT", 0, -self.y)
     c:SetWidth(PAGE_W)
-    c.cy, c.rows = 4, 0
+    c.cy = 4
     if title then
         local t = W.Text(c, "MLZUI_FontHead", title)
         t:SetPoint("TOPLEFT", PAD, -13)
@@ -275,9 +295,7 @@ function Page:Card(title, subtitle)
 end
 
 local function Divider(frame)
-    local line = frame:CreateTexture(nil, "BORDER")
-    line:SetColorTexture(unpack(T.border))
-    line:SetHeight(1)
+    local line = W.Line(frame)
     line:SetPoint("TOPLEFT", PAD - 1, 0)
     line:SetPoint("TOPRIGHT", -(PAD - 1), 0)
     return line
@@ -292,7 +310,7 @@ function Page:Row(opts, build, refresh)
     row:SetPoint("TOPLEFT", 1, -c.cy)
     row:SetPoint("TOPRIGHT", -1, -c.cy)
     if c.cy > 4 then Divider(row) end
-    row.hl = W.Fill(row, { 1, 1, 1, 0.03 }, "BACKGROUND", 1)
+    row.hl = W.Fill(row, T.shade, "BACKGROUND", 1)
     row.hl:Hide()
 
     local control = build and build(row)
@@ -361,7 +379,6 @@ function Page:Row(opts, build, refresh)
     end)
 
     c.cy = c.cy + h
-    c.rows = c.rows + 1
     return row, control
 end
 
@@ -458,7 +475,6 @@ function Page:Buttons(list)
         made[#made + 1] = b
     end
     c.cy = c.cy + 48
-    c.rows = c.rows + 1
     return made
 end
 
@@ -475,7 +491,6 @@ function Page:Text(text, lines)
     fs:SetHeight(h)
     if type(text) == "function" then self:OnRefresh(function() fs:SetText(Eval(text)) end) end
     c.cy = c.cy + h + 16
-    c.rows = c.rows + 1
     return fs
 end
 
@@ -488,49 +503,51 @@ end
 ------------------------------------------------------------------------
 -- Overview widgets
 ------------------------------------------------------------------------
-local function StatusCard(parent, w, h)
+-- One line per area: colored strip, title, short status text, badge and "Open >". Click opens the page.
+local STATUS_H = 38
+local function StatusLine(parent)
     local b = CreateFrame("Button", nil, parent)
-    b:SetSize(w, h)
-    b.bg = W.Fill(b, T.card)
-    b.border = W.Border(b, T.border)
+    b:SetHeight(STATUS_H)
+    b.hl = W.Fill(b, T.shade, "HIGHLIGHT")
     b.strip = b:CreateTexture(nil, "ARTWORK")
-    b.strip:SetPoint("TOPLEFT", 1, -1)
-    b.strip:SetPoint("BOTTOMLEFT", 1, 1)
+    b.strip:SetPoint("TOPLEFT", 0, -9)
+    b.strip:SetPoint("BOTTOMLEFT", 0, 9)
     b.strip:SetWidth(3)
-    b.title = W.Text(b, "MLZUI_FontHead", "")
-    b.title:SetPoint("TOPLEFT", PAD, -12)
-    b.title:SetWidth(w - 150)
+    b.title = W.Text(b, "MLZUI_FontButton", "")
+    b.title:SetPoint("LEFT", PAD, 0)
+    b.title:SetWidth(150)
     b.title:SetWordWrap(false)
-    b.badge = W.Badge(b)
-    b.badge:SetPoint("TOPRIGHT", -12, -13)
-    b.text = W.Text(b, "GameFontHighlightSmall", "")
-    b.text:SetTextColor(unpack(T.muted))
-    b.text:SetPoint("TOPLEFT", PAD, -34)
-    b.text:SetWidth(w - PAD * 2 - 44) -- leave room for "Open >" in the bottom-right corner
-    b.text:SetHeight(26)
-    b.text:SetJustifyV("TOP")
     b.link = W.Text(b, "MLZUI_FontSmallBold", "Open >", "RIGHT")
     b.link:SetTextColor(unpack(T.accent))
-    b.link:SetPoint("BOTTOMRIGHT", -12, 8)
-    b.link:SetAlpha(0.6)
+    b.link:SetPoint("RIGHT", -PAD, 0)
+    b.link:SetAlpha(0.45)
+    b.badge = W.Badge(b)
+    b.badge:SetWidth(120)
+    b.badge:SetPoint("RIGHT", b.link, "LEFT", -16, 0)
+    b.text = W.Muted(b, "GameFontHighlightSmall", "")
+    b.text:SetPoint("LEFT", PAD + 156, 0)
+    b.text:SetPoint("RIGHT", b.badge, "LEFT", -12, 0)
+    b.text:SetWordWrap(false)
     b:SetScript("OnEnter", function(self)
-        self.bg:SetColorTexture(unpack(T.hover))
-        self.border:SetColor(T.accent)
         self.link:SetAlpha(1)
+        if self.text:IsTruncated() then
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:SetText(self.title:GetText(), 1, 1, 1)
+            GameTooltip:AddLine(self.text:GetText(), nil, nil, nil, true)
+            GameTooltip:Show()
+        end
     end)
     b:SetScript("OnLeave", function(self)
-        self.bg:SetColorTexture(unpack(T.card))
-        self.border:SetColor(T.border)
-        self.link:SetAlpha(0.6)
+        self.link:SetAlpha(0.45)
+        if GameTooltip:IsOwned(self) then GameTooltip:Hide() end
     end)
     b:SetScript("OnClick", function(self) if self.page then S:Select(self.page) end end)
-    function b:Fill(s)
-        self.page = s.page
-        self.title:SetText(s.title)
-        self.badge:Set(s.state, s.badge)
-        self.text:SetText(s.text or "")
-        local col = (W.BADGE[s.state] or W.BADGE.info)[1]
-        self.strip:SetColorTexture(unpack(col))
+    function b:Fill(st)
+        self.page = st.page
+        self.title:SetText(st.title)
+        self.badge:Set(st.state, st.badge)
+        self.text:SetText(st.text or "")
+        self.strip:SetColorTexture(unpack((W.BADGE[st.state] or W.BADGE.info)[1]))
     end
     return b
 end
@@ -566,49 +583,48 @@ end
 local PAGES = {}
 
 PAGES[#PAGES + 1] = { key = "overview", title = "Overview", icon = "Interface\\Icons\\INV_Misc_Book_09", build = function(p)
-    p:Title("Overview", "Everything MLZ UI controls, at a glance. Click a card to change it.")
+    p:Title("Overview", "Everything MLZ UI looks after. Click a line to change it.")
+    local top = p.y
 
-    local banner = Banner(p.content, p.y)
-    p.y = p.y + 50 + 14
+    -- The banner only shows when you need to do something
+    local banner = Banner(p.content, top)
+    local list = W.Card(p.content)
+    list:SetWidth(PAGE_W)
+    list:SetHeight(#SECTIONS * STATUS_H + 8)
+    local lines = {}
+    for i = 1, #SECTIONS do
+        local line = StatusLine(list)
+        line:SetPoint("TOPLEFT", 1, -(4 + (i - 1) * STATUS_H))
+        line:SetPoint("TOPRIGHT", -1, -(4 + (i - 1) * STATUS_H))
+        if i > 1 then
+            local d = W.Line(line)
+            d:SetPoint("TOPLEFT", PAD - 1, 0)
+            d:SetPoint("TOPRIGHT", -(PAD - 1), 0)
+        end
+        lines[i] = line
+    end
+    p.y = top + 50 + PAD + #SECTIONS * STATUS_H + 8
+
     p:OnRefresh(function()
+        local action = true
         if not ns.db.installed then
-            banner:Set(T.amber, "MLZ UI is not set up yet. The setup wizard walks you through everything and takes a backup first.",
+            banner:Set(T.amber, "MLZ UI is not set up yet. The setup wizard walks you through it and takes a backup first.",
                 "Run setup wizard", function() OpenWizard() end)
         elseif ns.needsReload then
-            banner:Set(T.amber, "Some changes need a reload: " .. table.concat(ns.reloadReasons, ", ") .. ".",
-                "Reload UI", function() ReloadUI() end)
+            banner:Set(T.amber, S.ReloadText() .. ".", "Reload UI", function() ReloadUI() end)
         else
-            banner:Set(T.green, C.green .. "MLZ UI is set up and running." .. C.r .. "  Hover over any setting to read what it does.")
+            action = false
+        end
+        banner:SetShown(action)
+        list:ClearAllPoints()
+        list:SetPoint("TOPLEFT", 0, -(action and (top + 50 + PAD) or top))
+
+        local sum = S.Summary()
+        for i, line in ipairs(lines) do
+            line:SetShown(sum[i] ~= nil)
+            if sum[i] then line:Fill(sum[i]) end
         end
     end)
-
-    local GAP, CH = 12, 78
-    local CW = (PAGE_W - GAP) / 2
-    local cards = {}
-    for i = 1, #SECTIONS do
-        local card = StatusCard(p.content, CW, CH)
-        local col, line = (i - 1) % 2, math.floor((i - 1) / 2)
-        card:SetPoint("TOPLEFT", col * (CW + GAP), -(p.y + line * (CH + GAP)))
-        cards[i] = card
-    end
-    p.y = p.y + math.ceil(#SECTIONS / 2) * (CH + GAP) + 4
-    p:OnRefresh(function()
-        local list = S.Summary()
-        for i, card in ipairs(cards) do
-            local s = list[i]
-            card:SetShown(s ~= nil)
-            if s then card:Fill(s) end
-        end
-    end)
-
-    p:Card("Quick actions", "The things you change most often.")
-    p:Choice("My role", RoleDesc, ROLE_OPTIONS, GetRoleChoice, SetRoleChoice, 62)
-    p:Choice("Nameplate mode", "Auto follows your role and group. Picking a mode turns Auto off.",
-        NP_OPTIONS, GetNPChoice, SetNPChoice, 58, { avail = NPNotReady })
-    p:Toggle("Pause fading", "Shows every faded frame until you reload or turn this off again.",
-        function() return ns.fadePaused end, function(on) M("fade"):SetPaused(on) end)
-    p:Toggle("FPS counter", "FPS and ping in the bottom-right corner.",
-        function() return M("tweaks"):IsOn("fps") end, function(on) M("tweaks"):Set("fps", on) end)
 end }
 
 PAGES[#PAGES + 1] = { key = "layout", title = "Layout & scale", icon = "Interface\\Icons\\INV_Misc_Map_01", build = function(p)
@@ -631,10 +647,10 @@ PAGES[#PAGES + 1] = { key = "layout", title = "Layout & scale", icon = "Interfac
         modes, 280, function() return sc:Mode() end, function(v) sc:SetMode(v) end)
     p:Value("Right now", nil, function()
         local w, h = GetPhysicalScreenSize()
-        return ("%.3f on a %dx%d screen%s"):format(UIParent:GetScale(), w or 0, h or 0, sc:IsApplied() and "" or C.grey .. " (not managed)" .. C.r)
+        return ("%.3f on a %dx%d screen%s"):format(UIParent:GetScale(), w or 0, h or 0, sc:IsApplied() and "" or C.grey .. " (Blizzard's own scale)" .. C.r)
     end, { width = 320 })
 
-    p:Card("Edit Mode layout", "MLZ UI keeps its own Edit Mode layout. Your other layouts are never changed.")
+    p:Card("Screen layout", "Where bars and frames sit. MLZ UI keeps its own Edit Mode layout and never changes your other layouts.")
     p:Status("Active layout", function()
         return lay:Exists() and "The MLZ UI layout is saved." or "The MLZ UI layout has not been created yet."
     end, function()
@@ -652,11 +668,7 @@ PAGES[#PAGES + 1] = { key = "layout", title = "Layout & scale", icon = "Interfac
 
     -- Edit Mode can't be saved in combat: the save waits until combat ends
     local function SaveMap(v, what)
-        if InCombatLockdown() then
-            ns.RunOutOfCombat(function() tw.SaveMap(v, true) end, "minimap size", true)
-            S:Notify("In combat: the minimap size is saved when combat ends.", "warn")
-            return
-        end
+        if not S.QueueOrNotify(function() tw.SaveMap(v, true) end, "minimap size", "the minimap size is saved") then return end
         local ok, err = tw.SaveMap(v, true)
         S:Notify(ok and (what .. ": " .. v .. "%") or ("Minimap not saved in the layout: " .. tostring(err)), ok and "good" or "warn")
     end
@@ -691,8 +703,7 @@ end }
 
 PAGES[#PAGES + 1] = { key = "nameplates", title = "Nameplates", icon = "Interface\\Icons\\Ability_Warrior_DefensiveStance", build = function(p)
     local NP = ns.NP
-    local NotReady = NPNotReady
-    p:Title("Nameplates", "Platynator settings that follow your role. Changes show at once, no reload needed.")
+    p:Title("Nameplates", "Nameplates that follow your role. Changes show at once.")
 
     p:Card("Right now")
     p:Status("Platynator", function()
@@ -711,11 +722,11 @@ PAGES[#PAGES + 1] = { key = "nameplates", title = "Nameplates", icon = "Interfac
         local m = NP.Mode()
         if not m then return C.grey .. (InCombatLockdown() and "waiting for combat to end" or "not applied yet") .. C.r end
         return MODE_TEXT[m] .. ((NP.PvP() and NP.InPvP()) and "  + PvP" or "")
-    end, { avail = NotReady, width = 180 })
+    end, { avail = NPNotReady, width = 180 })
 
     p:Card("Mode", "Auto: Tank while you tank (Defensive Stance / Bear Form with tank talents, or the group's tank). "
         .. "Healer or DPS in a group, depending on your role. Solo when you are not in a group.")
-    p:Choice("Mode", "Picking a mode turns Auto off.", NP_OPTIONS, GetNPChoice, SetNPChoice, 62, { avail = NotReady })
+    p:Choice("Mode", "Picking a mode turns Auto off.", NP_OPTIONS, GetNPChoice, SetNPChoice, 62, { avail = NPNotReady })
     p:Text(C.blue .. "Tank" .. C.r .. ": every mob fully visible, your target a bit bigger.\n"
         .. C.blue .. "Healer" .. C.r .. ": enemies dimmed to 60% so your eyes stay on the raid frames.\n"
         .. C.blue .. "DPS" .. C.r .. ": mobs you don't target are faded a little.\n"
@@ -723,15 +734,15 @@ PAGES[#PAGES + 1] = { key = "nameplates", title = "Nameplates", icon = "Interfac
 
     p:Card("Options")
     p:Toggle("Friendly names for healers", "In Healer mode friendly players get a name above their head, but it can't be clicked, so it never steals a click.",
-        NP.HealerFriends, NP.SetHealerFriends, { avail = NotReady })
+        NP.HealerFriends, NP.SetHealerFriends, { avail = NPNotReady })
     p:Toggle("Clean nameplate style", "Minimal enemy nameplates: name and percent in the bar, cast bar, crowd control and only your own debuffs.",
-        NP.Style, NP.SetStyle, { avail = NotReady,
+        NP.Style, NP.SetStyle, { avail = NPNotReady,
         tip = "Built from your own enemy design, so your font and colors stay. Everything it removes is remembered: turning it off puts it back." })
     p:Toggle("Threat colors per role", "Tank: red = a mob is not on you. DPS: red = a mob is on you. Off for healers and when solo.",
-        NP.Threat, NP.SetThreat, { avail = NotReady,
+        NP.Threat, NP.SetThreat, { avail = NPNotReady,
         tip = "Changes the threat color rule of your enemy design. Turning it off puts your own rule back." })
     p:Toggle("PvP tweak", "In battlegrounds and arenas: every enemy fully visible, enemy buffs shown, no threat colors.",
-        NP.PvP, NP.SetPvP, { avail = NotReady })
+        NP.PvP, NP.SetPvP, { avail = NPNotReady })
 
     p:Card("Your Platynator profile", "MLZ UI saves a copy of your profile before it changes anything. Restore puts that copy back.")
     p:Value("Saved copy", nil, function() return NP.HasSnapshot() and "Yes" or (C.grey .. "None yet" .. C.r) end)
@@ -744,26 +755,20 @@ PAGES[#PAGES + 1] = { key = "nameplates", title = "Nameplates", icon = "Interfac
     })
 end }
 
-PAGES[#PAGES + 1] = { key = "healer", title = "Healer", icon = "Interface\\Icons\\Spell_Nature_HealingTouch", build = function(p)
+PAGES[#PAGES + 1] = { key = "healer", title = "Role & healing", icon = "Interface\\Icons\\Spell_Nature_HealingTouch", build = function(p)
     local H, lay = ns.Healer, M("layout")
-    p:Title("Healer layouts", "When you heal, group frames move to the middle of the screen. One layout for dungeons, one for raids.")
+    p:Title("Role & healing", "Your role drives the nameplate mode and the healer layouts. When you heal, group frames move to the middle of the screen.")
 
-    p:Card("Status")
-    p:Value("Role", nil, function()
-        local role, source = ns.Role()
-        if not role then return C.grey .. "unknown" .. C.r end
-        return ROLE_TEXT[role] .. C.grey .. "  (" .. (SOURCE_TEXT[source] or tostring(source)) .. ")" .. C.r
-    end)
+    p:Card("My role")
+    p:Choice("My role", RoleDesc, ROLE_OPTIONS, GetRoleChoice, SetRoleChoice, 62)
+
+    p:Card("Healer layouts", "One layout for dungeons, one for raids. They switch only while an MLZ UI layout is active, and never in combat.")
     p:Status("Counts as healer", nil, function()
         if H.IsHealer() then return "on", "Yes" end
         return "off", "No"
     end)
     p:Value("Layout now", nil, function() return lay:ActiveName() or (C.grey .. "unknown" .. C.r) end, { width = 260 })
-    p:Value("Layout it wants", "Switches only while an MLZ layout is active, and never in combat.",
-        function() return tostring(H.Wanted()) end, { width = 260 })
-
-    p:Card("Settings")
-    p:Choice("My role", RoleDesc, ROLE_OPTIONS, GetRoleChoice, SetRoleChoice, 62)
+    p:Value("Layout for your role", nil, function() return H.Wanted() or (C.grey .. "unknown" .. C.r) end, { width = 260 })
     p:Buttons({
         { text = "Rebuild healer layouts", width = 190, fn = function()
             if InCombatLockdown() then
@@ -772,9 +777,9 @@ PAGES[#PAGES + 1] = { key = "healer", title = "Healer", icon = "Interface\\Icons
                 return
             end
             local ok, msg = H.Rebuild()
-            S:Notify(ok and ("Healer layouts rebuilt: " .. tostring(msg) .. ". Reload to see them.") or ("Rebuild failed: " .. tostring(msg)), ok and "warn" or "bad")
+            S:Notify(ok and ("Healer layouts rebuilt: " .. tostring(msg) .. ".") or ("Rebuild failed: " .. tostring(msg)), ok and "good" or "bad")
         end, refresh = function(b) b:SetEnabled(EditModeAvailable()) end,
-          tip = "Copies the main layout (MLZ UI) again with the healer changes. Do this after you have changed the main layout. Needs a reload." },
+          tip = "Copies the main layout (MLZ UI) again with the healer changes. Do this after you have changed the main layout. Reload before you open Edit Mode again." },
     })
 end }
 
@@ -782,15 +787,15 @@ PAGES[#PAGES + 1] = { key = "fade", title = "Minimalism", icon = "Interface\\Ico
     local fade = M("fade")
     p:Title("Minimalism", "Hide what you rarely need. Faded frames come back on mouseover, and everything shows while Edit Mode is open.")
 
-    p:Card("Controls")
-    p:Toggle("Pause all fading", "Shows everything again until you reload or turn this off. Handy for a quick look.",
+    p:Card("Pause")
+    p:Toggle("Pause all fading", "Shows everything again until you turn this off or reload. Handy for a quick look.",
         function() return ns.fadePaused end, function(on) fade:SetPaused(on) end)
 
     p:Card("Hide until needed", "Keybinds keep working when a bar is invisible.")
     local missing = {}
     for _, row in ipairs(ns.data.fade) do
         if fade:Exists(row) then
-            local how = FADE_MODE[row.mode] or row.mode
+            local how = FadeModeText(row.mode)
             if row.alpha then how = how .. " (" .. math.floor(row.alpha * 100) .. "%)" end
             p:Toggle(row.label, C.blue .. how .. C.r .. "  " .. (row.desc or ""),
                 function() return fade:IsOn(row.id) end, function(on) fade:SetRow(row.id, on) end)
@@ -813,8 +818,7 @@ PAGES[#PAGES + 1] = { key = "buttons", title = "Action bars & UI", icon = "Inter
 
     p:Card("Action buttons", C.red .. "Red" .. C.r .. " = out of range, " .. C.blue .. "blue" .. C.r .. " = not enough mana, dark grey = can't be used right now.")
     for _, o in ipairs(ab.options) do
-        p:Toggle(o.label, o.desc, function() return ab:IsOn(o.id) end, function(on) ab:Set(o.id, on) end,
-            o.id == "hotkeys" and { tip = "Turning this off needs a reload to bring back Blizzard's hotkey text." } or nil)
+        p:Toggle(o.label, o.desc, function() return ab:IsOn(o.id) end, function(on) ab:Set(o.id, on) end)
     end
 
     local last
@@ -832,7 +836,7 @@ PAGES[#PAGES + 1] = { key = "qol", title = "Quality of life", icon = "Interface\
     local V, MT, IA = ns.Vendor, ns.ManaTick, ns.Interrupt
     p:Title("Quality of life", "Small helpers that save you clicks and give you information Blizzard doesn't show.")
 
-    p:Card("Merchants", "Hold Shift while you talk to a merchant to skip this once.")
+    p:Card("Merchants", "Hold SHIFT while you talk to a merchant to skip this once.")
     p:Toggle("Repair automatically", "Repairs all your gear when you open a merchant who can repair.",
         function() return V.Get("repair") end, function(on) V.Set("repair", on) end)
     p:Toggle("Use guild bank money first", "When your guild lets you repair with guild money, that is used before your own gold.",
@@ -888,10 +892,24 @@ PAGES[#PAGES + 1] = { key = "addons", title = "Other addons", icon = "Interface\
     p:Buttons({
         { text = "Apply addon settings...", width = 190, style = "primary", fn = function() OpenWizard("addons") end,
           tip = "Opens the setup wizard at the addons step, so you can see and pick each change." },
-        { text = "Check installed addons", width = 190, fn = function() ns.RunCommand("health") end,
-          tip = "Lists supported addons that are missing or switched off, in chat." },
     })
+
+    p:Card("Switched-off addons")
+    p:Toggle("Point out switched-off addons", "Shows a note on the overview and the minimap button when a supported addon "
+        .. "is installed but switched off. Nothing is printed in chat.",
+        function() return ns.db.healthWarn ~= false end, function(on) ns.db.healthWarn = on and true or false; ns.FireState() end,
+        { tip = "Turn this off if you switch some of these addons off on purpose." })
 end }
+
+-- "2026-10-13 14:02:11" -> "Today 14:02", "Yesterday 09:15" or "2026-10-01 18:40"
+function S.BackupLabel(stamp)
+    stamp = tostring(stamp or "")
+    local day, hm = stamp:match("^(%d+%-%d+%-%d+) (%d+:%d+)")
+    if not day then return stamp end
+    if day == date("%Y-%m-%d") then return "Today " .. hm end
+    if day == date("%Y-%m-%d", time() - 86400) then return "Yesterday " .. hm end
+    return day .. " " .. hm
+end
 
 PAGES[#PAGES + 1] = { key = "profiles", title = "Profiles & backup", icon = "Interface\\Icons\\INV_Misc_Note_01", gap = true, build = function(p)
     p:Title("Profiles & backup", "Share your choices, or go back to how things were before the setup wizard ran.")
@@ -909,7 +927,7 @@ PAGES[#PAGES + 1] = { key = "profiles", title = "Profiles & backup", icon = "Int
     p:Buttons({
         { text = "Save as my role", width = 150, style = "primary", fn = function()
             local role = ns.Role()
-            if not role then S:Notify("Your role is unknown. Pick it under My role first.", "warn") return end
+            if not role then S:Notify("Your role is unknown. Pick it on the Role & healing page first.", "warn") return end
             RP.Save(role)
             S:Notify("Saved as your " .. ns.ROLE_TEXT[role] .. " profile.", "good")
         end, tip = "Saves your current choices as the profile for the role you have right now." },
@@ -938,9 +956,13 @@ PAGES[#PAGES + 1] = { key = "profiles", title = "Profiles & backup", icon = "Int
         for i = #list, 1, -1 do
             local e = list[i]
             local parts = {}
-            for k in pairs(e.data or {}) do parts[#parts + 1] = k end
+            for k in pairs(e.data or {}) do
+                local mod = ns.modules[k]
+                parts[#parts + 1] = mod and mod.title or k
+            end
             table.sort(parts)
-            lines[#lines + 1] = (i == #list and C.green or C.grey) .. tostring(e.time) .. C.r
+            local what = e.kind == "import" and "import" or (i == 1 and "before MLZ UI" or "setup wizard")
+            lines[#lines + 1] = (i == #list and C.green or C.grey) .. S.BackupLabel(e.time) .. ", " .. what .. C.r
                 .. "   " .. table.concat(parts, ", ") .. (i == #list and (C.green .. "   (undo restores this)" .. C.r) or "")
         end
         return table.concat(lines, "\n")
@@ -965,8 +987,13 @@ PAGES[#PAGES + 1] = { key = "profiles", title = "Profiles & backup", icon = "Int
             b:SetText(LABEL)
             local queued = InCombatLockdown()
             ns.Backup:Undo()
-            S:Notify(queued and "In combat: parts of the undo are queued until combat ends. Reload afterwards."
-                or "Backup restored. Reload to finish.", "warn")
+            if queued then
+                S:Notify("In combat: parts of the undo are queued until combat ends.", "warn")
+            elseif ns.needsReload then
+                S:Notify("Backup restored. Reload to finish.", "warn")
+            else
+                S:Notify("Backup restored.", "good")
+            end
         end, refresh = function(b) b:SetEnabled((ns.db.backups and #ns.db.backups or 0) > 0) end,
           tip = "Puts back everything the newest backup saved. Click twice to confirm." },
     })
@@ -977,11 +1004,10 @@ PAGES[#PAGES + 1] = { key = "about", title = "About & help", icon = "Interface\\
 
     p:Card("How it works")
     p:Text("The " .. C.gold .. "setup wizard" .. C.r .. " is for the first install and for re-applying the whole setup with a backup. "
-        .. "This window is for everyday changes: everything here applies at once, and the footer tells you when a reload is needed. "
-        .. "Hover over any setting to read more about it.")
+        .. "This window is for everyday changes. Everything here applies at once, and hovering a setting tells you more.")
 
     p:Card("Minimap button")
-    p:Toggle("Show the minimap button", "Left-click opens this window, right-click opens a quick menu, Shift-click reloads. Drag it to move it around the minimap.",
+    p:Toggle("Show the minimap button", "Left-click opens this window, right-click opens a quick menu, SHIFT-click reloads when a reload is needed. Drag it to move it around the minimap.",
         function() return not (ns.db.minimap and ns.db.minimap.hide) end,
         function(on) if ns.MinimapButton then ns.MinimapButton:SetHidden(not on) end end)
 
@@ -999,8 +1025,9 @@ PAGES[#PAGES + 1] = { key = "about", title = "About & help", icon = "Interface\\
         function() return ns.db.debug end, function(on) ns.db.debug = on and true or false end)
     p:Buttons({
         { text = "Collect client info", width = 170, fn = function() ns.RunCommand("probe") end,
-          tip = "Saves information about this client in the SavedVariables, for checking that MLZ UI matches it." },
-        { text = "Check installed addons", width = 190, fn = function() ns.RunCommand("health") end },
+          tip = "Writes facts about your game client to MLZ UI's saved data after the next reload. Useful for bug reports." },
+        { text = "List addon problems", width = 170, fn = function() ns.RunCommand("health") end,
+          tip = "Prints supported addons that are switched off or not installed, in chat." },
     })
 end }
 
@@ -1013,7 +1040,7 @@ local function SidebarButton(parent, page, y)
     b:SetPoint("TOPLEFT", 0, -y)
     b.sel = W.Fill(b, T.hover)
     b.sel:Hide()
-    b.hl = W.Fill(b, { 1, 1, 1, 0.04 }, "HIGHLIGHT")
+    b.hl = W.Fill(b, T.shade, "HIGHLIGHT")
     b.bar = b:CreateTexture(nil, "ARTWORK")
     b.bar:SetColorTexture(unpack(T.accent))
     b.bar:SetPoint("TOPLEFT")
@@ -1143,11 +1170,13 @@ function S:RefreshFooter()
         color, text = n.color, n.text
     elseif ns.needsReload then
         color = T.amber
-        text = C.amber .. "Reload needed" .. C.r .. (#ns.reloadReasons > 0 and (": " .. table.concat(ns.reloadReasons, ", ")) or "")
+        text = C.amber .. S.ReloadText() .. C.r
     elseif not ns.db.installed then
         color, text = T.accent, "Not set up yet. Run the setup wizard to get started."
+    elseif ns.editModeStale then
+        color, text = T.muted, "All changes are applied. Reload before you open Edit Mode."
     else
-        color, text = T.green, "All changes are applied. Hover over a setting to learn more."
+        color, text = T.green, "All changes are applied."
     end
     foot.dot:SetColorTexture(unpack(color))
     foot.text:SetText(text)

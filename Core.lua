@@ -26,6 +26,16 @@ function ns.Debug(...)
     if ns.db and ns.db.debug then ns.Print("|cff888888[debug]|r", ...) end
 end
 
+-- Errors print once per session per message, so a broken handler on a busy event can't flood chat.
+-- Repeats still show with /mlz debug.
+local seenErrors = {}
+function ns.Error(where, err)
+    local msg = tostring(where) .. ": " .. tostring(err)
+    if seenErrors[msg] then return ns.Debug("|cffff4444Error|r", msg) end
+    seenErrors[msg] = true
+    ns.Print("|cffff4444Error in " .. tostring(where) .. ":|r", tostring(err))
+end
+
 ------------------------------------------------------------------------
 -- Helpers
 ------------------------------------------------------------------------
@@ -86,6 +96,14 @@ function ns.MarkReload(reason)
     ns.FireState()
 end
 
+-- Edit Mode layouts saved through C_EditMode move the frames at once, but the Edit Mode window keeps
+-- its own copy until a reload. Saving in Edit Mode before that would put the old layout back, so we
+-- don't ask for a reload right away: Modules/Layout.lua warns only if Edit Mode is opened first.
+function ns.MarkEditModeStale()
+    ns.editModeStale = true
+    ns.FireState()
+end
+
 ------------------------------------------------------------------------
 -- Modules
 -- A module is a table with:
@@ -125,7 +143,7 @@ eventFrame:SetScript("OnEvent", function(_, event, ...)
     if not list then return end
     for i = 1, #list do
         local ok, err = pcall(list[i], event, ...)
-        if not ok then ns.Print("|cffff4444Error in", event .. ":|r", err) end
+        if not ok then ns.Error(event, err) end
     end
 end)
 
@@ -162,7 +180,7 @@ ns.On("PLAYER_REGEN_ENABLED", function()
     while #queue > 0 do
         local job = table.remove(queue, 1)
         local ok, err = pcall(job.fn)
-        if not ok then ns.Print("|cffff4444Error in queued job|r", job.label or "", err) end
+        if not ok then ns.Error(job.label or "queued job", err) end
     end
 end)
 
@@ -419,15 +437,20 @@ ns.On("PLAYER_LOGIN", function()
         return
     end
     if not ns.db.wizardSeen then
-        -- First time: open the wizard once. After that just a reminder in chat.
+        -- First time: open the wizard once.
         C_Timer.After(2, function()
             if ns.Installer and not InCombatLockdown() then
                 ns.db.wizardSeen = true
                 ns.Installer:Open()
             end
         end)
-    else
-        ns.Print("v" .. ns.version .. " is not set up yet. Type |cffffff00/mlz install|r for the setup wizard, or |cffffff00/mlz|r for the settings.")
+        return
+    end
+    -- After that: one reminder per character, then the minimap button and overview carry it.
+    local c = ns.CharDB()
+    if not c.setupReminded then
+        c.setupReminded = true
+        ns.Print("Not set up yet. Click the minimap button or type |cffffff00/mlz install|r to start.")
     end
 end)
 

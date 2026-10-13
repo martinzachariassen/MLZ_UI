@@ -169,7 +169,7 @@ function Addons:Backup(items)
 end
 
 function Addons:Apply(items)
-    local changed = 0
+    local changed, needReload = 0, false
     for _, item in ipairs(items) do
         local entry, row = Find(item.id)
         if entry and not item.unavailable and not entry.manual then
@@ -178,13 +178,14 @@ function Addons:Apply(items)
                 if parent then
                     parent[key] = type(part.value) == "table" and ns.CopyTable(part.value) or part.value
                     changed = changed + 1
+                    if not entry.live then needReload = true end
                 end
             end
         end
     end
     ns.Debug("Addon settings set:", changed)
-    -- Addons read their saved settings when they load
-    if changed > 0 then ns.MarkReload("addon settings changed") end
+    -- Most addons read their saved settings only when they load; entries marked live don't
+    if needReload then ns.MarkReload("addon settings") end
 end
 
 function Addons:Restore(snap)
@@ -199,6 +200,7 @@ function Addons:Restore(snap)
                     local parent, key = Resolve(entry, row, part.path)
                     if parent then
                         if prev.has then parent[key] = prev.value else parent[key] = nil end
+                        if not entry.live then ns.MarkReload("addon settings") end
                     end
                 end
             end

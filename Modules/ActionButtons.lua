@@ -33,12 +33,12 @@ local COLORS = {
 local OPTIONS = {
     { id = "range", label = "Red when out of range",
       desc = "The whole icon turns red when the target is too far away, not just the hotkey text." },
-    { id = "mana", label = "Blue when low on mana/resource",
+    { id = "mana", label = "Blue when low on mana",
       desc = "Clearer blue tint when you lack mana, energy or rage." },
     { id = "unusable", label = "Dark grey when unusable",
-      desc = "Wrong form/stance, missing reagent, requires a target, etc." },
+      desc = "For example the wrong form or stance, a missing reagent, or no target." },
     { id = "hotkeys", label = "Short hotkeys",
-      desc = "Short, clear key in the top right of every button: 1 on bar 1, S1 (Shift+1) on bar 2, C1 (Ctrl+1) on bar 3. Mouse wheel is shown as SWU/CWU." },
+      desc = "A short key in the top right of every button: 1 on bar 1, S1 for SHIFT-1 on bar 2, C1 for CTRL-1 on bar 3. The mouse wheel shows as WU and WD." },
     { id = "macroNames", label = "Hide macro names",
       desc = "Macro names are not shown on the button (the icon is enough)." },
 }
@@ -150,7 +150,10 @@ end
 
 local function StyleHotkey(btn, hk)
     if btn.mlzHotkeyStyled then return end
-    btn.mlzHotkeyStyled = true
+    -- remember Blizzard's look, so turning short hotkeys off can put it back without a reload
+    local points = {}
+    for i = 1, hk:GetNumPoints() do points[i] = { hk:GetPoint(i) } end
+    btn.mlzHotkeyStyled = { font = { hk:GetFont() }, points = points, justify = hk:GetJustifyH(), width = hk:GetWidth() }
     local font = (NumberFontNormal and NumberFontNormal:GetFont()) or STANDARD_TEXT_FONT
     local w = btn:GetWidth() or 36
     hk:SetFont(font, (w > 0 and w < 34) and 10 or 13, "OUTLINE") -- stance and pet buttons are smaller
@@ -158,6 +161,23 @@ local function StyleHotkey(btn, hk)
     hk:SetPoint("TOPRIGHT", btn, "TOPRIGHT", -2, -3)
     hk:SetJustifyH("RIGHT")
     hk:SetWidth(0)
+end
+
+local function UnstyleHotkey(btn)
+    local saved, hk = btn.mlzHotkeyStyled, btn.HotKey
+    if type(saved) ~= "table" or not hk then return end
+    btn.mlzHotkeyStyled = nil
+    if saved.font[1] then hk:SetFont(saved.font[1], saved.font[2], saved.font[3]) end
+    hk:ClearAllPoints()
+    for _, p in ipairs(saved.points) do hk:SetPoint(unpack(p)) end
+    if saved.justify then hk:SetJustifyH(saved.justify) end
+    hk:SetWidth(saved.width or 0)
+    -- let Blizzard write its own text again
+    if type(btn.UpdateHotkeys) == "function" then
+        pcall(btn.UpdateHotkeys, btn, btn.buttonType)
+    elseif type(ActionButton_UpdateHotkeys) == "function" then
+        pcall(ActionButton_UpdateHotkeys, btn, btn.buttonType)
+    end
 end
 
 local function FixHotkey(btn)
@@ -232,7 +252,7 @@ function AB:Refresh()
     for _, b in ipairs(buttons) do
         HookButton(b)
         FixName(b)
-        if cfg.hotkeys then FixHotkey(b) end
+        if cfg.hotkeys then FixHotkey(b) else UnstyleHotkey(b) end
         b.mlzState = nil
     end
     -- If colors are turned off: reset to normal (Blizzard takes over on the next update)
@@ -302,15 +322,17 @@ function AB:IsOn(id) return (ns.db.actionButtons and ns.db.actionButtons[id]) an
 
 function AB:Set(id, on)
     ns.db.actionButtons = ns.db.actionButtons or {}
-    local was = ns.db.actionButtons[id] and true or false
     ns.db.actionButtons[id] = on and true or nil
-    self:Refresh()
-    -- Blizzard only redraws the hotkey text when bindings change, so turning short hotkeys off needs a reload
-    if id == "hotkeys" and was and not on then ns.MarkReload("hotkey text") end
+    -- Blizzard's hotkey redraw is kept out of combat to stay clear of the action buttons there
+    if id == "hotkeys" and not on then
+        ns.RunOutOfCombat(function() self:Refresh() end, "hotkey text", true)
+    else
+        self:Refresh()
+    end
     ns.FireState()
 end
 
-ns.AddCommand("buttons", "toggles action button coloring on/off (range/mana/unusable)", function()
+ns.AddCommand("buttons", "turns action button colors for range, mana and usability on or off", function()
     local cfg = Cfg()
     if not cfg then ns.Print("Not set up. Run /mlz install.") return end
     local on = not (cfg.range or cfg.mana or cfg.unusable)

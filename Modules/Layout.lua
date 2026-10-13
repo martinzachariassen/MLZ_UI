@@ -406,7 +406,7 @@ function Layout:Apply(items)
     ok, err = pcall(C_EditMode.SetActiveLayout, numPresets + idx)
     if not ok then ns.Print("|cffff4444SetActiveLayout failed:|r", err) end
     ns.Debug("layout saved, frames moved:", moved)
-    ns.MarkReload("Edit Mode layout changed")
+    ns.MarkEditModeStale()
     -- A healer should land on the healer layout straight away, not on the next group change
     if ns.Healer and ns.Healer.Switch then C_Timer.After(1, function() ns.Healer.Switch(true) end) end
 end
@@ -450,7 +450,7 @@ function Layout:UpdateOne(id, name, value)
     local saved, err = pcall(C_EditMode.SaveLayouts, raw)
     if not saved then return false, tostring(err) end
     -- Edit Mode keeps its own copy until a reload; saving there before that would undo this change
-    ns.MarkReload("Edit Mode layout changed")
+    ns.MarkEditModeStale()
     return true
 end
 
@@ -555,5 +555,47 @@ function Layout:Restore(snap)
     raw.activeLayout = index
     pcall(C_EditMode.SaveLayouts, raw)
     pcall(C_EditMode.SetActiveLayout, index)
-    ns.MarkReload("Edit Mode layout changed")
+    ns.MarkEditModeStale()
 end
+
+------------------------------------------------------------------------
+-- Edit Mode guard: after MLZ UI saved a layout, Edit Mode still holds the old copy until a reload.
+-- Instead of asking for a reload every time, we only speak up if Edit Mode is opened first.
+------------------------------------------------------------------------
+local guard
+
+local function ShowGuard()
+    local W = ns.W
+    if not W then return end
+    if not guard then
+        local T = W.T
+        guard = CreateFrame("Frame", "MLZUI_EditModeGuard", UIParent)
+        guard:SetSize(460, 92)
+        guard:SetPoint("TOP", 0, -120)
+        guard:SetFrameStrata("FULLSCREEN_DIALOG")
+        guard:EnableMouse(true)
+        W.Fill(guard, T.bg)
+        W.Border(guard, T.border)
+        local strip = guard:CreateTexture(nil, "ARTWORK")
+        strip:SetColorTexture(unpack(T.amber))
+        strip:SetPoint("TOPLEFT", 1, -1)
+        strip:SetPoint("BOTTOMLEFT", 1, 1)
+        strip:SetWidth(3)
+        local text = W.Text(guard, "GameFontHighlight",
+            "MLZ UI changed your layout since the last reload. Reload first, or saving in Edit Mode may undo that change.")
+        text:SetPoint("TOPLEFT", 16, -14)
+        text:SetWidth(428)
+        local reload = W.Button(guard, "Reload now", 120, 26, function() ReloadUI() end, "primary")
+        reload:SetPoint("BOTTOMRIGHT", -12, 12)
+        local keep = W.Button(guard, "Keep editing", 120, 26, function() guard:Hide() end, "subtle")
+        keep:SetPoint("RIGHT", reload, "LEFT", -8, 0)
+    end
+    guard:Show()
+end
+
+ns.On("PLAYER_LOGIN", function()
+    local f = _G.EditModeManagerFrame
+    if not (f and f.HookScript) then return end
+    f:HookScript("OnShow", function() if ns.editModeStale then ShowGuard() end end)
+    f:HookScript("OnHide", function() if guard then guard:Hide() end end)
+end)

@@ -6,6 +6,7 @@
 -- Each addon has:
 --   addon   = folder name, used for the "is it loaded?" check
 --   title   = heading in the wizard
+--   live    = true if the addon reads these settings while it runs, so no reload is asked for
 --   root    = function returning the table that `path` starts from (nil = not available yet)
 --   rows    = { id, label, desc, path = { "key", "subkey" }, value, enabled }
 --             `enabled = false` means the row is listed but off until you tick it.
@@ -53,6 +54,7 @@ ns.data.addons = {
     },
     {
         addon = "Auctionator", title = "Auctionator",
+        live = true, -- reads its settings each time they are used: no reload needed
         root = function() return AUCTIONATOR_CONFIG end,
         rows = {
             { id = "splash", label = "Hide splash screen", desc = "Skips the what's-new window after updates.",
@@ -73,6 +75,7 @@ ns.data.addons = {
     },
     {
         addon = "WhatsTraining", title = "What's Training?",
+        live = true, -- reads its settings when the window opens: no reload needed
         root = function() return _G end,
         rows = {
             { id = "known", label = "Hide known weapon skills", desc = "Only list weapon skills you can still learn.",

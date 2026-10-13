@@ -147,7 +147,7 @@ ns.AddCommand("export", "shows a string with your MLZ UI choices", function()
         ns.Print("This client has no C_EncodingUtil, export is not possible.")
         return
     end
-    ns.ShowCopy("MLZ UI: your choices (Ctrl+C to copy)", Encode(Export()))
+    ns.ShowCopy("MLZ UI: your choices (CTRL-C to copy)", Encode(Export()))
 end)
 
 ns.AddCommand("import", "pastes a string made by /mlz export", function(arg)
@@ -225,7 +225,11 @@ function RP.Load(role, quiet)
     if not snap then return false end
     ns.RunOutOfCombat(function()
         Load(snap)
-        if not quiet then ns.Print("Loaded your " .. ns.ROLE_TEXT[role] .. " profile.") end
+        if quiet then return end
+        local text = "Loaded your " .. ns.ROLE_TEXT[role] .. " profile."
+        ns.Debug(text)
+        local S = ns.Settings
+        if S and S.frame and S.frame:IsShown() then S:Notify(text, "info") end
     end, "role profile", true)
     return true
 end

@@ -12,7 +12,7 @@ local _, ns = ...
 ns.data.cvars = {
     -- Loot and interaction
     { name = "autoLootDefault", value = "1", label = "Auto loot", enabled = true,
-      desc = "Picks up all loot automatically without Shift-click." },
+      desc = "Picks up all loot automatically without SHIFT-click." },
     { name = "autoSelfCast", value = "1", label = "Auto self-cast", enabled = true,
       desc = "Helpful spells are cast on yourself if you have no friendly target." },
     { name = "autoDismountFlying", value = "1", label = "Auto dismount (flying)", enabled = true,
@@ -29,7 +29,7 @@ ns.data.cvars = {
 
     -- Action bars
     { name = "lockActionBars", value = "0", label = "Unlock action bars", enabled = true,
-      desc = "Keeps all action bars unlocked so you can drag spells and items around freely, without holding Shift." },
+      desc = "Keeps all action bars unlocked so you can drag spells and items around freely, without holding SHIFT." },
 
     -- Cooldowns
     { name = "countdownForCooldowns", value = "1", label = "Cooldown numbers on buttons", enabled = true,
@@ -67,7 +67,7 @@ ns.data.cvars = {
       desc = "Raid frames only show debuffs you can remove, so the ones that matter stand out." },
     { name = "raidFramesDisplayPowerBars", value = "1", label = "Raid frames: power bars", enabled = true,
       roles = { HEALER = true },
-      desc = "Shows mana/rage/energy under each raid frame, so you can see who is out of mana." },
+      desc = "Shows mana, rage or energy under each raid frame, so you can see who is out of mana." },
     { name = "raidFramesDisplayAggroHighlight", value = "1", label = "Raid frames: aggro highlight", enabled = true,
       desc = "Red border on raid frames of players who have aggro." },
     { name = "raidFramesDisplayClassColor", value = "1", label = "Raid frames: class colors", enabled = true,

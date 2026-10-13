@@ -1,7 +1,7 @@
 -- MLZ UI: Health check
--- After login: warns once if an addon MLZ UI configures is installed but not loaded
--- (usually switched off in the addon list by mistake). Addons you don't have are not mentioned.
--- /mlz health lists everything, including supported addons that aren't installed.
+-- Finds addons MLZ UI configures that are installed but switched off (usually by mistake in the addon
+-- list). Silent at login: the result shows on the overview and in the minimap tooltip.
+-- /mlz health prints the full list, including supported addons that aren't installed.
 
 local _, ns = ...
 
@@ -19,14 +19,16 @@ local function Installed(addon)
     return ns.IsAddOnInstalled(addon) -- GetAddOnInfo returns a name with reason "MISSING" for missing addons
 end
 
--- onlyInstalled = skip addons that aren't installed at all (the login check)
+-- onlyInstalled = skip addons that aren't installed at all
+-- Returns a list of { title, installed }
 local function Problems(onlyInstalled)
-    local list = {}
+    local list, seen = {}, {}
     local function Check(addon, title)
-        if ns.IsAddOnLoaded(addon) then return end
+        if seen[title] or ns.IsAddOnLoaded(addon) then return end
         local exists = Installed(addon)
         if onlyInstalled and not exists then return end
-        list[#list + 1] = title .. (exists and " (installed but not loaded, check the addon list)" or " (not installed)")
+        seen[title] = true
+        list[#list + 1] = { title = title, installed = exists }
     end
     for _, entry in ipairs(ns.data.addons) do Check(entry.addon, entry.title) end
     for _, entry in ipairs(EXTRA) do Check(entry.addon, entry.title) end
@@ -35,18 +37,26 @@ end
 
 ns.HealthProblems = Problems
 
-local function Report(quiet)
-    local list = Problems(quiet)
-    if #list == 0 then
-        if not quiet then ns.Print("Health: all supported addons are loaded.") end
-        return
-    end
-    ns.Print("|cffff8800Health:|r " .. #list .. (quiet and " addon(s) installed but not loaded:" or " addon(s) missing or not loaded:"))
-    for _, line in ipairs(list) do DEFAULT_CHAT_FRAME:AddMessage("  - " .. line) end
+-- Installed but switched off, for the overview and the minimap tooltip. Empty when the warning is off.
+function ns.HealthOff()
+    if ns.db and ns.db.healthWarn == false then return {} end
+    local names = {}
+    for _, p in ipairs(Problems(true)) do names[#names + 1] = p.title end
+    return names
 end
 
-ns.On("PLAYER_LOGIN", function()
-    C_Timer.After(8, function() ns.Try(Report, true) end)
-end)
+local function Report()
+    local list = Problems(false)
+    if #list == 0 then
+        ns.Print("All supported addons are loaded.")
+        return
+    end
+    local off, missing = {}, {}
+    for _, p in ipairs(list) do
+        if p.installed then off[#off + 1] = p.title else missing[#missing + 1] = p.title end
+    end
+    if #off > 0 then ns.Print("Switched off in the addon list: " .. table.concat(off, ", ") .. ".") end
+    if #missing > 0 then ns.Print("Not installed: " .. table.concat(missing, ", ") .. ".") end
+end
 
-ns.AddCommand("health", "checks that the supported addons are installed and loaded", function() Report(false) end)
+ns.AddCommand("health", "lists supported addons that are switched off or not installed", Report)

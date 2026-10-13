@@ -63,10 +63,12 @@ function Backup:Undo()
                 if not ok then ns.Print("|cffff4444Restore failed for|r", mod.title, err) end
             end
         end
-        ns.Print("Restored backup from", entry.time .. ". Type |cffffff00/reload|r to finish.")
         -- Undoing an import only gives back your old choices; the setup itself is still in place
         if #list == 0 and entry.kind ~= "import" then ns.db.installed = false end
-        ns.MarkReload("setup undone")
+        -- Modules that can't restore live (some addon settings) have called ns.MarkReload themselves
+        ns.Print("Undone: back to how things were on " .. entry.time .. "."
+            .. (ns.needsReload and " Reload to finish." or ""))
+        ns.FireState()
     end, "undo")
 end
 

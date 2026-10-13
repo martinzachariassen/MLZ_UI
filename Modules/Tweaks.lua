@@ -10,14 +10,26 @@ local Tweaks = ns.RegisterModule({ key = "tweaks", title = "Tweaks" })
 
 local OPTIONS = {
     { id = "trackerHeader", label = 'Hide the "All Objectives" line',
-      desc = "Removes the header/tab at the top of the quest tracker. Quests are still shown, and each section (Quests etc.) can still be collapsed. /mlz tracker toggles it." },
+      desc = "Removes the header at the top of the quest tracker. Your quests still show, and each section can still be collapsed." },
     { id = "trackerHide", label = "Hide the entire quest tracker", default = false,
-      desc = "No tracked quests on screen at all. The quest log (L) and quest markers on the map work as before. /mlz quests toggles it at any time." },
+      desc = "No tracked quests on screen. The quest log and the quest markers on the map work as before." },
     { id = "fps", label = "FPS counter in the bottom-right corner", group = "Info",
-      desc = "Small text in the bottom-right corner: FPS (green/yellow/red) and ping in ms. Clicks pass through it. /mlz fps toggles it." },
+      desc = "Small FPS and ping text in the bottom-right corner. Clicks pass through it." },
     { id = "cleanCombatFont", label = "Clean combat text font", group = "Combat text",
-      desc = "Uses Roboto Bold for floating damage and healing numbers. Needs a full game restart (not just /reload) to take effect." },
+      desc = "Uses Roboto Bold for floating damage and healing numbers." },
 }
+
+-- The combat font is read once when the game starts, so a change only shows after a restart.
+-- fontAtStart remembers what this session started with, so the note stays until then.
+local fontAtStart
+OPTIONS[4].desc = function()
+    local base = "Uses Roboto Bold for floating damage and healing numbers."
+    local want = (ns.db and ns.db.tweaks and ns.db.tweaks.cleanCombatFont) and true or false
+    if fontAtStart ~= nil and want ~= fontAtStart then
+        return base .. " " .. ns.W.C.amber .. "Takes effect after you restart the game." .. ns.W.C.r
+    end
+    return base .. " Changes take effect after a game restart."
+end
 
 Tweaks.options = OPTIONS -- read by the settings window
 
@@ -162,7 +174,6 @@ function Tweaks:Set(id, on)
     ns.db.tweaks = ns.db.tweaks or {}
     ns.db.tweaks[id] = on and true or nil
     self:Refresh()
-    if id == "cleanCombatFont" then ns.MarkReload("combat font (needs a full game restart)") end
     ns.FireState()
 end
 
@@ -247,7 +258,7 @@ function Tweaks:Preview()
         local isOn = (cur and cur[o.id]) and true or false
         local offText = o.group and "off" or "shown"
         local item = {
-            id = o.id, label = o.label, group = o.group or "Quest tracker", note = o.desc,
+            id = o.id, label = o.label, group = o.group or "Quest tracker", note = type(o.desc) == "function" and o.desc() or o.desc,
             toggle = true, isOn = isOn, offText = offText,
             old = isOn and (o.group and "on" or "hidden") or offText,
             new = o.group and "on" or "hidden",
@@ -285,7 +296,8 @@ end
 ns.On("ADDON_LOADED", function(_, name)
     if name ~= "MLZ_UI" then return end
     local c = Cfg()
-    if c and c.cleanCombatFont then _G.DAMAGE_TEXT_FONT = "Interface\\AddOns\\MLZ_UI\\Media\\Roboto-Bold.ttf" end
+    fontAtStart = (c and c.cleanCombatFont) and true or false
+    if fontAtStart then _G.DAMAGE_TEXT_FONT = "Interface\\AddOns\\MLZ_UI\\Media\\Roboto-Bold.ttf" end
 end)
 
 ns.On("PLAYER_ENTERING_WORLD", function()

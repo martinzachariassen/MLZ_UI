@@ -1,7 +1,7 @@
 -- MLZ UI: Minimap button (no libraries)
 --   Left-click   opens/closes the control center
 --   Right-click  quick menu (nameplate mode, healer, pause fading, reload ...)
---   Shift-click  reloads the UI
+--   Shift-click  reloads the UI, only when a reload is pending
 --   Drag         moves the button around the minimap edge (saved in MLZUIDB.minimap.angle)
 -- Also hooks into the addon compartment (the TOC lines AddonCompartmentFunc*) on clients that have it.
 
@@ -69,14 +69,23 @@ local function ShowTooltip(owner)
             GameTooltip:AddDoubleLine(s.title, s.badge or b[2], 0.85, 0.86, 0.88, col[1], col[2], col[3])
         end
     end
+    local paused = ns.Installer and ns.Installer.hiddenByCombat
+    if paused then
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine("Setup is paused. Left-click to continue.", T.amber[1], T.amber[2], T.amber[3], true)
+    end
     if ns.needsReload then
         GameTooltip:AddLine(" ")
-        GameTooltip:AddLine("Reload needed" .. (#ns.reloadReasons > 0 and (": " .. table.concat(ns.reloadReasons, ", ")) or ""),
-            T.amber[1], T.amber[2], T.amber[3], true)
+        GameTooltip:AddLine(ns.Settings.ReloadText(), T.amber[1], T.amber[2], T.amber[3], true)
+    elseif ns.editModeStale then
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine("Reload before you open Edit Mode.", T.muted[1], T.muted[2], T.muted[3], true)
     end
     GameTooltip:AddLine(" ")
-    GameTooltip:AddLine(C.gold .. "Left-click" .. C.r .. " settings   " .. C.gold .. "Right-click" .. C.r .. " quick menu", 0.8, 0.8, 0.8)
-    GameTooltip:AddLine(C.gold .. "Shift-click" .. C.r .. " reload UI   " .. C.gold .. "Drag" .. C.r .. " move", 0.8, 0.8, 0.8)
+    GameTooltip:AddLine(C.gold .. "Left-click" .. C.r .. (paused and " continue setup   " or " settings   ")
+        .. C.gold .. "Right-click" .. C.r .. " quick menu", 0.8, 0.8, 0.8)
+    GameTooltip:AddLine((ns.needsReload and (C.gold .. "SHIFT-click" .. C.r .. " reload UI   ") or "")
+        .. C.gold .. "Drag" .. C.r .. " move", 0.8, 0.8, 0.8)
     GameTooltip:Show()
 end
 
@@ -120,9 +129,7 @@ local function BuildMenu()
         y = y + 22
     end
     local function Divider()
-        local line = f:CreateTexture(nil, "BORDER")
-        line:SetColorTexture(unpack(T.border))
-        line:SetHeight(1)
+        local line = W.Line(f)
         line:SetPoint("TOPLEFT", 8, -(y + 4))
         line:SetPoint("TOPRIGHT", -8, -(y + 4))
         y = y + 9
@@ -133,7 +140,7 @@ local function BuildMenu()
         b:SetPoint("TOPLEFT", 4, -y)
         b:SetPoint("TOPRIGHT", -4, -y)
         b:SetHeight(22)
-        W.Fill(b, { 1, 1, 1, 0.07 }, "HIGHLIGHT")
+        W.Fill(b, W.T.press, "HIGHLIGHT")
         b.mark = b:CreateTexture(nil, "ARTWORK")
         b.mark:SetSize(8, 8)
         b.mark:SetPoint("LEFT", 10, 0)
@@ -151,13 +158,12 @@ local function BuildMenu()
     end
 
     local NP = ns.NP
-    local function npReady() return NP.Ready() end
 
     Header("NAMEPLATES")
-    Item("Auto (follow role)", function() NP.SetAuto(true) end, function() return NP.Auto() end, npReady)
+    Item("Auto (follow role)", function() NP.SetAuto(true) end, function() return NP.Auto() end, NP.Ready)
     for _, m in ipairs(NP.MODES) do
         Item(NP.MODE_TEXT[m], function() NP.SetMode(m) end,
-            function() return not NP.Auto() and NP.Mode() == m end, npReady)
+            function() return not NP.Auto() and NP.Mode() == m end, NP.Ready)
     end
     Divider()
     Header("MY ROLE")
@@ -261,7 +267,10 @@ local function Create()
         if which == "RightButton" then
             MB:ToggleMenu(self)
         elseif IsShiftKeyDown() then
-            ReloadUI()
+            -- only when something is waiting for a reload, so a stray SHIFT-click costs nothing
+            if ns.needsReload then ReloadUI() end
+        elseif ns.Installer and ns.Installer.Resume and ns.Installer:Resume() then
+            if menu then menu:Hide() end -- setup was paused for combat: pick it up again
         elseif ns.Settings then
             if menu then menu:Hide() end
             ns.Settings:Toggle()

@@ -22,29 +22,29 @@ ns.Installer = Installer
 -- Same order as the backup module uses (undo runs it in reverse)
 local APPLY_ORDER = ns.Backup.APPLY_ORDER
 
--- Module pages are numbered automatically ("3. Settings", "Step 3 of 9"); `blurb` is the line in the intro.
+-- Module pages are numbered automatically ("3. Game settings", "Step 3 of 9"). Titles match the control center.
 local PAGES = {
     { kind = "intro", title = "Welcome to MLZ UI" },
-    { kind = "module", key = "scale", title = "Scaling", blurb = "Scaling that fits your screen",
+    { kind = "module", key = "scale", title = "UI scale",
       text = "Sets the UI scale so edges are crisp and everything is the same size regardless of resolution. The scale is recalculated automatically if you change resolution." },
-    { kind = "module", key = "layout", title = "Layout (Edit Mode)", blurb = "Placement of bars and frames (a dedicated Edit Mode layout)",
-      text = "Creates a dedicated Edit Mode layout with bars at bottom center, player/target on the sides, chat at bottom left and minimap/buffs at top right. You can fine-tune everything in Edit Mode afterwards. Requires /reload." },
-    { kind = "module", key = "settings", title = "Settings", blurb = "Settings such as auto loot and cast on key down",
+    { kind = "module", key = "layout", title = "Screen layout",
+      text = "Makes an Edit Mode layout of its own with bars at bottom center, player/target on the sides, chat at bottom left and minimap/buffs at top right. You can fine-tune everything in Edit Mode afterwards." },
+    { kind = "module", key = "settings", title = "Game settings",
       text = "Good default settings. Rows marked (already) have the right value. Hover over a row for an explanation." },
-    { kind = "module", key = "bindings", title = "Keybinds", blurb = "Keybinds: ESDF or WASD, three layers of the same keys",
-      text = "Same 12 keys on three layers: no modifier = Bar 1, " .. C.gold .. "Shift" .. C.r .. " = Bar 2, " .. C.gold .. "Ctrl" .. C.r .. " = Bar 3. " .. C.red .. "Red" .. C.r .. " = the key currently has a different action. Displaced panels are moved to Alt." },
-    { kind = "module", key = "fade", title = "Minimalism", blurb = "Minimalism: hide what you rarely need, see more of the world",
+    { kind = "module", key = "bindings", title = "Keybinds",
+      text = "The same 12 keys on three layers: no modifier = Bar 1, " .. C.gold .. "SHIFT" .. C.r .. " = Bar 2, " .. C.gold .. "CTRL" .. C.r .. " = Bar 3. " .. C.red .. "Red" .. C.r .. " = the key does something else today. Panels you lose a key for move to " .. C.gold .. "ALT" .. C.r .. "." },
+    { kind = "module", key = "fade", title = "Minimalism",
       text = "Things you rarely use stay invisible until you hover over them, and things you only need in combat are dimmed otherwise. Untick a row that is on to turn it off. You can change all of this later in the settings window (" .. C.gold .. "/mlz" .. C.r .. ")." },
-    { kind = "module", key = "actionbuttons", title = "Action buttons", blurb = "Action buttons that show range, mana and usability",
-      text = "See at a glance why a button isn't working: " .. C.red .. "red" .. C.r .. " = out of range, |cff5577ffblue|r = low mana, dark grey = can't be used right now. Short hotkeys and no macro names make for cleaner bars. Change it later in the settings window (" .. C.gold .. "/mlz" .. C.r .. ")." },
-    { kind = "module", key = "tweaks", title = "Tweaks", blurb = "Small tweaks: quest tracker, FPS counter, combat text",
+    { kind = "module", key = "actionbuttons", title = "Action buttons",
+      text = "See at a glance why a button isn't working: " .. C.red .. "red" .. C.r .. " = out of range, " .. C.blue .. "blue" .. C.r .. " = low mana, dark grey = can't be used right now. Short hotkeys and no macro names make for cleaner bars. Change it later in the settings window (" .. C.gold .. "/mlz" .. C.r .. ")." },
+    { kind = "module", key = "tweaks", title = "Interface tweaks",
       text = "Smaller things that declutter the screen. The minimap size and everything else here can be changed later in the settings window (" .. C.gold .. "/mlz" .. C.r .. ")." },
-    { kind = "module", key = "addons", title = "Other addons", blurb = "Settings for supported addons you already have",
-      text = "Settings for supported addons that are installed and loaded; the rest are skipped. The values live in Data/Addons.lua. Some addons need a /reload to pick up the changes." },
-    { kind = "module", key = "nameplates", title = "Nameplates", blurb = "Nameplates: Platynator profile and clean style",
-      text = "Imports your saved Platynator profile (skipped until a profile string is saved in Data/Nameplates.lua) and/or turns on the clean MLZ style, which follows your role: tank, healer, DPS or solo. Automatic switching, threat colors and the PvP option are in the settings window (" .. C.gold .. "/mlz" .. C.r .. ")." },
+    { kind = "module", key = "addons", title = "Other addons",
+      text = "Settings for supported addons that are installed and loaded; the rest are skipped. Some addons only pick up the changes after a reload; the last page tells you if that is the case." },
+    { kind = "module", key = "nameplates", title = "Nameplates",
+      text = "Turns on the clean MLZ style for Platynator, which follows your role: tank, healer, DPS or solo. Threat colors and the PvP option are in the settings window (" .. C.gold .. "/mlz" .. C.r .. ")." },
     { kind = "summary", title = "Review" },
-    { kind = "done", title = "Done!" },
+    { kind = "done", title = "All set" },
 }
 
 -- Number of each module page, and how many there are
@@ -56,21 +56,19 @@ for _, page in ipairs(PAGES) do
     end
 end
 
-local LEGEND = C.grey .. "Ticked = included. " .. C.r .. C.green .. "Green" .. C.r .. C.grey .. " = will change. " .. C.r .. C.red .. "Red" .. C.r .. C.grey .. " = replaces something you use today. Options that don't apply to your setup, or are already right, are folded away at the bottom." .. C.r
+-- Shown once, under the list, on every step
+local LEGEND = "Ticked = included     " .. C.green .. "Green" .. C.r .. " = will change     " .. C.red .. "Red" .. C.r .. " = replaces what you use today"
 
 local function Intro()
-    local lines = { "This wizard sets up your UI step by step:", "" }
+    local names = {}
     for _, page in ipairs(PAGES) do
-        if page.number then
-            lines[#lines + 1] = ("  %s%d.%s %s"):format(C.gold, page.number, C.r, page.blurb or page.title)
-        end
+        if page.number then names[#names + 1] = page.title end
     end
-    lines[#lines + 1] = ""
-    lines[#lines + 1] = "Each step shows what it is today and what it will be. Turn off whole steps or single rows; untick something that is already on to turn it off."
-    lines[#lines + 1] = "Nothing changes until you press " .. C.gold .. "Apply changes" .. C.r .. " on the last page."
-    lines[#lines + 1] = ""
-    lines[#lines + 1] = C.green .. "A backup is always taken first." .. C.r .. " " .. C.gold .. "/mlz" .. C.r .. " opens the settings window where you change things later. " .. C.gold .. "/mlz undo" .. C.r .. " undoes the wizard, " .. C.gold .. "/mlz install" .. C.r .. " opens it again."
-    return table.concat(lines, "\n")
+    return "MLZ UI sets up your interface in " .. NUM_STEPS .. " short steps. Each one shows what you have now and what it will become.\n\n"
+        .. C.grey .. table.concat(names, "  ·  ") .. C.r .. "\n\n"
+        .. "Nothing changes until you press " .. C.gold .. "Apply changes" .. C.r .. ", and a backup is taken first. "
+        .. C.gold .. "/mlz undo" .. C.r .. " puts everything back.\n\n"
+        .. "In a hurry? " .. C.gold .. "Use recommended" .. C.r .. " takes every suggestion and jumps to the review."
 end
 
 local WIDTH, HEIGHT = 760, 620
@@ -87,24 +85,30 @@ function Installer:Build()
     local f = W.Window("MLZUI_Installer", WIDTH, HEIGHT, "MLZ UI - Setup wizard")
     self.frame = f
 
-    -- Progress strip: one segment per page (not the "Done" page). Click to jump.
+    -- Progress strip: one segment per numbered step, so it matches "STEP n OF 9". Click to jump.
     f.progress = {}
-    local segs, gap = #PAGES - 1, 4
+    local steps = {}
+    for i, page in ipairs(PAGES) do
+        if page.number then steps[#steps + 1] = i end
+    end
+    local segs, gap = #steps, 4
     local segW = (WIDTH - 32 - gap * (segs - 1)) / segs
-    for i = 1, segs do
+    for n = 1, segs do
+        local i = steps[n]
         local page = PAGES[i]
         local b = CreateFrame("Button", nil, f)
+        b.pageIndex = i
         b:SetSize(segW, 14)
-        b:SetPoint("TOPLEFT", 16 + (i - 1) * (segW + gap), -46)
+        b:SetPoint("TOPLEFT", 16 + (n - 1) * (segW + gap), -46)
         b.bar = b:CreateTexture(nil, "ARTWORK")
         b.bar:SetPoint("LEFT")
         b.bar:SetPoint("RIGHT")
         b.bar:SetHeight(4)
         b:SetScript("OnClick", function()
-            if self.page ~= #PAGES then self:Go(i) end
+            if self.page ~= #PAGES then self:Go(b.pageIndex) end
         end)
-        W.Tooltip(b, page.number and (page.number .. ". " .. page.title) or page.title, "Click to go to this step.")
-        f.progress[i] = b
+        W.Tooltip(b, page.number .. ". " .. page.title, "Click to go to this step.")
+        f.progress[n] = b
     end
 
     f.title = W.Text(f, "MLZUI_FontTitle")
@@ -136,7 +140,10 @@ function Installer:Build()
     -- The list sits on a darker panel, with column headers at the top
     f.panel = CreateFrame("Frame", nil, f)
     f.panel:SetPoint("TOPLEFT", f.stepCheck, "BOTTOMLEFT", 0, -10)
-    f.panel:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -16, 56)
+    f.panel:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -16, 76)
+
+    f.legend = W.Muted(f, "GameFontHighlightSmall", LEGEND)
+    f.legend:SetPoint("TOPLEFT", f.panel, "BOTTOMLEFT", 2, -6)
     W.Fill(f.panel, W.T.panel)
     W.Border(f.panel, W.T.border)
 
@@ -176,6 +183,17 @@ function Installer:Build()
         self:Go(self.page + 1)
     end, "subtle")
     f.skip:SetPoint("RIGHT", f.next, "LEFT", -8, 0)
+    -- Welcome page: keep every suggestion as it is and go straight to the review
+    f.quick = W.Button(f, "Use recommended", 150, 28, function()
+        for _, page in ipairs(PAGES) do
+            if page.key then self.stepOn[page.key] = true end
+        end
+        for i, page in ipairs(PAGES) do
+            if page.kind == "summary" then self:Go(i) end
+        end
+    end)
+    f.quick:SetPoint("RIGHT", f.next, "LEFT", -8, 0)
+    f.quick.tipText = "Takes every suggestion as it is and shows the review. Nothing changes until you press Apply changes there."
 
     f.reload = W.Button(f, "Reload now", 150, 28, function() ReloadUI() end, "primary")
     f.reload:SetPoint("BOTTOMRIGHT", -16, 14)
@@ -545,13 +563,14 @@ function Installer:Go(index)
     local page = PAGES[index]
 
     f.title:SetText(page.number and (page.number .. ". " .. page.title) or page.title)
-    f.step:SetText(page.number and ("STEP %d OF %d"):format(page.number, NUM_STEPS) or "")
-    f.desc:SetText(page.kind == "module" and ((page.text or "") .. "\n" .. LEGEND) or (page.text or ""))
+    f.step:SetText(page.number and ("STEP %d OF %d"):format(page.number, NUM_STEPS)
+        or (page.kind == "summary" and "REVIEW") or "")
+    f.desc:SetText(page.text or "")
 
-    -- Progress strip: green = behind you, blue = here, grey = ahead (all green on the Done page)
-    for i, seg in ipairs(f.progress) do
-        local c
-        if page.kind == "done" or i < index then c = W.T.green
+    -- Progress strip: green = behind you, blue = here, grey = ahead (all green on Review and Done)
+    for _, seg in ipairs(f.progress) do
+        local i, c = seg.pageIndex
+        if i < index then c = W.T.green
         elseif i == index then c = W.T.accent
         else c = W.T.off end
         seg.bar:SetColorTexture(unpack(c))
@@ -562,6 +581,7 @@ function Installer:Go(index)
     local isList = page.kind == "module" or page.kind == "summary"
     f.panel:SetShown(isList)
     f.desc:SetShown(isList)
+    f.legend:SetShown(page.kind == "module")
     f.stepCheck:SetShown(page.kind == "module")
     f.selAll:SetShown(page.kind == "module")
     f.selNone:SetShown(page.kind == "module")
@@ -587,10 +607,12 @@ function Installer:Go(index)
     f.settings:SetShown(done)
     f.next:SetShown(not done)
     f.skip:SetShown(page.kind == "module")
-    f.reload:SetShown(done and self.appliedAny)
+    f.quick:SetShown(page.kind == "intro")
+    local wantReload = done and self.appliedAny and ns.needsReload and true or false
+    f.reload:SetShown(wantReload)
     f.close:SetShown(done)
     f.close:ClearAllPoints()
-    if self.appliedAny then
+    if wantReload then
         f.close:SetPoint("RIGHT", f.reload, "LEFT", -8, 0)
     else
         f.close:SetPoint("BOTTOMRIGHT", -16, 14)
@@ -677,7 +699,9 @@ function Installer:ApplyAll()
 
     self.doneText = table.concat(lines, "\n") .. "\n\n" ..
         (failed > 0 and (C.red .. "Something failed. Type /mlz undo to undo, and pass on the error message." .. C.r .. "\n\n") or "") ..
-        "Press " .. C.gold .. "Reload now" .. C.r .. " to reload the UI (needed for layout, scaling and some addons).\n\n" ..
+        (ns.needsReload
+            and ("Some addons pick up their new settings after a reload. Press " .. C.gold .. "Reload now" .. C.r .. " when it suits you.\n\n")
+            or ("Everything is already in effect. No reload needed.\n\n")) ..
         "Settings: " .. C.gold .. "/mlz" .. C.r .. "     Undo: " .. C.gold .. "/mlz undo" .. C.r .. "     Run again: " .. C.gold .. "/mlz install" .. C.r
     self:Go(#PAGES)
 end
@@ -720,23 +744,26 @@ end
 
 ns.AddCommand("install", "opens the installation wizard", function() Installer:Open() end)
 
--- Entering combat hides the wizard but keeps your choices; it comes back after combat
--- (unless it was on the Done page, then there is nothing left to do).
+-- Entering combat hides the wizard but keeps your choices. It does not pop back up on its own;
+-- Installer:Resume() (minimap button) brings it back where you left off.
 ns.On("PLAYER_REGEN_DISABLED", function()
     local f = Installer.frame
     if f and f:IsShown() then
         f:Hide()
         if PAGES[Installer.page] and PAGES[Installer.page].kind ~= "done" then
+            if not Installer.hiddenByCombat then
+                ns.Print("Setup paused for combat. Open it again from the minimap button.")
+            end
             Installer.hiddenByCombat = true
-            ns.Print("The wizard is hidden while you are in combat. It comes back with your choices after combat.")
         end
     end
 end)
 
-ns.On("PLAYER_REGEN_ENABLED", function()
-    if Installer.hiddenByCombat and Installer.frame then
-        Installer.hiddenByCombat = nil
-        Installer.frame:Show()
-        Installer:Go(Installer.page)
-    end
-end)
+-- Opens the wizard again with the choices kept, if it was paused by combat. Returns true if it did.
+function Installer:Resume()
+    if not (self.hiddenByCombat and self.frame) or InCombatLockdown() then return false end
+    self.hiddenByCombat = nil
+    self.frame:Show()
+    self:Go(self.page)
+    return true
+end

@@ -1,5 +1,5 @@
 -- MLZ UI: Probe
--- /mlz probe collects info about the client (APIs, CVars, Edit Mode, bindings) and stores
+-- /mlz probe collects info about the client (APIs, CVars, Edit Mode, bindings, nameplates) and stores
 -- it in MLZUIDB.probe. After /reload or logout everything is in
 -- WTF/Account/<account>/SavedVariables/MLZ_UI.lua, so we can verify instead of guessing.
 -- At login only a slim version is stored (build, screen, APIs, frames, CVars), so the saved
@@ -57,6 +57,42 @@ local EXTRA_CVARS = {
     "useCompactPartyFrames", "raidOptionDisplayPets", "raidFramesHealthText",
 }
 
+-- Nameplate facts for our own plates (Modules/Plates.lua). Checked before we rely on any of it.
+local PLATE_API = {
+    "C_NamePlate", "C_NamePlate.GetNamePlates", "C_NamePlate.GetNamePlateForUnit",
+    "C_NamePlate.SetNamePlateFriendlyClickThrough", "C_NamePlate.SetNamePlateEnemyClickThrough",
+    "C_NamePlate.SetNamePlateFriendlySize", "C_NamePlate.SetNamePlateEnemySize",
+    "C_NamePlate.GetNamePlateEnemySize", "C_NamePlate.SetNamePlateSelfClickThrough",
+    "C_NamePlateManager", "NamePlateDriverFrame", "issecure",
+    "UnitThreatSituation", "UnitDetailedThreatSituation", "GetThreatStatusColor",
+    "UnitCastingInfo", "UnitChannelInfo", "UnitIsTapDenied", "UnitClassification", "UnitReaction",
+    "UnitIsQuestBoss", "UnitIsPlayer", "UnitEffectiveLevel", "UnitSelectionColor",
+    "GetRaidTargetIndex", "SetRaidTargetIconTexture",
+    "C_TooltipInfo", "C_TooltipInfo.GetUnit", "TooltipUtil", "C_UnitAuras", "C_UnitAuras.GetAuraDataByIndex",
+    "C_UnitAuras.GetAuraDataByAuraInstanceID", "UnitAura", "UnitDebuff", "AuraUtil.ForEachAura",
+    "C_QuestLog", "C_QuestLog.GetNumQuestLogEntries", "C_QuestLog.GetQuestObjectives", "GetNumQuestLogEntries",
+    "GetQuestLogTitle", "GetQuestLogLeaderBoard", "C_QuestLog.UnitIsRelatedToActiveQuest",
+    "CastingBarFrame_SetUnit", "RAID_CLASS_COLORS", "C_ClassColor",
+}
+
+local PLATE_EVENTS = {
+    "NAME_PLATE_CREATED", "NAME_PLATE_UNIT_ADDED", "NAME_PLATE_UNIT_REMOVED", "FORBIDDEN_NAME_PLATE_CREATED",
+    "UNIT_THREAT_LIST_UPDATE", "UNIT_THREAT_SITUATION_UPDATE", "UNIT_HEALTH", "UNIT_HEALTH_FREQUENT",
+    "UNIT_MAXHEALTH", "UNIT_AURA", "UNIT_SPELLCAST_START", "UNIT_SPELLCAST_CHANNEL_START",
+    "UNIT_SPELLCAST_INTERRUPTIBLE", "UNIT_SPELLCAST_NOT_INTERRUPTIBLE", "UNIT_CLASSIFICATION_CHANGED",
+    "UNIT_FACTION", "RAID_TARGET_UPDATE", "QUEST_LOG_UPDATE", "UNIT_QUEST_LOG_CHANGED", "QUEST_WATCH_UPDATE",
+}
+
+local PLATE_CVARS = {
+    "nameplateSelectedScale", "nameplateSelectedAlpha", "nameplateMinAlpha", "nameplateMaxAlpha",
+    "nameplateOccludedAlphaMult", "nameplateNotSelectedAlpha", "nameplateShowFriends", "nameplateShowEnemies",
+    "nameplateShowFriendlyNPCs", "nameplateShowEnemyMinions", "nameplateShowEnemyMinus", "nameplateOtherAtBase",
+    "nameplateMinScale", "nameplateMaxScale", "nameplateGlobalScale", "nameplateLargerScale",
+    "nameplateOverlapV", "nameplateOverlapH", "nameplateTargetBehindMaxDistance", "nameplateHorizontalScale",
+    "nameplateVerticalScale", "nameplateResourceOnTarget", "nameplateShowSelf", "ShowClassColorInNameplate",
+    "ShowClassColorInFriendlyNameplate", "nameplateShowDebuffsOnFriendly", "threatWarning", "nameplateShowOnlyNames",
+}
+
 local function SafeCopy(v, depth)
     depth = depth or 0
     if depth > 8 then return "<too deep>" end
@@ -73,7 +109,108 @@ local function SafeCopy(v, depth)
     return v
 end
 
-local function CVarInfo(name)
+local CVarInfo -- defined below
+
+-- Keys on a Blizzard frame table, with their type (frame object type for widgets)
+local function Shape(obj)
+    if type(obj) ~= "table" then return type(obj) end
+    local out = {}
+    for k, v in pairs(obj) do
+        if type(k) == "string" and k ~= "0" then
+            if type(v) == "table" and v.GetObjectType then
+                local ok, kind = pcall(v.GetObjectType, v)
+                out[k] = ok and kind or "widget"
+            elseif type(v) ~= "function" then
+                out[k] = type(v) == "table" and "table" or tostring(v)
+            end
+        end
+    end
+    return out
+end
+
+local function Call(obj, method, ...)
+    if type(obj) ~= "table" or type(obj[method]) ~= "function" then return nil end
+    local ok, a, b = pcall(obj[method], obj, ...)
+    if ok then return a, b end
+    return nil
+end
+
+local function ProbePlate(plate)
+    local entry = {
+        name = Call(plate, "GetName"),
+        forbidden = Call(plate, "IsForbidden") or false,
+        protected = Call(plate, "IsProtected") or false,
+        size = { Call(plate, "GetSize") },
+        scale = Call(plate, "GetScale"),
+        strata = Call(plate, "GetFrameStrata"),
+        unit = plate.namePlateUnitToken,
+    }
+    if entry.forbidden then return entry end
+    local uf = plate.UnitFrame
+    entry.hasUnitFrame = uf ~= nil
+    if uf then
+        entry.unitFrame = {
+            type = Call(uf, "GetObjectType"),
+            protected = Call(uf, "IsProtected") or false,
+            shown = Call(uf, "IsShown"),
+            alpha = Call(uf, "GetAlpha"),
+            unit = uf.unit or uf.displayedUnit,
+            keys = Shape(uf),
+            numChildren = Call(uf, "GetNumChildren"),
+            numRegions = Call(uf, "GetNumRegions"),
+        }
+        local hb = uf.healthBar or uf.HealthBar
+        if hb then entry.unitFrame.healthBar = { size = { Call(hb, "GetSize") }, texture = Call(hb, "GetStatusBarTexture") and true } end
+        local cb = uf.castBar or uf.CastBar
+        if cb then entry.unitFrame.castBar = Shape(cb) end
+    end
+    if entry.unit and UnitExists(entry.unit) then
+        local u = entry.unit
+        entry.unitInfo = {
+            name = UnitName(u), level = UnitLevel(u), classification = UnitClassification and UnitClassification(u),
+            reaction = UnitReaction and UnitReaction(u, "player"), player = UnitIsPlayer(u),
+            threat = UnitThreatSituation and UnitThreatSituation("player", u),
+            tapDenied = UnitIsTapDenied and UnitIsTapDenied(u),
+            questBoss = UnitIsQuestBoss and UnitIsQuestBoss(u),
+        }
+        if C_TooltipInfo and C_TooltipInfo.GetUnit then
+            local ok, data = pcall(C_TooltipInfo.GetUnit, u)
+            if ok and type(data) == "table" and type(data.lines) == "table" then
+                entry.tooltipLines = {}
+                for i, line in ipairs(data.lines) do
+                    entry.tooltipLines[i] = { text = line.leftText, type = line.type }
+                end
+            end
+        end
+    end
+    return entry
+end
+
+local function ProbeNameplates()
+    local np = { api = {}, events = {}, cvars = {}, plates = {} }
+    for _, name in ipairs(PLATE_API) do np.api[name] = Resolve(name) ~= nil end
+    local f = CreateFrame("Frame")
+    for _, ev in ipairs(PLATE_EVENTS) do
+        np.events[ev] = pcall(f.RegisterEvent, f, ev) and true or false
+    end
+    f:UnregisterAllEvents()
+    for _, name in ipairs(PLATE_CVARS) do np.cvars[name] = CVarInfo(name) end
+    if NamePlateDriverFrame then np.driver = Shape(NamePlateDriverFrame) end
+    if C_NamePlate and C_NamePlate.GetNamePlates then
+        local ok, plates = pcall(C_NamePlate.GetNamePlates, issecure and issecure() or false)
+        if ok and type(plates) == "table" then
+            np.visible = #plates
+            for i = 1, math.min(#plates, 4) do np.plates[i] = ProbePlate(plates[i]) end
+        end
+    end
+    if C_NamePlate and C_NamePlate.GetNamePlateEnemySize then
+        local ok, w, h = pcall(C_NamePlate.GetNamePlateEnemySize)
+        if ok then np.enemySize = { w, h } end
+    end
+    return np
+end
+
+function CVarInfo(name)
     local entry = { exists = false }
     if C_CVar and C_CVar.GetCVarInfo then
         local ok, value, default, acc, char, locked, secure, readOnly = pcall(C_CVar.GetCVarInfo, name)
@@ -195,6 +332,9 @@ function ns.RunProbe(silent)
         end
     end
 
+    local okNp, np = pcall(ProbeNameplates)
+    p.nameplates = okNp and np or { error = tostring(np) }
+
     ns.db.probe = p
 
     -- Short summary in chat
@@ -208,6 +348,15 @@ function ns.RunProbe(silent)
     ns.Print("Edit Mode: saved layouts =", layouts and #layouts or "?",
         ", active =", p.editMode.raw and p.editMode.raw.activeLayout or "?",
         ", presets =", p.editMode.presetCount or "?")
+    if okNp then
+        local missingEv = {}
+        for _, ev in ipairs(PLATE_EVENTS) do if not np.events[ev] then missingEv[#missingEv + 1] = ev end end
+        ns.Print(("Nameplates: %s visible, missing events: %s"):format(tostring(np.visible or "?"),
+            #missingEv > 0 and table.concat(missingEv, ", ") or "none"))
+        if (np.visible or 0) == 0 then
+            ns.Print("No nameplates were visible. Stand near a few mobs with nameplates on (V) and run it again.")
+        end
+    end
     ns.Print("Probe saved. Type |cffffff00/reload|r to write it to SavedVariables/MLZ_UI.lua.")
 end
 

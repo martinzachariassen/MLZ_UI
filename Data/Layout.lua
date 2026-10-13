@@ -97,9 +97,9 @@ ns.data.layout = {
         -- Combat cluster: three tightly stacked bars, bar 1 at the bottom
         { label = "Bar 1", system = "ActionBar", indexEnum = ABI, index = "MainBar",
           point = "BOTTOM", relPoint = "BOTTOM", x = 0, y = BASE, settingEnum = AB, settings = MAIN_BAR },
-        { label = "Bar 2 (Shift)", system = "ActionBar", indexEnum = ABI, index = "Bar2",
+        { label = "Bar 2 (SHIFT)", system = "ActionBar", indexEnum = ABI, index = "Bar2",
           point = "BOTTOM", relPoint = "BOTTOM", x = 0, y = BASE + ROW, settingEnum = AB, settings = MAIN_BAR },
-        { label = "Bar 3 (Ctrl)", system = "ActionBar", indexEnum = ABI, index = "Bar3",
+        { label = "Bar 3 (CTRL)", system = "ActionBar", indexEnum = ABI, index = "Bar3",
           point = "BOTTOM", relPoint = "BOTTOM", x = 0, y = BASE + 2 * ROW, settingEnum = AB, settings = MAIN_BAR },
 
         -- Gryphons / end caps on the main bar

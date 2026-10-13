@@ -7,12 +7,13 @@ local _, ns = ...
 
 local Fade = ns.RegisterModule({ key = "fade", title = "Minimalism" })
 
-local MODE_TEXT = {
+local MODE_TEXT = { -- also used by the control center (UI/Settings.lua)
     mouseover = "hidden until mouseover",
     combat = "dimmed out of combat",
     hideInCombat = "hidden in combat",
     group = "hidden when solo",
 }
+Fade.MODE_TEXT = MODE_TEXT
 
 local function Frames(row)
     local list = {}

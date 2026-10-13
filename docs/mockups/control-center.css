@@ -41,6 +41,19 @@
 .banner::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--green); }
 .banner.amber::before { background: var(--amber); }
 
+.slist { padding: 4px 1px; margin-bottom: 16px; }
+.sline { position: relative; height: 38px; display: flex; align-items: center; padding: 0 14px; gap: 12px; }
+.sline + .sline::after { content: ""; position: absolute; top: 0; left: 13px; right: 13px; height: 1px; background: var(--border); }
+.sline::before { content: ""; position: absolute; left: 0; top: 9px; bottom: 9px; width: 3px; background: var(--green); }
+.sline.warn::before { background: var(--amber); }
+.sline.off::before, .sline.na::before { background: var(--off); }
+.sline .ttl { width: 144px; flex: none; }
+.sline .txt { flex: 1; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sline .badge { width: 104px; justify-content: flex-end; flex: none; }
+.sline .open { color: var(--accent); opacity: .45; flex: none; margin-left: 4px; }
+.sline.hover { background: rgba(255,255,255,.04); }
+.sline.hover .open { opacity: 1; }
+
 .cards { display: grid; grid-template-columns: 308px 308px; gap: 12px; margin-bottom: 16px; }
 .scard { position: relative; height: 78px; padding: 12px 12px 0 14px; }
 .scard::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--green); }

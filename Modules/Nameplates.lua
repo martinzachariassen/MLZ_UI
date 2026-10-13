@@ -525,7 +525,7 @@ function NP.Apply() Refresh(true); ns.FireState() end
 function NP.Save() Save(); ns.FireState() end
 function NP.Load() Load(); ns.FireState() end
 function NP.Export()
-    if CanImport() then ns.ShowCopy("MLZ UI: Platynator profile (Ctrl+C to copy)", ProfileString()) end
+    if CanImport() then ns.ShowCopy("MLZ UI: Platynator profile (CTRL-C to copy)", ProfileString()) end
 end
 
 local function OnOff(v) return v and "|cff44ff44on|r" or "|cff888888off|r" end
@@ -587,8 +587,8 @@ function Nameplates:Preview()
     if not loaded then
         profile.old, profile.new, profile.enabled, profile.unavailable = "-", "Platynator not loaded", false, true
     elseif not text then
-        profile.old, profile.new, profile.enabled, profile.unavailable = "-", "no profile string saved", false, true
-        profile.note = "Run /mlz np export in a game with your setup and paste the string into profileString in Data/Nameplates.lua."
+        profile.old, profile.new, profile.enabled, profile.unavailable = "-", "no saved profile", false, true
+        profile.note = "No Platynator profile is saved in MLZ UI yet, so there is nothing to import. The clean style below works without one."
     else
         profile.old, profile.new = "current profile", "MLZ profile"
         profile.value = text

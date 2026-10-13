@@ -23,6 +23,10 @@ W.T = {
     off       = { 0.300, 0.320, 0.360, 1 },
     text      = { 0.930, 0.940, 0.960, 1 },
     muted     = { 0.580, 0.610, 0.660, 1 },
+    input     = { 0.060, 0.070, 0.085, 1 },   -- wells: checkboxes, segmented, stepper, slider track
+    inputEdge = { 0.320, 0.350, 0.410, 1 },   -- border of an enabled checkbox
+    shade     = { 1, 1, 1, 0.04 },             -- soft hover on rows and list items
+    press     = { 1, 1, 1, 0.08 },             -- stronger hover on small controls
 }
 local T = W.T
 
@@ -51,7 +55,6 @@ MakeFont("MLZUI_FontTitle", 20)
 MakeFont("MLZUI_FontHead", 14)
 MakeFont("MLZUI_FontButton", 12)
 MakeFont("MLZUI_FontSmallBold", 11)
-MakeFont("MLZUI_FontAccent", 12, T.accent)
 
 ------------------------------------------------------------------------
 -- Basic helpers
@@ -91,6 +94,21 @@ function W.Border(frame, color)
         for _, t in ipairs(self) do t:SetColorTexture(unpack(c)) end
     end
     return b
+end
+
+-- 1px horizontal line in the border color, anchored by the caller
+function W.Line(parent, layer)
+    local t = parent:CreateTexture(nil, layer or "BORDER")
+    t:SetColorTexture(unpack(T.border))
+    t:SetHeight(1)
+    return t
+end
+
+-- Secondary text (muted color)
+function W.Muted(parent, font, text, justify)
+    local fs = W.Text(parent, font or "GameFontHighlightSmall", text, justify)
+    fs:SetTextColor(unpack(T.muted))
+    return fs
 end
 
 -- Tooltip helper. text may be a function returning the text.
@@ -168,18 +186,6 @@ function W.Window(name, width, height, title)
     return f
 end
 
--- Kept for older code: sets the window title
-function W.SetTitle(frame, text)
-    local fs = frame.TitleText or (frame.TitleContainer and frame.TitleContainer.TitleText)
-    if not fs then
-        fs = W.Text(frame, "GameFontHighlight", nil, "CENTER")
-        fs:SetPoint("TOP", 0, -5)
-        frame.TitleText = fs
-    end
-    fs:SetText(text)
-    return fs
-end
-
 ------------------------------------------------------------------------
 -- Card: a section box
 ------------------------------------------------------------------------
@@ -221,7 +227,7 @@ function W.Button(parent, text, width, height, onClick, style)
         self.hovered = true
         if self:IsEnabled() then self.bg:SetColorTexture(unpack(self.style.hover)) end
         if self.tipTitle or self.tipText then
-            GameTooltip:SetOwner(self, "ANCHOR_TOP")
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
             GameTooltip:SetText(self.tipTitle or self:GetText() or "", 1, 1, 1)
             if self.tipText then GameTooltip:AddLine(self.tipText, nil, nil, nil, true) end
             GameTooltip:Show()
@@ -249,11 +255,11 @@ end
 ------------------------------------------------------------------------
 -- Check: flat square checkbox (CheckButton, so SetChecked/GetChecked/Click work as usual)
 ------------------------------------------------------------------------
-function W.Check(parent, label, onClick)
+function W.Check(parent)
     local c = CreateFrame("CheckButton", nil, parent)
     c:SetSize(18, 18)
-    c.bg = W.Fill(c, { 0.06, 0.07, 0.085, 1 })
-    c.border = W.Border(c, { 0.32, 0.35, 0.41, 1 })
+    c.bg = W.Fill(c, T.input)
+    c.border = W.Border(c, T.inputEdge)
     local mark = c:CreateTexture(nil, "ARTWORK")
     mark:SetPoint("TOPLEFT", 3, -3)
     mark:SetPoint("BOTTOMRIGHT", -3, 3)
@@ -266,14 +272,9 @@ function W.Check(parent, label, onClick)
     c:SetDisabledCheckedTexture(dis)
     local hl = c:CreateTexture(nil, "HIGHLIGHT")
     hl:SetAllPoints()
-    hl:SetColorTexture(1, 1, 1, 0.08)
-    c:SetScript("OnDisable", function(self) self.border:SetColor({ 0.2, 0.22, 0.26, 1 }) end)
-    c:SetScript("OnEnable", function(self) self.border:SetColor({ 0.32, 0.35, 0.41, 1 }) end)
-    if label then
-        c.label = W.Text(c, "GameFontHighlight", label)
-        c.label:SetPoint("LEFT", c, "RIGHT", 6, 0)
-    end
-    if onClick then c:SetScript("OnClick", function(self) onClick(self, self:GetChecked() and true or false) end) end
+    hl:SetColorTexture(unpack(T.press))
+    c:SetScript("OnDisable", function(self) self.border:SetColor(T.border) end)
+    c:SetScript("OnEnable", function(self) self.border:SetColor(T.inputEdge) end)
     return c
 end
 
@@ -337,7 +338,7 @@ function W.Segmented(parent, options, onSelect, segWidth)
     local s = CreateFrame("Frame", nil, parent)
     segWidth = segWidth or 70
     s:SetSize(segWidth * #options, 22)
-    W.Fill(s, { 0.06, 0.07, 0.085, 1 })
+    W.Fill(s, T.input)
     W.Border(s, T.border)
     s.buttons = {}
     for i, o in ipairs(options) do
@@ -346,7 +347,7 @@ function W.Segmented(parent, options, onSelect, segWidth)
         b:SetPoint("LEFT", 1 + (i - 1) * segWidth + (i > 1 and 1 or 0), 0)
         b.sel = W.Fill(b, T.accent)
         b.sel:Hide()
-        b.hl = W.Fill(b, { 1, 1, 1, 0.07 }, "HIGHLIGHT")
+        b.hl = W.Fill(b, T.press, "HIGHLIGHT")
         b.text = W.Text(b, "MLZUI_FontButton", o.text, "CENTER")
         b.text:SetPoint("CENTER")
         b.value = o.value
@@ -371,10 +372,6 @@ function W.Segmented(parent, options, onSelect, segWidth)
             b.text:SetTextColor(unpack(on and { 1, 1, 1, 1 } or T.muted))
         end
     end
-    function s:SetActive(on)
-        for _, b in ipairs(self.buttons) do b:SetEnabled(on) end
-        self:SetAlpha(on and 1 or 0.4)
-    end
     return s
 end
 
@@ -384,7 +381,7 @@ end
 function W.Stepper(parent, width, options, onSelect)
     local s = CreateFrame("Frame", nil, parent)
     s:SetSize(width, 22)
-    W.Fill(s, { 0.06, 0.07, 0.085, 1 })
+    W.Fill(s, T.input)
     W.Border(s, T.border)
     s.text = W.Text(s, "MLZUI_FontButton", "", "CENTER")
     s.text:SetPoint("LEFT", 24, 0)
@@ -395,7 +392,7 @@ function W.Stepper(parent, width, options, onSelect)
         local b = CreateFrame("Button", nil, s)
         b:SetSize(22, 20)
         b:SetPoint(dir < 0 and "LEFT" or "RIGHT", dir < 0 and 1 or -1, 0)
-        b.hl = W.Fill(b, { 1, 1, 1, 0.08 }, "HIGHLIGHT")
+        b.hl = W.Fill(b, T.press, "HIGHLIGHT")
         b.t = W.Text(b, "MLZUI_FontHead", dir < 0 and "<" or ">", "CENTER")
         b.t:SetPoint("CENTER")
         b.t:SetTextColor(unpack(T.accent))
@@ -436,7 +433,7 @@ function W.Slider(parent, width, minV, maxV, step, fmt, onChange, onCommit)
     if s.SetObeyStepOnDrag then s:SetObeyStepOnDrag(true) end
     s:EnableMouse(true)
     local track = s:CreateTexture(nil, "BACKGROUND")
-    track:SetColorTexture(0.06, 0.07, 0.085, 1)
+    track:SetColorTexture(unpack(T.input))
     track:SetPoint("LEFT")
     track:SetPoint("RIGHT")
     track:SetHeight(6)
@@ -528,7 +525,7 @@ function W.ScrollArea(parent)
     bar:SetMinMaxValues(0, 0)
     bar:SetValueStep(1)
     bar:EnableMouse(true)
-    W.Fill(bar, { 1, 1, 1, 0.04 })
+    W.Fill(bar, T.shade)
     local thumb = bar:CreateTexture(nil, "OVERLAY")
     thumb:SetColorTexture(0.40, 0.44, 0.50, 0.9)
     thumb:SetSize(5, 40)

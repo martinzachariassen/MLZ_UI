@@ -16,7 +16,7 @@ The target player wants a calm, good-looking UI without learning a big suite lik
 - **Namespace:** every file starts with `local _, ns = ...`. `ns` is global as `MLZUI` for `/dump` only. Never read `MLZUI` from code.
 - **`Data/` = what, `Modules/` = how.** Defaults and presets go in `Data/` as plain tables. Logic goes in `Modules/`.
 - **Module contract:** `ns.RegisterModule({ key, title })`, then `:Preview()`, `:Backup(items)`, `:Apply(items)`, `:Restore(snap)`. New wizard modules must be added to `Backup.APPLY_ORDER` in `Modules/Backup.lua`.
-- **Reuse Core helpers** instead of writing your own: `ns.On`/`ns.TryOn`, `ns.RunOutOfCombat`, `ns.FireState`/`ns.OnState`, `ns.MarkReload`, `ns.Enabled`/`ns.SetEnabled`, `ns.Try`, `ns.IsAddOnLoaded`/`ns.IsAddOnInstalled`, `ns.Role`/`ns.LiveRole`, `ns.CharDB`, `ns.AddCommand`, `ns.ShowCopy`, `ns.Debug`.
+- **Reuse Core helpers** instead of writing your own: `ns.On`/`ns.TryOn`, `ns.RunOutOfCombat`, `ns.FireState`/`ns.OnState`, `ns.MarkReload` (last resort, apply live when you can), `ns.MarkEditModeStale`, `ns.Error`, `ns.Enabled`/`ns.SetEnabled`, `ns.Try`, `ns.IsAddOnLoaded`/`ns.IsAddOnInstalled`, `ns.Role`/`ns.LiveRole`, `ns.CharDB`, `ns.AddCommand`, `ns.ShowCopy`, `ns.Debug`.
 
 ## Hard rules
 
@@ -48,7 +48,7 @@ The look: **dark, flat, quiet, precise.** Think a modern desktop app, not a fant
 
 **Use the system, don't invent.**
 - Colors only from `W.T` (frames) and `W.C` (text codes) in `UI/Widgets.lua`. No new hex values in feature code.
-- Widgets only from `W.*`: `Window`, `Card`, `Button` (`normal`, `primary`, `danger`, `subtle`), `Check`, `Toggle`, `Segmented`, `Stepper`, `Slider`, `Badge`, `ScrollArea`, `Tooltip`. No Blizzard templates (`UIPanelButtonTemplate`, `BasicFrameTemplate`, and so on).
+- Widgets only from `W.*`: `Line`, `Muted`, `Window`, `Card`, `Button` (`normal`, `primary`, `danger`, `subtle`), `Check`, `Toggle`, `Segmented`, `Stepper`, `Slider`, `Badge`, `ScrollArea`, `Tooltip`. No Blizzard templates (`UIPanelButtonTemplate`, `BasicFrameTemplate`, and so on).
 - Control center pages are built only with the page builder in `UI/Settings.lua` (`Title`, `Card`, `Row`, `Toggle`, `Choice`, `Step`, `Slider`, `Value`, `Status`, `Buttons`, `Text`).
 
 **Visual rules.**
@@ -101,7 +101,7 @@ The README images in `docs/screenshots/` are currently **mockups**: HTML in `doc
 
 | File | What to show | Client state |
 |---|---|---|
-| `control-center.png` | `/mlz`, Overview page, set-up banner, all status cards | Setup done, no reload pending, healer role, hover one card |
+| `control-center.png` | `/mlz`, Overview page with all status lines | Setup done, no reload pending (so no banner), healer role, hover one line |
 | `nameplates.png` | `/mlz` → Nameplates, "Right now", Mode and Options cards | Platynator loaded, Auto mode, clean style on |
 | `wizard.png` | `/mlz install`, step 4 Keybinds | Moving ESDF → WASD so red conflicts and Alt moves show |
 | `minimap-menu.png` | Minimap button tooltip and right-click menu | Two separate captures composed side by side (they can't be open at once) |

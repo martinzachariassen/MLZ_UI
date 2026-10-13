@@ -135,10 +135,10 @@ Settings that don't exist in your installed version are shown as *not available*
 
 | Page | What you see and change |
 |---|---|
-| Overview | A status card per area, a banner when setup or a reload is pending, quick actions |
-| Layout & scale | Scale mode, active Edit Mode layout, minimap size, pet bar position |
+| Overview | One status line per area, and a banner only when setup or a reload is pending |
+| Layout & scale | Scale mode, screen layout (Edit Mode), minimap size, pet bar position |
 | Nameplates | Current mode and why, mode picker, friendly names, clean style, threat colors, PvP tweak, profile save/restore |
-| Healer | Your role and where it comes from, current and wanted layout, rebuild healer layouts |
+| Role & healing | Your role and where it comes from, healer layouts now and for your role, rebuild healer layouts |
 | Minimalism | One switch per faded frame, pause fading, clean chat |
 | Action bars & UI | Button colors and hotkeys, quest tracker, FPS counter, combat text |
 | Quality of life | Repair / sell greys, mana tick bar, interrupt announce |

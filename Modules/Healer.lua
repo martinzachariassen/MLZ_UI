@@ -60,10 +60,14 @@ local function Switch(silent)
     if not index then return end -- the layout hasn't been created yet: stay on the main layout
     local ok, err = pcall(C_EditMode.SetActiveLayout, index)
     if ok then
-        if not silent then ns.Print("Layout:", want) end
+        -- quiet in chat: the overview and the minimap tooltip show the active layout
+        ns.Debug("Layout:", want)
+        if not silent and ns.Settings and ns.Settings.Notify and ns.Settings.frame and ns.Settings.frame:IsShown() then
+            ns.Settings:Notify("Switched to the " .. want .. " layout.", "info")
+        end
         ns.FireState()
     else
-        ns.Print("|cffff4444Could not switch layout:|r", err)
+        ns.Error("layout switch", err)
     end
 end
 
@@ -131,7 +135,7 @@ end
 -- Returns ok, message
 function Healer.Rebuild()
     local ok, msg = Layout():RebuildVariants()
-    if ok then ns.MarkReload("healer layouts rebuilt") end
+    if ok then ns.MarkEditModeStale() end
     return ok, msg
 end
 

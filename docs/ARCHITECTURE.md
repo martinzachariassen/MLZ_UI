@@ -85,7 +85,7 @@ Wizard "Apply"
        └─ pushed onto MLZUIDB.backups (max 5, #1 is always kept: your pre-MLZ state)
   └─ modules apply in Backup.APPLY_ORDER
        scale → settings → layout → bindings → fade → actionbuttons → tweaks → addons → nameplates
-  └─ ns.MarkReload(reason) if a /reload is needed
+  └─ ns.MarkReload(reason) only if a /reload is really needed, ns.MarkEditModeStale() for layouts
 
 /mlz undo
   └─ pops the newest backup
@@ -104,7 +104,9 @@ Use these before writing your own.
 | `ns.On(event, fn)` · `ns.TryOn(event, fn)` | Event bus. `TryOn` skips events the client doesn't have. |
 | `ns.RunOutOfCombat(fn, label, quiet)` | Run now, or queue until combat ends. A newer job with the same label replaces the old one. |
 | `ns.FireState()` · `ns.OnState(fn)` | Tell the UI that something changed, so open pages refresh. |
-| `ns.MarkReload(reason)` | Flag that a `/reload` is needed. The reason shows in the footer and overview. |
+| `ns.MarkReload(reason)` | Flag that a `/reload` is truly needed (e.g. an addon that only reads its settings at load). The reason shows in the footer and overview. Prefer applying live. |
+| `ns.MarkEditModeStale()` | MLZ UI changed Edit Mode layouts. Frames already moved, but Edit Mode keeps an old copy until a reload, so a guard warns if the player opens Edit Mode before reloading. |
+| `ns.Error(where, err)` | Report an error once per session. Repeats only go to `ns.Debug`. |
 | `ns.Enabled(mod, id, default)` · `ns.SetEnabled` | Remember which wizard rows are ticked. |
 | `ns.Try(fn, ...)` | `pcall` wrapper for APIs that may not exist or may fail. |
 | `ns.IsAddOnLoaded(name)` · `ns.IsAddOnInstalled(name)` | Addon checks that work across client APIs. |
