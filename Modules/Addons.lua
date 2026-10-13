@@ -8,7 +8,7 @@ local _, ns = ...
 local Addons = ns.RegisterModule({ key = "addons", title = "Other addons" })
 
 local function Loaded(folder)
-    return C_AddOns.IsAddOnLoaded(folder)
+    return ns.IsAddOnLoaded(folder)
 end
 
 -- A row sets one key (path/value) or several (set = { { path, value }, ... }).
@@ -126,6 +126,11 @@ function Addons:Preview()
                     item.new = Format(row, function(_, part) return part.value end)
                     item.enabled = ns.Enabled("addons", id, row.enabled ~= false)
                     item.alreadySet = Matches(row, values)
+                    if entry.manual and not item.alreadySet then
+                        -- shown so you know what to change, but never written
+                        item.enabled, item.unavailable = false, true
+                        item.note = entry.manual .. (row.desc and ("  " .. row.desc) or "")
+                    end
                 end
                 items[#items + 1] = item
             end
@@ -167,7 +172,7 @@ function Addons:Apply(items)
     local changed = 0
     for _, item in ipairs(items) do
         local entry, row = Find(item.id)
-        if entry and not item.unavailable then
+        if entry and not item.unavailable and not entry.manual then
             for _, part in ipairs(Parts(row)) do
                 local parent, key = Resolve(entry, row, part.path, true)
                 if parent then
@@ -178,6 +183,8 @@ function Addons:Apply(items)
         end
     end
     ns.Debug("Addon settings set:", changed)
+    -- Addons read their saved settings when they load
+    if changed > 0 then ns.MarkReload("addon settings changed") end
 end
 
 function Addons:Restore(snap)
@@ -205,7 +212,7 @@ function Addons:Summary()
     local list = {}
     for _, entry in ipairs(ns.data.addons) do
         local s = { title = entry.title, addon = entry.addon, loaded = Loaded(entry.addon) and true or false,
-            differ = 0, total = 0, rows = #entry.rows, missing = {} }
+            differ = 0, total = 0, rows = #entry.rows, missing = {}, manual = entry.manual }
         if s.loaded then
             for _, row in ipairs(entry.rows) do
                 local ok, values = pcall(Read, entry, row)

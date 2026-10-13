@@ -54,15 +54,38 @@ B.layers = {
 }
 
 -- Stance / form keys (SHAPESHIFTBUTTON1-10 = Blizzard's stance bar). Per movement setup.
--- These take priority over the layer keys above: SHIFT-1/2/3 become stances, so bar 2 buttons 1-3
--- lose their key in WASD. ESDF has no stance keys, because SHIFT-2/3 are already used by bar 2 there.
+-- Only classes with a stance bar get them (see B.stanceClasses).
+-- WASD: SHIFT-1/2/3 become stances, so bar 2 buttons 1-3 move to the keys in B.stanceRelocate.
+-- ESDF: the 1 key is free in every layer (it's not a base key), so 1 / SHIFT-1 / CTRL-1 are the stances.
 B.stance = {
     WASD = {
         { key = "SHIFT-1", command = "SHAPESHIFTBUTTON1" },
         { key = "SHIFT-2", command = "SHAPESHIFTBUTTON2" },
         { key = "SHIFT-3", command = "SHAPESHIFTBUTTON3" },
     },
-    ESDF = {},
+    ESDF = {
+        { key = "1",       command = "SHAPESHIFTBUTTON1" },
+        { key = "SHIFT-1", command = "SHAPESHIFTBUTTON2" },
+        { key = "CTRL-1",  command = "SHAPESHIFTBUTTON3" },
+    },
+}
+
+-- Classes that have a stance/form/aura bar
+B.stanceClasses = { WARRIOR = true, DRUID = true, ROGUE = true, PALADIN = true, PRIEST = true }
+
+-- Pet keys for pet classes (BONUSACTIONBUTTON1-10 = the pet bar: 1 Attack, 2 Follow, 3 Stay)
+B.petClasses = { HUNTER = true, WARLOCK = true }
+B.pet = {
+    ESDF = {
+        { key = "5",       command = "BONUSACTIONBUTTON1", role = "Pet attack" },
+        { key = "SHIFT-5", command = "BONUSACTIONBUTTON2", role = "Pet follow" },
+        { key = "CTRL-5",  command = "BONUSACTIONBUTTON3", role = "Pet stay" },
+    },
+    WASD = {
+        { key = "T",       command = "BONUSACTIONBUTTON1", role = "Pet attack" },
+        { key = "CTRL-T",  command = "BONUSACTIONBUTTON2", role = "Pet follow" },
+        { key = "CTRL-G",  command = "BONUSACTIONBUTTON3", role = "Pet stay" },
+    },
 }
 
 -- Bar buttons that lost their key to a stance key get a new key here (free keys: WASD = G, V, T).

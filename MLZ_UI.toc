@@ -2,7 +2,7 @@
 ## Title: MLZ UI
 ## Notes: Sets up scaling, layout, keybinds and settings via an installation wizard. /mlz
 ## Author: Martin
-## Version: 0.6.0
+## Version: 0.7.0
 ## SavedVariables: MLZUIDB
 ## IconTexture: Interface\Icons\INV_Misc_Gear_01
 ## AddonCompartmentFunc: MLZUI_OnAddonCompartmentClick
@@ -31,6 +31,9 @@ Modules\Tweaks.lua
 Modules\Nameplates.lua
 Modules\Addons.lua
 Modules\Health.lua
+Modules\Vendor.lua
+Modules\ManaTick.lua
+Modules\Interrupt.lua
 Modules\Profile.lua
 
 UI\Widgets.lua

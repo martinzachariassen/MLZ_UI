@@ -12,7 +12,7 @@ local T, C = W.T, W.C
 local MB = {}
 ns.MinimapButton = MB
 
-local button, menu, catcher
+local button, menu
 
 local function Cfg()
     ns.db.minimap = ns.db.minimap or { angle = 200 }
@@ -101,15 +101,16 @@ local function BuildMenu()
     W.Border(f, T.border)
     tinsert(UISpecialFrames, "MLZUI_QuickMenu")
 
-    -- An invisible layer behind the menu: a click anywhere else closes the menu
-    catcher = CreateFrame("Button", nil, UIParent)
-    catcher:SetAllPoints(UIParent)
-    catcher:SetFrameStrata("FULLSCREEN")
-    catcher:RegisterForClicks("AnyUp")
-    catcher:SetScript("OnClick", function() f:Hide() end)
-    catcher:Hide()
-    f:SetScript("OnShow", function() catcher:Show() end)
-    f:SetScript("OnHide", function() catcher:Hide() end)
+    -- A click anywhere else closes the menu. GLOBAL_MOUSE_DOWN only listens; it doesn't eat the
+    -- click, so camera turning and targeting keep working while the menu is open.
+    -- Clicks on the button that opened the menu are left to that button (it toggles the menu).
+    f:SetScript("OnShow", function(self) self:RegisterEvent("GLOBAL_MOUSE_DOWN") end)
+    f:SetScript("OnHide", function(self) self:UnregisterEvent("GLOBAL_MOUSE_DOWN") end)
+    f:SetScript("OnEvent", function(self)
+        if self:IsMouseOver() then return end
+        if self.owner and self.owner.IsMouseOver and self.owner:IsVisible() and self.owner:IsMouseOver() then return end
+        self:Hide()
+    end)
 
     local y = 8
     local function Header(text)
@@ -149,19 +150,21 @@ local function BuildMenu()
         return b
     end
 
-    local NP, H = ns.NP, ns.Healer
+    local NP = ns.NP
     local function npReady() return NP.Ready() end
 
     Header("NAMEPLATES")
-    Item("Auto", function() NP.SetAuto(true) end, function() return NP.Auto() end, npReady)
-    Item("Tank", function() NP.SetMode("tank") end, function() return not NP.Auto() and NP.Mode() == "tank" end, npReady)
-    Item("DPS", function() NP.SetMode("dps") end, function() return not NP.Auto() and NP.Mode() == "dps" end, npReady)
-    Item("Solo", function() NP.SetMode("solo") end, function() return not NP.Auto() and NP.Mode() == "solo" end, npReady)
+    Item("Auto (follow role)", function() NP.SetAuto(true) end, function() return NP.Auto() end, npReady)
+    for _, m in ipairs(NP.MODES) do
+        Item(NP.MODE_TEXT[m], function() NP.SetMode(m) end,
+            function() return not NP.Auto() and NP.Mode() == m end, npReady)
+    end
     Divider()
-    Header("COUNT ME AS A HEALER")
-    Item("Auto (follow spec)", function() H.SetForce(nil) end, function() return H.Force() == "auto" end)
-    Item("Always", function() H.SetForce("on") end, function() return H.Force() == "on" end)
-    Item("Never", function() H.SetForce("off") end, function() return H.Force() == "off" end)
+    Header("MY ROLE")
+    Item("Auto (from talents)", function() ns.SetRoleForce(nil) end, function() return ns.GetRoleForce() == nil end)
+    for _, r in ipairs({ "TANK", "HEALER", "DAMAGER" }) do
+        Item(ns.ROLE_TEXT[r], function() ns.SetRoleForce(r) end, function() return ns.GetRoleForce() == r end)
+    end
     Divider()
     Item("Pause fading", function() ns.modules.fade:SetPaused(not ns.fadePaused) end, function() return ns.fadePaused and true or false end)
     Item("FPS counter", function()
@@ -203,11 +206,14 @@ function MB:ToggleMenu(owner)
         menu:Hide()
         return
     end
+    if InCombatLockdown() then return end -- the menu closes itself when combat starts
     HideTooltip()
+    menu.owner = owner
     menu:ClearAllPoints()
-    if owner and owner.GetCenter and owner:GetCenter() then
+    if owner == button and owner:GetCenter() then
         menu:SetPoint("TOPRIGHT", owner, "BOTTOMLEFT", 8, 8)
     else
+        -- the addon compartment's rows are in a dropdown that closes on click: use the cursor
         local x, y = GetCursorPosition()
         local s = UIParent:GetEffectiveScale()
         menu:SetPoint("TOPRIGHT", UIParent, "BOTTOMLEFT", x / s, y / s)
@@ -292,6 +298,10 @@ ns.On("PLAYER_LOGIN", function()
     UpdateButton()
 end)
 
+ns.On("PLAYER_REGEN_DISABLED", function()
+    if menu then menu:Hide() end
+end)
+
 -- Keep the tooltip, the menu and the reload dot current
 ns.OnState(function()
     UpdateButton()
@@ -308,9 +318,11 @@ end)
 ------------------------------------------------------------------------
 -- Addon compartment (clients that have it call these through the TOC)
 ------------------------------------------------------------------------
+-- Newer clients pass a table ({ buttonName = "RightButton" }) instead of the button name
 function MLZUI_OnAddonCompartmentClick(_, mouseButton, menuButtonFrame)
+    if type(mouseButton) == "table" then mouseButton = mouseButton.buttonName end
     if mouseButton == "RightButton" then
-        MB:ToggleMenu(menuButtonFrame)
+        MB:ToggleMenu(nil)
     elseif ns.Settings then
         ns.Settings:Toggle()
     end

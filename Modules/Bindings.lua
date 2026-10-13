@@ -28,7 +28,9 @@ function Bindings:Desired(movement)
         list[#list + 1] = { key = b.key, command = b.command, group = "Movement (" .. movement .. ")" }
     end
     local keys = D.baseKeys[movement]
-    local stance = D.stance and D.stance[movement] or {}
+    local class = ns.PlayerClass()
+    local hasStances = not D.stanceClasses or D.stanceClasses[class]
+    local stance = (hasStances and D.stance and D.stance[movement]) or {}
     local stanceKeys = {}
     for _, b in ipairs(stance) do stanceKeys[b.key] = true end
     local relocate = D.stanceRelocate and D.stanceRelocate[movement] or {}
@@ -47,7 +49,12 @@ function Bindings:Desired(movement)
         end
     end
     for i, b in ipairs(stance) do
-        list[#list + 1] = { key = b.key, command = b.command, group = "Stances", role = "Stance " .. i }
+        list[#list + 1] = { key = b.key, command = b.command, group = "Stances / forms", role = "Stance " .. i }
+    end
+    if D.petClasses and D.petClasses[class] and D.pet and D.pet[movement] then
+        for _, b in ipairs(D.pet[movement]) do
+            list[#list + 1] = { key = b.key, command = b.command, group = "Pet", role = b.role }
+        end
     end
     for _, b in ipairs(D.mouse) do
         list[#list + 1] = { key = b.key, command = b.command, group = "Bar 4 (mouseover)" }
@@ -231,11 +238,12 @@ function Bindings:Apply(items)
 end
 
 function Bindings:Restore(snap)
-    -- First unbind all keys we touched, then restore the old actions
-    for key in pairs(snap.keys) do SetBinding(key) end
-    for key, action in pairs(snap.keys) do
-        if action ~= "" then SetBinding(key, action) end
+    -- First unbind all keys we touched, then restore the old actions. One bad key must not
+    -- stop the rest, and the result is always saved.
+    for key in pairs(snap.keys or {}) do pcall(SetBinding, key) end
+    for key, action in pairs(snap.keys or {}) do
+        if action ~= "" then pcall(SetBinding, key, action) end
     end
-    Save(snap.set)
+    pcall(Save, snap.set)
     if snap.movement then ns.db.movement = snap.movement end
 end

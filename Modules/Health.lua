@@ -12,16 +12,18 @@ local EXTRA = {
 }
 
 local function Installed(addon)
-    if C_AddOns.DoesAddOnExist then return C_AddOns.DoesAddOnExist(addon) end
-    local name = C_AddOns.GetAddOnInfo(addon)
-    return name ~= nil
+    if C_AddOns and C_AddOns.DoesAddOnExist then
+        local ok, exists = pcall(C_AddOns.DoesAddOnExist, addon)
+        if ok then return exists and true or false end
+    end
+    return ns.IsAddOnInstalled(addon) -- GetAddOnInfo returns a name with reason "MISSING" for missing addons
 end
 
 -- onlyInstalled = skip addons that aren't installed at all (the login check)
 local function Problems(onlyInstalled)
     local list = {}
     local function Check(addon, title)
-        if C_AddOns.IsAddOnLoaded(addon) then return end
+        if ns.IsAddOnLoaded(addon) then return end
         local exists = Installed(addon)
         if onlyInstalled and not exists then return end
         list[#list + 1] = title .. (exists and " (installed but not loaded, check the addon list)" or " (not installed)")
@@ -30,6 +32,8 @@ local function Problems(onlyInstalled)
     for _, entry in ipairs(EXTRA) do Check(entry.addon, entry.title) end
     return list
 end
+
+ns.HealthProblems = Problems
 
 local function Report(quiet)
     local list = Problems(quiet)

@@ -19,7 +19,8 @@ local C = W.C
 local Installer = {}
 ns.Installer = Installer
 
-local APPLY_ORDER = { "scale", "settings", "layout", "bindings", "fade", "actionbuttons", "tweaks", "addons", "nameplates" }
+-- Same order as the backup module uses (undo runs it in reverse)
+local APPLY_ORDER = ns.Backup.APPLY_ORDER
 
 -- Module pages are numbered automatically ("3. Settings", "Step 3 of 9"); `blurb` is the line in the intro.
 local PAGES = {
@@ -41,7 +42,7 @@ local PAGES = {
     { kind = "module", key = "addons", title = "Other addons", blurb = "Settings for supported addons you already have",
       text = "Settings for supported addons that are installed and loaded; the rest are skipped. The values live in Data/Addons.lua. Some addons need a /reload to pick up the changes." },
     { kind = "module", key = "nameplates", title = "Nameplates", blurb = "Nameplates: Platynator profile and clean style",
-      text = "Imports your saved Platynator profile (skipped until a profile string is saved in Data/Nameplates.lua) and/or turns on the clean MLZ style, which follows tank/DPS/solo. Tank/DPS switching by stance is controlled in the settings window (" .. C.gold .. "/mlz" .. C.r .. ")." },
+      text = "Imports your saved Platynator profile (skipped until a profile string is saved in Data/Nameplates.lua) and/or turns on the clean MLZ style, which follows your role: tank, healer, DPS or solo. Automatic switching, threat colors and the PvP option are in the settings window (" .. C.gold .. "/mlz" .. C.r .. ")." },
     { kind = "summary", title = "Review" },
     { kind = "done", title = "Done!" },
 }
@@ -121,6 +122,7 @@ function Installer:Build()
         local page = PAGES[self.page]
         if page.key then
             self.stepOn[page.key] = on
+            self:UpdateSelButtons()
             self:RenderList()
         end
     end, "Use this step")
@@ -224,7 +226,11 @@ local function RowTooltip(r)
     if not item then return end
     local truncOld = r.old.IsTruncated and r.old:IsTruncated()
     local truncNew = r.newText.IsTruncated and r.newText:IsTruncated()
-    if not (item.note or r.blocker or truncOld or truncNew) then return end
+    if not (item.note or r.blocker or truncOld or truncNew) then
+        -- nothing to say about this row: don't leave the previous row's tooltip up
+        if GameTooltip:IsOwned(r) then GameTooltip:Hide() end
+        return
+    end
     GameTooltip:SetOwner(r, "ANCHOR_CURSOR")
     GameTooltip:SetText(Plain(item.label), 1, 1, 1)
     if r.blocker then
@@ -405,7 +411,7 @@ end
 function Installer:SetAll(on)
     local page = PAGES[self.page]
     local key = page.key
-    if not key then return end
+    if not key or not self.stepOn[key] then return end
     for _, item in ipairs(self.items[key] or {}) do
         local eligible = not item.unavailable and not item.fixed and (item.toggle or not item.alreadySet)
         if eligible then
@@ -414,6 +420,14 @@ function Installer:SetAll(on)
         end
     end
     self:RenderList()
+end
+
+-- Tick all / Untick all only make sense while the step is on
+function Installer:UpdateSelButtons()
+    local page = PAGES[self.page]
+    local on = page.key and self.stepOn[page.key] and true or false
+    self.frame.selAll:SetEnabled(on)
+    self.frame.selNone:SetEnabled(on)
 end
 
 function Installer:CycleChoice(modKey, item)
@@ -556,6 +570,7 @@ function Installer:Go(index)
     local nothing = false
     if page.kind == "module" then
         f.stepCheck:SetChecked(self.stepOn[page.key])
+        self:UpdateSelButtons()
     elseif page.kind == "summary" then
         nothing = #self:Selections() == 0
         f.desc:SetText(nothing
@@ -633,6 +648,7 @@ function Installer:ApplyAll()
     local sels = self:Selections()
     if #sels == 0 then
         ns.db.installed = true
+        ns.FireState()
         self.frame:Hide()
         ns.Print("Nothing was changed. " .. C.gold .. "/mlz install" .. C.r .. " opens the wizard again.")
         return
@@ -657,6 +673,7 @@ function Installer:ApplyAll()
     end
     ns.db.installed = true
     self.appliedAny = true
+    ns.FireState()
 
     self.doneText = table.concat(lines, "\n") .. "\n\n" ..
         (failed > 0 and (C.red .. "Something failed. Type /mlz undo to undo, and pass on the error message." .. C.r .. "\n\n") or "") ..
@@ -674,6 +691,7 @@ function Installer:Open(stepKey)
         return
     end
     self:Build()
+    self.hiddenByCombat = nil
     self.items, self.stepOn, self.appliedAny, self.showAlready = {}, {}, false, {}
     for _, page in ipairs(PAGES) do
         if page.key then
@@ -686,7 +704,8 @@ function Installer:Open(stepKey)
                 ns.Print(C.red .. "Could not create preview for " .. mod.title .. ":" .. C.r, items)
                 self.items[page.key] = {}
             end
-            self.stepOn[page.key] = true
+            -- Opened for one step (e.g. "Re-apply layout"): only that step is on
+            self.stepOn[page.key] = (stepKey == nil) or (page.key == stepKey)
         end
     end
     self.frame:Show()
@@ -701,9 +720,23 @@ end
 
 ns.AddCommand("install", "opens the installation wizard", function() Installer:Open() end)
 
+-- Entering combat hides the wizard but keeps your choices; it comes back after combat
+-- (unless it was on the Done page, then there is nothing left to do).
 ns.On("PLAYER_REGEN_DISABLED", function()
-    if Installer.frame and Installer.frame:IsShown() then
-        Installer.frame:Hide()
-        ns.Print("The wizard was closed because you entered combat. Reopen with /mlz install.")
+    local f = Installer.frame
+    if f and f:IsShown() then
+        f:Hide()
+        if PAGES[Installer.page] and PAGES[Installer.page].kind ~= "done" then
+            Installer.hiddenByCombat = true
+            ns.Print("The wizard is hidden while you are in combat. It comes back with your choices after combat.")
+        end
+    end
+end)
+
+ns.On("PLAYER_REGEN_ENABLED", function()
+    if Installer.hiddenByCombat and Installer.frame then
+        Installer.hiddenByCombat = nil
+        Installer.frame:Show()
+        Installer:Go(Installer.page)
     end
 end)

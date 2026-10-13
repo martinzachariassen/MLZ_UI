@@ -12,26 +12,12 @@ local _, ns = ...
 
 local function Layout() return ns.modules.layout end
 
-local function SpecRole()
-    local info = C_SpecializationInfo
-    if info and info.GetSpecialization and info.GetSpecializationInfo then
-        local ok, index = pcall(info.GetSpecialization)
-        if ok and index then
-            local ok2, _, _, _, _, role = pcall(info.GetSpecializationInfo, index)
-            if ok2 and role then return role end
-        end
-    end
-end
-
--- Returns "HEALER" | "TANK" | "DAMAGER" | nil
+-- Returns "HEALER" | "TANK" | "DAMAGER" | nil (shared role detection, Core.lua)
 local function Role()
-    return SpecRole() or ((IsInGroup() and UnitGroupRolesAssigned and UnitGroupRolesAssigned("player")) or nil)
+    return (ns.Role())
 end
 
 local function IsHealer()
-    local force = ns.db and ns.db.healForce
-    if force == "on" then return true end
-    if force == "off" then return false end
     return Role() == "HEALER"
 end
 
@@ -53,8 +39,14 @@ local function Switch(silent)
     if not (C_EditMode and C_EditMode.GetLayouts and C_EditMode.SetActiveLayout) then return end
     if not (ns.db and ns.db.installed) then return end
     if InCombatLockdown() then pending = true return end
+    -- Never swap layouts under the user's hands while Edit Mode is open
+    if EditModeManagerFrame and EditModeManagerFrame.IsEditModeActive
+        and EditModeManagerFrame:IsEditModeActive() then
+        pending = true
+        return
+    end
     local L = Layout()
-    local raw, presets, active = L:GetInfo()
+    local raw, _, active = L:GetInfo()
     if not raw or not active then return end
 
     -- Only act when one of our own layouts is active
@@ -64,19 +56,15 @@ local function Switch(silent)
 
     local want = WantedLayout()
     if want == active.layoutName then return end
-    for i, l in ipairs(raw.layouts) do
-        if l.layoutName == want then
-            local ok, err = pcall(C_EditMode.SetActiveLayout, #presets + i)
-            if ok then
-                if not silent then ns.Print("Layout:", want) end
-                ns.FireState()
-            else
-                ns.Print("|cffff4444Could not switch layout:|r", err)
-            end
-            return
-        end
+    local index = L:IndexOf(want)
+    if not index then return end -- the layout hasn't been created yet: stay on the main layout
+    local ok, err = pcall(C_EditMode.SetActiveLayout, index)
+    if ok then
+        if not silent then ns.Print("Layout:", want) end
+        ns.FireState()
+    else
+        ns.Print("|cffff4444Could not switch layout:|r", err)
     end
-    -- the layout hasn't been created yet: stay on the main layout
 end
 
 -- Group and spec events come in bursts; wait a moment and do it once
@@ -90,12 +78,12 @@ local function Schedule()
     end)
 end
 
-for _, event in ipairs({
-    "PLAYER_ENTERING_WORLD", "GROUP_ROSTER_UPDATE", "PLAYER_ROLES_ASSIGNED",
-    "PLAYER_SPECIALIZATION_CHANGED", "ACTIVE_TALENT_GROUP_CHANGED", "PLAYER_TALENT_UPDATE",
-}) do
-    pcall(ns.On, event, Schedule) -- skip events this client doesn't have
-end
+-- Role changes (spec, talents, forced role) come from Core; group size changes from the roster
+ns.OnRoleChanged(function(_, _, roleChanged)
+    if roleChanged then Schedule() end
+end)
+ns.TryOn("GROUP_ROSTER_UPDATE", Schedule)
+ns.TryOn("PLAYER_ENTERING_WORLD", Schedule)
 
 ns.On("PLAYER_REGEN_ENABLED", function()
     if pending then
@@ -103,6 +91,16 @@ ns.On("PLAYER_REGEN_ENABLED", function()
         Schedule()
     end
 end)
+
+-- Leaving Edit Mode: do a switch that was held back while it was open
+if EventRegistry and EventRegistry.RegisterCallback then
+    pcall(EventRegistry.RegisterCallback, EventRegistry, "EditMode.Exit", function()
+        if pending then
+            pending = false
+            Schedule()
+        end
+    end, "MLZUI_Healer")
+end
 
 ------------------------------------------------------------------------
 -- Public API (settings window, minimap menu, /mlz heal)
@@ -113,14 +111,21 @@ ns.Healer = Healer
 Healer.Role = Role
 Healer.IsHealer = IsHealer
 Healer.Wanted = WantedLayout
+Healer.Switch = Switch
 
--- "auto" | "on" | "off"
-function Healer.Force() return ns.db.healForce or "auto" end
+-- Kept for older callers: "auto" | "on" | "off", mapped onto the shared role choice
+function Healer.Force()
+    local f = ns.GetRoleForce()
+    if f == "HEALER" then return "on" end
+    if f then return "off" end
+    return "auto"
+end
 
 function Healer.SetForce(v)
-    ns.db.healForce = (v == "on" or v == "off") and v or nil
+    if v == "on" then ns.SetRoleForce("HEALER")
+    elseif v == "off" then ns.SetRoleForce("DAMAGER")
+    else ns.SetRoleForce(nil) end
     Switch(true)
-    ns.FireState()
 end
 
 -- Returns ok, message
@@ -147,8 +152,28 @@ ns.AddCommand("heal","healer layouts: (status) | on | off | auto | build", funct
         local ok, msg = Healer.Rebuild()
         ns.Print(ok and "Healer layouts rebuilt:" or "|cffff4444Failed:|r", msg)
     else
-        ns.Print("Role:", tostring(Role()), "| healer:", IsHealer() and "yes" or "no",
-            "| forced:", ns.db.healForce or "no (auto)", "| wanted layout:", WantedLayout())
+        local role, source = ns.Role()
+        ns.Print("Role:", tostring(role), "(" .. tostring(source) .. ") | healer:", IsHealer() and "yes" or "no",
+            "| wanted layout:", WantedLayout())
         ns.Print("Use /mlz heal on, off, auto or build (rebuilds the healer layouts from the main layout).")
+    end
+end)
+
+local ROLE_ARG = { tank = "TANK", healer = "HEALER", heal = "HEALER", dps = "DAMAGER", damage = "DAMAGER" }
+ns.AddCommand("role", "your role: (status) | tank | healer | dps | auto", function(arg)
+    arg = strlower(strtrim(arg or ""))
+    if ROLE_ARG[arg] then
+        ns.SetRoleForce(ROLE_ARG[arg])
+        ns.Print("Your role is set to", ns.ROLE_TEXT[ROLE_ARG[arg]] .. ". /mlz role auto reads it from your talents again.")
+    elseif arg == "auto" then
+        ns.SetRoleForce(nil)
+        local role = ns.Role()
+        ns.Print("Your role is read automatically:", ns.ROLE_TEXT[role or ""] or "unknown", ".")
+    else
+        local role, source = ns.Role()
+        local live, why = ns.LiveRole()
+        ns.Print("Role:", ns.ROLE_TEXT[role or ""] or "unknown", "(" .. tostring(source) .. "), right now:",
+            ns.ROLE_TEXT[live or ""] or "unknown", "(" .. tostring(why) .. ")")
+        ns.Print("Use /mlz role tank, healer, dps or auto.")
     end
 end)

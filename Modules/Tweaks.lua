@@ -57,16 +57,18 @@ end
 ------------------------------------------------------------------------
 local TRACKERS = { "ObjectiveTrackerFrame", "QuestWatchFrame" }
 local trackerHooked = {}
+local hiddenByUs = {} -- only frames we hid get shown again (Blizzard hides an empty tracker on purpose)
 
 local function HideTracker(frame)
     local c = Cfg()
     if not (c and c.trackerHide) then return end
+    hiddenByUs[frame] = true
     if InCombatLockdown() then
         frame:SetAlpha(0)
         ns.RunOutOfCombat(function()
             local c2 = Cfg()
             if c2 and c2.trackerHide then frame:Hide() end
-        end, "hiding quest tracker")
+        end, "hiding quest tracker " .. (frame:GetName() or ""), true)
     else
         frame:Hide()
     end
@@ -84,13 +86,14 @@ local function TrackerVisibility()
             end
             if hide then
                 HideTracker(frame)
-            elseif not frame:IsShown() then
+            elseif hiddenByUs[frame] then
                 ns.RunOutOfCombat(function()
+                    hiddenByUs[frame] = nil
                     frame:SetAlpha(1)
                     frame:Show()
                     -- Let Blizzard rebuild the contents
                     if frame.Update then pcall(frame.Update, frame) end
-                end, "showing quest tracker")
+                end, "showing quest tracker " .. name)
             end
         end
     end
@@ -182,24 +185,33 @@ local function MapSize()
     return 130
 end
 
+-- The minimap cluster is an Edit Mode frame; only touch it out of combat
 local function PreviewMap(size)
     local cluster = _G.MinimapCluster
-    if cluster then pcall(cluster.SetScale, cluster, size / 100) end
+    if not cluster or InCombatLockdown() then return end
+    if math.abs(cluster:GetScale() - size / 100) > 0.001 then pcall(cluster.SetScale, cluster, size / 100) end
 end
 
--- Saves the size in MLZUIDB and in the Edit Mode layout. quiet = no chat line on success.
--- Returns ok, error message.
+-- Saves the size in MLZUIDB and in the Edit Mode layout. quiet = no chat output (the settings window
+-- shows the result itself). In combat it waits until combat ends. Returns ok, error message.
 local function SaveMap(size, quiet)
     size = math.max(MAP_MIN, math.min(MAP_MAX, math.floor(size / MAP_STEP + 0.5) * MAP_STEP))
     ns.db.overrides = ns.db.overrides or {}
     ns.db.overrides.minimapSize = size
+    if InCombatLockdown() then
+        ns.RunOutOfCombat(function() SaveMap(size, true) end, "saving the minimap size", quiet)
+        ns.FireState()
+        return false, "in combat, saved when combat ends"
+    end
     PreviewMap(size)
     local ok, err = ns.modules.layout:UpdateOne("minimap", "Size", size)
-    if ok then
-        if not quiet then ns.Print("Minimap size:", size .. "%. Saved in the Edit Mode layout.") end
-    else
-        ns.Print("Minimap set to", size .. "% for now, but it was not saved in the layout:", tostring(err),
-            "(it will be used the next time you run the layout step in the setup wizard)")
+    if not quiet then
+        if ok then
+            ns.Print("Minimap size:", size .. "%. Saved in the Edit Mode layout.")
+        else
+            ns.Print("Minimap set to", size .. "% for now, but it was not saved in the layout:", tostring(err),
+                "(it will be used the next time you run the layout step in the setup wizard)")
+        end
     end
     ns.FireState()
     return ok, err

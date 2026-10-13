@@ -9,9 +9,12 @@ ns.Backup = Backup
 
 local MAX_BACKUPS = 5
 
--- selections = { { mod = <module>, items = {...} }, ... }
-function Backup:Create(selections)
-    local entry = { time = date("%Y-%m-%d %H:%M:%S"), data = {} }
+-- Order the wizard applies modules in (UI/Installer.lua); undo goes the other way
+Backup.APPLY_ORDER = { "scale", "settings", "layout", "bindings", "fade", "actionbuttons", "tweaks", "addons", "nameplates" }
+
+-- selections = { { mod = <module>, items = {...} }, ... }; kind = "import" for profile imports
+function Backup:Create(selections, kind)
+    local entry = { time = date("%Y-%m-%d %H:%M:%S"), data = {}, kind = kind }
     for _, sel in ipairs(selections) do
         if sel.mod.Backup then
             local ok, snap = pcall(sel.mod.Backup, sel.mod, sel.items)
@@ -25,8 +28,23 @@ function Backup:Create(selections)
     end
     ns.db.backups = ns.db.backups or {}
     table.insert(ns.db.backups, entry)
-    while #ns.db.backups > MAX_BACKUPS do table.remove(ns.db.backups, 1) end
+    -- Drop the oldest, but always keep #1: it holds your settings from before MLZ UI changed anything
+    while #ns.db.backups > MAX_BACKUPS do table.remove(ns.db.backups, 2) end
     return entry
+end
+
+-- Module order for restoring: reverse apply order, then any module not in that list
+local function RestoreOrder()
+    local list, seen = {}, {}
+    for i = #Backup.APPLY_ORDER, 1, -1 do
+        local mod = ns.modules[Backup.APPLY_ORDER[i]]
+        if mod then list[#list + 1] = mod seen[mod] = true end
+    end
+    for i = #ns.modules, 1, -1 do
+        local mod = ns.modules[i]
+        if not seen[mod] then list[#list + 1] = mod end
+    end
+    return list
 end
 
 function Backup:Undo()
@@ -35,11 +53,10 @@ function Backup:Undo()
         ns.Print("No backup to restore.")
         return
     end
-    ns.RunOutOfCombat(function()
+    -- Returns true when it ran now, false when it waits for combat to end
+    return ns.RunOutOfCombat(function()
         local entry = table.remove(list)
-        -- Restore in reverse order of Apply
-        for i = #ns.modules, 1, -1 do
-            local mod = ns.modules[i]
+        for _, mod in ipairs(RestoreOrder()) do
             local snap = entry.data[mod.key]
             if snap and mod.Restore then
                 local ok, err = pcall(mod.Restore, mod, snap)
@@ -47,7 +64,8 @@ function Backup:Undo()
             end
         end
         ns.Print("Restored backup from", entry.time .. ". Type |cffffff00/reload|r to finish.")
-        if #list == 0 then ns.db.installed = false end
+        -- Undoing an import only gives back your old choices; the setup itself is still in place
+        if #list == 0 and entry.kind ~= "import" then ns.db.installed = false end
         ns.MarkReload("setup undone")
     end, "undo")
 end

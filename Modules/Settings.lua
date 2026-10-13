@@ -41,7 +41,17 @@ function Settings:Preview()
                 end
                 item.choiceIndex = item.choiceIndex or 1
             end
-            item.enabled = ns.Enabled("settings", row.name, row.enabled)
+            local default = row.enabled
+            if row.roles then
+                -- role rows are only preselected for that role
+                local role = ns.Role and ns.Role() or "DAMAGER"
+                local names = {}
+                for r in pairs(row.roles) do names[#names + 1] = (ns.ROLE_TEXT and ns.ROLE_TEXT[r]) or r end
+                table.sort(names)
+                item.note = (item.note or "") .. "  |cff888888(Ticked for: " .. table.concat(names, ", ") .. ")|r"
+                default = default and row.roles[role] and true or false
+            end
+            item.enabled = ns.Enabled("settings", row.name, default)
             item.alreadySet = Same(item.old, target)
         end
         items[#items + 1] = item

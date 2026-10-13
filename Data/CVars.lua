@@ -53,18 +53,36 @@ ns.data.cvars = {
       desc = "Size of floating numbers. Default 1. Click the value to change it." },
     { name = "WorldTextGravity", value = "0.5", label = "Combat text gravity", enabled = true,
       desc = "How fast numbers move away. Lower = calmer." },
-    { name = "WorldTextRampDuration", value = "0.8", label = "Combat text duration", enabled = true,
-      desc = "How long numbers stay visible while rising." },
 
-    -- Nameplates
-    { name = "nameplateMotion", value = "1", label = "Stacking nameplates", enabled = true,
-      desc = "Nameplates stack instead of overlapping. Useful in big pulls." },
-    { name = "nameplateMaxDistance", value = "60", label = "Nameplate distance", enabled = true,
-      desc = "How far away you see nameplates (yards)." },
+    -- Nameplates (stacking and friendly plates are handled by Platynator, see the Nameplates page)
+    { name = "nameplateMaxDistance", value = "41", label = "Nameplate distance", enabled = true,
+      desc = "How far away you see nameplates (yards). This client allows at most 41; a higher value is lowered to the client's limit." },
     { name = "nameplateShowEnemies", value = "1", label = "Enemy nameplates", enabled = true,
       desc = "Shows nameplates above enemies." },
-    { name = "nameplateShowFriends", value = "0", label = "Hide friendly nameplates", enabled = true,
-      desc = "Hides nameplates above friendly players and NPCs." },
+
+    -- Raid and party frames. Rows with `roles` are only ticked by default for that role
+    -- (the role comes from your talents, see /mlz heal). Unknown CVars are skipped.
+    { name = "raidFramesDisplayOnlyDispellableDebuffs", value = "1", label = "Raid frames: only debuffs you can dispel", enabled = true,
+      roles = { HEALER = true },
+      desc = "Raid frames only show debuffs you can remove, so the ones that matter stand out." },
+    { name = "raidFramesDisplayPowerBars", value = "1", label = "Raid frames: power bars", enabled = true,
+      roles = { HEALER = true },
+      desc = "Shows mana/rage/energy under each raid frame, so you can see who is out of mana." },
+    { name = "raidFramesDisplayAggroHighlight", value = "1", label = "Raid frames: aggro highlight", enabled = true,
+      desc = "Red border on raid frames of players who have aggro." },
+    { name = "raidFramesDisplayClassColor", value = "1", label = "Raid frames: class colors", enabled = true,
+      desc = "Colors raid frame health bars by class." },
+    { name = "raidFramesDisplayIncomingHeals", value = "1", label = "Raid frames: incoming heals", enabled = true,
+      roles = { HEALER = true },
+      desc = "Shows heals that are on the way, so you don't overheal." },
+
+    -- Threat
+    { name = "threatWarning", value = "3", label = "Threat warning", enabled = true,
+      roles = { TANK = true },
+      desc = "Warns when you are about to lose (or gain) aggro. 3 = always." },
+    { name = "threatShowNumeric", value = "1", label = "Threat percent on target", enabled = true,
+      roles = { TANK = true },
+      desc = "Shows your threat as a percent on the target frame." },
 
     -- Screen effects
     { name = "doNotFlashLowHealthWarning", value = "1", label = "Disable low health flash", enabled = true,
@@ -77,10 +95,12 @@ ns.data.cvars = {
       desc = "Shows the number of free bag slots on the backpack icon." },
     { name = "UnitNameFriendlyPlayerName", value = "1", label = "Friendly player names", enabled = false,
       desc = "Shows names above friendly players." },
-    { name = "SoftTargetEnemy", value = "1", label = "Soft target enemies", enabled = false,
-      desc = "Automatically targets the enemy you are facing. Personal taste, off by default." },
-    { name = "SoftTargetInteract", value = "1", label = "Soft target interact", enabled = false,
-      desc = "Highlights the NPC or object you can interact with in front of you." },
+    { name = "SoftTargetEnemy", value = "2", label = "Soft target enemies", enabled = false,
+      choices = { "0", "2", "3" },
+      desc = "Automatically targets the enemy you are facing. 0 = off, 2 = keyboard and mouse, 3 = always (1, the default, is gamepad only). Personal taste, off by default. Click the value to change it." },
+    { name = "SoftTargetInteract", value = "2", label = "Soft target interact", enabled = false,
+      choices = { "0", "2", "3" },
+      desc = "Highlights the NPC or object you can interact with in front of you, so the interact key works on it. 0 = off, 2 = keyboard and mouse, 3 = always. Click the value to change it." },
 
     -- Sound and noise
     { name = "Sound_EnableAmbience", value = "0", label = "Mute ambience", enabled = false,

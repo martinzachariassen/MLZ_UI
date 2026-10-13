@@ -1,135 +1,63 @@
--- MLZ UI: Nameplates (Platynator tank/DPS)
--- Switches a few Platynator settings depending on stance: Warrior Defensive Stance / Druid Bear Form = tank,
--- everything else = DPS in a group, SOLO when alone.
--- Platynator has no public profile API, so this goes through its own slash command
--- (/platy config <name> <value>), which only handles simple values (numbers, text, on/off).
--- The threat colors on the enemy health bar are tuned per mode (see ns.data.nameplates.threat).
--- Everything else in your designs stays as you made it.
+-- MLZ UI: Nameplates (Platynator)
+-- Four modes (tank / healer / DPS / solo) that follow your role, plus an optional clean style,
+-- optional threat colors and an optional PvP tweak. See Data/Nameplates.lua for the values.
+--
+-- How changes reach Platynator: MLZ builds a copy of your current Platynator profile with the
+-- changes in it and imports that copy into the same profile through Platynator.API.ImportString.
+-- Platynator then compares old and new and refreshes every nameplate at once, so nothing needs a
+-- /reload. (Importing only a design does NOT refresh the plates until /reload.)
+-- In combat only the simple numbers (alpha, target scale) are switched, through /platy config;
+-- the rest follows when combat ends.
+--
+-- Everything the clean style removes is remembered (MLZUIDB.nameplates.stash), so turning the
+-- style off puts it back. Settings a mode changes are remembered too (MLZUIDB.nameplates.base),
+-- so a mode that doesn't use a setting gives you back your own value.
+-- Automatic switching never prints anything; problems are shown in the settings window.
 
 local _, ns = ...
 
-local DEFENSIVE_FORM = 2 -- Warrior: 1 = Battle, 2 = Defensive, 3 = Berserker
+local NP = {}
+ns.NP = NP
 
--- Druid: Bear Form (5) and Dire Bear Form (8) = tank; every other form or no form = DPS
-local BEAR_FORM_IDS = { [5] = true, [8] = true }
+local function D() return ns.data.nameplates end
+NP.MODES = ns.data.nameplates.modes
+NP.MODE_TEXT = ns.data.nameplates.modeText
 
-local current -- "tank" | "dps" | "solo" | nil
-local ApplyStyle -- defined below
+local current        -- mode that is on the plates right now
+local currentReason  -- why (for the settings window)
+local lastError      -- last problem, shown in the settings window
+local pending        -- something to apply when combat ends
 
-local function PlatynatorReady()
-    return C_AddOns.IsAddOnLoaded("Platynator") and SlashCmdList and SlashCmdList.Platynator
-end
-
-local function Set(mode, silent)
-    if not PlatynatorReady() then
-        if not silent then ns.Print("Platynator is not loaded.") end
-        return false
-    end
-    -- Platynator prints a line per setting; mute it while we apply the preset
-    local realPrint = print
-    print = function() end
-    for name, value in pairs(ns.data.nameplates.presets[mode]) do
-        pcall(SlashCmdList.Platynator, "config " .. name .. " " .. value)
-    end
-    print = realPrint
-    if current ~= mode and not silent then
-        ns.Print("Nameplates:", mode == "tank" and "|cff4da6ffTANK|r" or mode == "solo" and "|cff66dd66SOLO|r" or "|cffffd100DPS|r")
-    end
-    local changed = current ~= mode
-    current = mode
-    if changed and ns.db and ns.db.nameplates and (ns.db.nameplates.style or ns.db.nameplates.threat ~= false) then
-        ApplyStyle(mode, silent)
-    end
-    if changed then ns.FireState() end
-    return true
-end
-
-local function IsTankForm()
-    local class = UnitClassBase and UnitClassBase("player")
-    if class == "WARRIOR" then return GetShapeshiftForm() == DEFENSIVE_FORM end
-    if class == "DRUID" then
-        local id = GetShapeshiftFormID and GetShapeshiftFormID()
-        return BEAR_FORM_IDS[id] and true or false
-    end
-    return false
-end
-
-local function Auto()
-    if not (ns.db and ns.db.nameplates and ns.db.nameplates.auto) then return end
-    local mode = IsTankForm() and "tank" or (IsInGroup() and "dps" or "solo")
-    if mode ~= current then Set(mode) end
-end
-
--- For the settings window
-function ns.NameplateMode() return current end
-
-ns.On("PLAYER_ENTERING_WORLD", function()
+local function DB()
     ns.db.nameplates = ns.db.nameplates or { auto = true }
-    C_Timer.After(1, Auto)
-end)
-ns.On("UPDATE_SHAPESHIFT_FORM", Auto)
-ns.On("GROUP_ROSTER_UPDATE", Auto)
-
-------------------------------------------------------------------------
--- Design tidy, save/restore and export
--- All writes go through Platynator's own import API (Platynator.API.ImportString),
--- using the same string format as its Export button: PLATY!1! + base64(compress(CBOR)).
-------------------------------------------------------------------------
-local function Encode(tbl)
-    return "PLATY!1!" .. C_EncodingUtil.EncodeBase64(C_EncodingUtil.CompressString(C_EncodingUtil.SerializeCBOR(tbl)))
+    return ns.db.nameplates
 end
 
-local function CanImport()
-    if not (C_AddOns.IsAddOnLoaded("Platynator") and Platynator and Platynator.API and Platynator.API.ImportString
-        and C_EncodingUtil and PLATYNATOR_CONFIG and PLATYNATOR_CURRENT_PROFILE) then
-        ns.Print("Platynator (or its import API) is not available.")
-        return false
-    end
-    if InCombatLockdown() then
-        ns.Print("Not in combat, please.")
-        return false
-    end
-    return true
+local function Ready()
+    if not ns.IsAddOnLoaded("Platynator") then return false end
+    if not (Platynator and Platynator.API and Platynator.API.ImportString) then return false end
+    if not (C_EncodingUtil and C_EncodingUtil.SerializeCBOR and C_EncodingUtil.CompressString) then return false end
+    if type(PLATYNATOR_CONFIG) ~= "table" or type(PLATYNATOR_CONFIG.Profiles) ~= "table" then return false end
+    return PLATYNATOR_CURRENT_PROFILE ~= nil and type(PLATYNATOR_CONFIG.Profiles[PLATYNATOR_CURRENT_PROFILE]) == "table"
 end
 
 local function CurrentProfile()
     return PLATYNATOR_CONFIG.Profiles[PLATYNATOR_CURRENT_PROFILE]
 end
 
--- Platynator prints a thank-you line on every import; mute it
-local function QuietImport(text, name)
-    local realPrint = print
-    print = function() end
-    local ok, err = pcall(Platynator.API.ImportString, text, name)
-    print = realPrint
-    return ok, err
+local function Encode(tbl)
+    return "PLATY!1!" .. C_EncodingUtil.EncodeBase64(C_EncodingUtil.CompressString(C_EncodingUtil.SerializeCBOR(tbl)))
 end
 
-local function Tidy()
-    if not CanImport() then return end
-    local cfg = ns.data.nameplates
-    local design = CurrentProfile().designs and CurrentProfile().designs[cfg.enemyDesign]
-    if not design then
-        ns.Print("Could not find the design", cfg.enemyDesign, "in the current Platynator profile.")
-        return
-    end
-    design = ns.CopyTable(design)
-    design.scale = cfg.tidy.scale
-    local changed = 0
-    for _, text in ipairs(design.texts or {}) do
-        if text.kind == "health" then
-            text.displayTypes = ns.CopyTable(cfg.tidy.healthText)
-            changed = changed + 1
-        end
-    end
-    design.addon, design.kind = "Platynator", "style"
-    local ok, err = QuietImport(Encode(design), cfg.enemyDesign)
-    if ok then
-        ns.Print(("Tidied %s: scale %s, %d health text(s) set to %s."):format(
-            cfg.enemyDesign, cfg.tidy.scale, changed, table.concat(cfg.tidy.healthText, "+")))
-    else
-        ns.Print("|cffff4444Import failed:|r", err)
-    end
+-- Platynator prints a line on every import and every /platy config. Mute the chat frame while
+-- calling it (the override is an instance field, removed again afterwards).
+local function Quiet(fn, ...)
+    local chat = DEFAULT_CHAT_FRAME
+    local had = chat and rawget(chat, "AddMessage")
+    if chat then chat.AddMessage = function() end end
+    local ok, err = pcall(fn, ...)
+    if chat then chat.AddMessage = had end
+    return ok, err
 end
 
 local function ProfileString()
@@ -138,35 +66,113 @@ local function ProfileString()
     return Encode(profile)
 end
 
-------------------------------------------------------------------------
--- Clean style (/mlz np style). Edits a copy of the enemy design and imports it under the same name.
-------------------------------------------------------------------------
--- Threat colors per mode: edits the "threat" rule of the enemy health bar in place (never removes it).
-local function TuneThreat(design, mode)
-    local t = ns.data.nameplates.threat and ns.data.nameplates.threat[mode]
-    if not t then return end
-    for _, b in ipairs(design.bars or {}) do
-        if b.kind == "health" then
-            for _, c in ipairs(b.autoColors or {}) do
-                if c.kind == "threat" then
-                    c.enabled = c.enabled or {}
-                    for k, v in pairs(t.enabled) do c.enabled[k] = v end
-                    c.tanksOnly = t.tanksOnly
-                end
-            end
+local function ImportProfileString(text)
+    return Quiet(Platynator.API.ImportString, text, PLATYNATOR_CURRENT_PROFILE)
+end
+
+local function InPvP()
+    local inInstance, kind = IsInInstance()
+    return inInstance and (kind == "pvp" or kind == "arena") or false
+end
+
+-- The design Platynator uses for attackable units (the assignment with only "can-attack")
+local function EnemyDesignName(profile)
+    for _, a in ipairs(profile.design_assignments or {}) do
+        local c = a.criteria
+        if type(c) == "table" and #c == 1 and c[1] == "can-attack" and type(a.style) == "string" then
+            return a.style
         end
+    end
+    return D().enemyDesign
+end
+
+------------------------------------------------------------------------
+-- Mode settings ("a.b" = field b of table a)
+------------------------------------------------------------------------
+local function GetPath(tbl, key)
+    local a, b = strsplit(".", key)
+    if not b then return tbl[a] end
+    if type(tbl[a]) ~= "table" then return nil end
+    return tbl[a][b]
+end
+
+local function SetPath(tbl, key, value)
+    local a, b = strsplit(".", key)
+    if not b then
+        tbl[a] = value
+    elseif type(tbl[a]) == "table" then
+        tbl[a][b] = value
     end
 end
 
-local function BuildStyled(design, mode)
-    local st = ns.data.nameplates.style
-    design = ns.CopyTable(design)
+local function Desired(mode, inPvP)
+    local d, want = D(), {}
+    for k, v in pairs(d.presets[mode] or {}) do want[k] = v end
+    if mode == "healer" and DB().healerFriends ~= false then
+        for k, v in pairs(d.healerFriends) do want[k] = v end
+    end
+    if inPvP then
+        for k, v in pairs(d.pvp) do want[k] = v end
+    end
+    return want
+end
+
+local function AllKeys()
+    local d, keys = D(), {}
+    for _, p in pairs(d.presets) do for k in pairs(p) do keys[k] = true end end
+    for k in pairs(d.healerFriends) do keys[k] = true end
+    for k in pairs(d.pvp) do keys[k] = true end
+    return keys
+end
+
+-- Remembers your own value the first time MLZ changes a key ({ v = value }, v = nil if unset)
+local function Base(key)
+    local db = DB()
+    db.base = db.base or {}
+    if db.base[key] == nil then db.base[key] = { v = GetPath(CurrentProfile(), key) } end
+    return db.base[key].v
+end
+
+local function ApplySettings(profile, mode, inPvP)
+    local want = Desired(mode, inPvP)
+    for key in pairs(AllKeys()) do
+        local v = want[key]
+        if v == nil then v = Base(key) else Base(key) end
+        SetPath(profile, key, v)
+    end
+end
+
+------------------------------------------------------------------------
+-- Clean style and threat colors (edits the enemy design in the profile copy)
+------------------------------------------------------------------------
+local function GetStash(name)
+    local db = DB()
+    db.stash = db.stash or {}
+    db.stash[name] = db.stash[name] or {}
+    local s = db.stash[name]
+    s.texts, s.bars, s.auras, s.colors = s.texts or {}, s.bars or {}, s.auras or {}, s.colors or {}
+    return s
+end
+
+local function StashEmpty(s)
+    return #s.texts == 0 and #s.bars == 0 and #s.auras == 0 and #s.colors == 0 and s.scale == nil
+        and s.healthText == nil and s.specialBars == nil and s.debuff == nil and s.threat == nil
+end
+
+local function StyleDesign(design, stash, inPvP)
+    local st = D().style
+    if stash.scale == nil then stash.scale = design.scale or false end
     design.scale = st.scale
 
     local texts = {}
     for _, t in ipairs(design.texts or {}) do
-        if not st.removeTexts[t.kind] then
-            if t.kind == "health" then t.displayTypes = ns.CopyTable(st.healthText) end
+        if st.removeTexts[t.kind] then
+            stash.texts[#stash.texts + 1] = t
+        else
+            if t.kind == "health" then
+                if stash.healthText == nil then stash.healthText = ns.CopyTable(t.displayTypes or {}) end
+                t.displayTypes = ns.CopyTable(st.healthText)
+            end
             texts[#texts + 1] = t
         end
     end
@@ -174,11 +180,17 @@ local function BuildStyled(design, mode)
 
     local bars = {}
     for _, b in ipairs(design.bars or {}) do
-        if not st.removeBars[b.kind] then
+        if st.removeBars[b.kind] then
+            stash.bars[#stash.bars + 1] = b
+        else
             if b.kind == "health" and b.autoColors then
                 local colors = {}
-                for _, c in ipairs(b.autoColors) do
-                    if not st.dropColors[c.kind] then colors[#colors + 1] = c end
+                for i, c in ipairs(b.autoColors) do
+                    if st.dropColors[c.kind] then
+                        stash.colors[#stash.colors + 1] = { pos = i, rule = c }
+                    else
+                        colors[#colors + 1] = c
+                    end
                 end
                 b.autoColors = colors
             end
@@ -187,192 +199,389 @@ local function BuildStyled(design, mode)
     end
     design.bars = bars
 
-    if st.removeSpecialBars then design.specialBars = {} end
+    if st.removeSpecialBars and type(design.specialBars) == "table" and #design.specialBars > 0 then
+        stash.specialBars = stash.specialBars or {}
+        for _, s in ipairs(design.specialBars) do stash.specialBars[#stash.specialBars + 1] = s end
+        design.specialBars = {}
+    end
 
     if design.auras then
         local auras = {}
         for _, a in ipairs(design.auras) do
-            if a.kind == "debuffs" then
-                a.scale, a.limit = st.debuffScale, st.debuffLimit
-                auras[#auras + 1] = a
-            elseif not st.removeBuffAuras then
+            if st.removeAuras[a.kind] and not (inPvP and a.kind == "buffs") then
+                stash.auras[#stash.auras + 1] = a
+            else
+                if a.kind == "debuffs" then
+                    if stash.debuff == nil then
+                        stash.debuff = { scale = a.scale, limit = a.limit, fromYou = (a.filters and a.filters.fromYou) and true or false }
+                    end
+                    a.scale, a.limit = st.debuffScale, st.debuffLimit
+                    if st.debuffsFromYou then
+                        a.filters = a.filters or {}
+                        a.filters.fromYou = true
+                    end
+                end
                 auras[#auras + 1] = a
             end
         end
+        if inPvP then
+            -- enemy buffs matter against players: put back the ones removed earlier
+            local keep = {}
+            for _, a in ipairs(stash.auras) do
+                if a.kind == "buffs" then auras[#auras + 1] = a else keep[#keep + 1] = a end
+            end
+            stash.auras = keep
+        end
         design.auras = auras
     end
-
-    TuneThreat(design, mode)
-
-    design.addon, design.kind = "Platynator", "style"
-    return design
 end
 
--- Only the threat colors, for people who don't use the clean style
-local function BuildThreatOnly(design, mode)
-    design = ns.CopyTable(design)
-    TuneThreat(design, mode)
-    design.addon, design.kind = "Platynator", "style"
-    return design
+-- Puts back everything StyleDesign removed or changed (threat is handled by TuneThreat)
+local function UnstyleDesign(design, stash)
+    if stash.scale ~= nil then design.scale = stash.scale or nil end
+    design.texts = design.texts or {}
+    for _, t in ipairs(stash.texts) do design.texts[#design.texts + 1] = t end
+    if stash.healthText then
+        for _, t in ipairs(design.texts) do
+            if t.kind == "health" then t.displayTypes = ns.CopyTable(stash.healthText) end
+        end
+    end
+    design.bars = design.bars or {}
+    for _, b in ipairs(stash.bars) do design.bars[#design.bars + 1] = b end
+    table.sort(stash.colors, function(x, y) return x.pos < y.pos end)
+    for _, b in ipairs(design.bars) do
+        if b.kind == "health" then
+            b.autoColors = b.autoColors or {}
+            for _, c in ipairs(stash.colors) do
+                table.insert(b.autoColors, math.min(c.pos, #b.autoColors + 1), c.rule)
+            end
+            break
+        end
+    end
+    if stash.specialBars then
+        design.specialBars = design.specialBars or {}
+        for _, s in ipairs(stash.specialBars) do design.specialBars[#design.specialBars + 1] = s end
+    end
+    if #stash.auras > 0 or stash.debuff then
+        design.auras = design.auras or {}
+        for _, a in ipairs(stash.auras) do design.auras[#design.auras + 1] = a end
+        if stash.debuff then
+            for _, a in ipairs(design.auras) do
+                if a.kind == "debuffs" then
+                    a.scale, a.limit = stash.debuff.scale, stash.debuff.limit
+                    a.filters = a.filters or {}
+                    a.filters.fromYou = stash.debuff.fromYou
+                end
+            end
+        end
+    end
+    stash.texts, stash.bars, stash.auras, stash.colors = {}, {}, {}, {}
+    stash.scale, stash.healthText, stash.specialBars, stash.debuff = nil, nil, nil, nil
 end
 
-local pendingStyle
-ApplyStyle = function(mode, silent)
+-- Threat rule of the enemy health bar: set per mode when on, put back as it was when off
+local function TuneThreat(design, mode, stash, on, inPvP)
+    local t = D().threat[inPvP and "solo" or mode]
+    if not t then return end
+    for _, b in ipairs(design.bars or {}) do
+        if b.kind == "health" then
+            for _, c in ipairs(b.autoColors or {}) do
+                if c.kind == "threat" then
+                    if on then
+                        if stash.threat == nil then
+                            stash.threat = { enabled = ns.CopyTable(c.enabled or {}), tanksOnly = c.tanksOnly and true or false }
+                        end
+                        c.enabled = c.enabled or {}
+                        for k, v in pairs(t.enabled) do c.enabled[k] = v end
+                        c.tanksOnly = t.tanksOnly
+                    elseif stash.threat then
+                        c.enabled = ns.CopyTable(stash.threat.enabled)
+                        c.tanksOnly = stash.threat.tanksOnly
+                    end
+                end
+            end
+        end
+    end
+    if not on then stash.threat = nil end
+end
+
+-- Returns the profile copy to import, and a note if the design couldn't be changed
+local function Build(mode, inPvP)
+    local db = DB()
+    local live = CurrentProfile()
+    local profile = ns.CopyTable(live)
+    ApplySettings(profile, mode, inPvP)
+
+    local name = EnemyDesignName(live)
+    local hadStash = db.stash and db.stash[name] ~= nil
+    if not (db.style or db.threat or hadStash) then return profile end
+    if name:sub(1, 1) == "_" then return profile, "builtin" end
+    local design = type(profile.designs) == "table" and profile.designs[name]
+    if type(design) ~= "table" then return profile, "missing" end
+
+    local stash = GetStash(name)
+    if db.style then StyleDesign(design, stash, inPvP) else UnstyleDesign(design, stash) end
+    TuneThreat(design, mode, stash, db.threat and true or false, inPvP)
+    if StashEmpty(stash) then db.stash[name] = nil end
+    return profile
+end
+
+------------------------------------------------------------------------
+-- Deciding and applying the mode
+------------------------------------------------------------------------
+local function Decide()
+    local db = DB()
+    if not db.auto then
+        local m = D().presets[db.mode] and db.mode or "dps"
+        return m, "chosen by you"
+    end
+    local live, why = ns.LiveRole()
+    if live == "TANK" then return "tank", why end
+    if not IsInGroup() then return "solo", "not in a group" end
+    if live == "HEALER" then return "healer", why end
+    return "dps", why
+end
+
+local NOTES = {
+    builtin = "Your enemy design is one of Platynator's built-in designs, which can't be changed. Make a copy of it in /platy and assign it to enemies to use the clean style or threat colors.",
+    missing = "The enemy design was not found in the current Platynator profile, so the clean style and threat colors are not applied.",
+}
+
+-- In combat: only the simple top-level numbers, through Platynator's own /platy config
+local function ApplyInCombat(mode, inPvP)
+    if not (SlashCmdList and SlashCmdList.Platynator) then return end
+    for key, v in pairs(Desired(mode, inPvP)) do
+        if not key:find(".", 1, true) and type(v) == "number" and GetPath(CurrentProfile(), key) ~= v then
+            Base(key)
+            Quiet(SlashCmdList.Platynator, "config " .. key .. " " .. v)
+        end
+    end
+end
+
+-- force = apply even if nothing seems to have changed. Returns true when the plates are up to date.
+local function Refresh(force)
+    if not ns.db then return false end
+    local db = DB()
+    local mode, why = Decide()
+    currentReason = why
+    if not Ready() then
+        current, lastError = nil, "Platynator is not loaded."
+        return false
+    end
+    local inPvP = db.pvp and InPvP() or false
     if InCombatLockdown() then
-        pendingStyle = mode -- applied when combat ends
+        if mode ~= current then
+            ApplyInCombat(mode, inPvP)
+            current = mode
+        end
+        pending = true
         return false
     end
-    if not CanImport() then return false end
-    local name = ns.data.nameplates.enemyDesign
-    local design = CurrentProfile().designs and CurrentProfile().designs[name]
-    if not design then
-        if not silent then ns.Print("Could not find the design", name, "in the current Platynator profile.") end
-        return false
+    pending = nil
+    local key = table.concat({ mode, tostring(db.style), tostring(db.threat), tostring(inPvP),
+        tostring(db.healerFriends ~= false), tostring(PLATYNATOR_CURRENT_PROFILE) }, "|")
+    if not force and key == db.lastKey then
+        current = mode
+        return true
     end
-    -- Keep a way back: save the profile once before the first restyle
-    if not ns.db.nameplates.snapshot then ns.db.nameplates.snapshot = ProfileString() end
-    local full = ns.db.nameplates.style
-    if not full and ns.db.nameplates.threat == false then return false end
-    local ok, err = QuietImport(Encode((full and BuildStyled or BuildThreatOnly)(design, mode)), name)
+    -- the first time MLZ writes anything, keep a copy of the profile as it was
+    if not db.snapshot then
+        local ok, text = pcall(ProfileString)
+        if ok then db.snapshot = text end
+    end
+    db.lastKey = key -- also on failure, so a broken setup isn't retried on every event
+    local ok, profile, note = pcall(Build, mode, inPvP)
     if not ok then
-        ns.Print("|cffff4444Style import failed:|r", err)
+        lastError = "Could not build the nameplate settings: " .. tostring(profile)
+        ns.Debug(lastError)
         return false
     end
-    if not silent then
-        ns.Print(full and "Clean nameplate style applied (" or "Threat colors set (", mode .. ").")
+    local imported, err = ImportProfileString(Encode((function()
+        profile.addon, profile.version, profile.kind = "Platynator", 1, "profile"
+        return profile
+    end)()))
+    if not imported then
+        lastError = "Platynator refused the import: " .. tostring(err)
+        ns.Debug(lastError)
+        return false
+    end
+    current = mode
+    lastError = note and NOTES[note] or nil
+    return true
+end
+
+local scheduled = false
+local function ScheduleRefresh()
+    if scheduled then return end
+    scheduled = true
+    C_Timer.After(0.5, function()
+        scheduled = false
+        if ns.db and ns.db.installed then
+            Refresh()
+            ns.FireState()
+        end
+    end)
+end
+
+ns.OnRoleChanged(function() ScheduleRefresh() end)
+ns.On("GROUP_ROSTER_UPDATE", ScheduleRefresh)
+ns.On("PLAYER_ENTERING_WORLD", function()
+    -- give Platynator time to set itself up after login / loading screens
+    C_Timer.After(2, ScheduleRefresh)
+end)
+ns.On("PLAYER_REGEN_ENABLED", function()
+    if pending then ScheduleRefresh() end
+end)
+
+------------------------------------------------------------------------
+-- Save / restore / export
+------------------------------------------------------------------------
+local function CanImport(quiet)
+    if not Ready() then
+        if not quiet then ns.Print("Platynator (or its import API) is not available.") end
+        return false
+    end
+    if InCombatLockdown() then
+        if not quiet then ns.Print("Not in combat, please.") end
+        return false
     end
     return true
 end
 
-ns.On("PLAYER_REGEN_ENABLED", function()
-    if pendingStyle then
-        local m = pendingStyle
-        pendingStyle = nil
-        ApplyStyle(m, true)
-    end
-end)
-
 local function Save()
     if not CanImport() then return end
-    ns.db.nameplates.snapshot = ProfileString()
+    DB().snapshot = ProfileString()
     ns.Print("Saved the current Platynator profile (" .. PLATYNATOR_CURRENT_PROFILE .. ") in MLZ UI.")
 end
 
+-- Restoring the saved copy also turns the clean style and threat colors off, otherwise they
+-- would be put straight back. The mode settings keep following your role.
 local function Load()
     if not CanImport() then return end
-    local text = ns.db.nameplates.snapshot or ns.data.nameplates.profileString
+    local db = DB()
+    local text = db.snapshot or D().profileString
     if not text then
-        ns.Print("Nothing saved yet. Use /mlz np save first.")
+        ns.Print("Nothing saved yet. Use Save profile (or /mlz np save) first.")
         return
     end
-    local ok, err = QuietImport(text, PLATYNATOR_CURRENT_PROFILE)
-    if ok then
-        ns.Print("Restored the saved profile into", PLATYNATOR_CURRENT_PROFILE .. ".")
-    else
+    local ok, err = ImportProfileString(text)
+    if not ok then
         ns.Print("|cffff4444Import failed:|r", err)
+        return
     end
+    db.style, db.threat, db.stash, db.lastKey = false, false, nil, nil
+    Refresh(true)
+    ns.Print("Restored the saved profile into " .. PLATYNATOR_CURRENT_PROFILE .. ". Clean style and threat colors are off.")
 end
 
 ------------------------------------------------------------------------
--- Public API (used by the settings window, the minimap menu and /mlz np). Quiet: no chat output.
+-- Public API (settings window, minimap menu, /mlz np). Quiet: no chat output.
 ------------------------------------------------------------------------
-local NP = {}
-ns.NP = NP
-
-local function DB()
-    ns.db.nameplates = ns.db.nameplates or { auto = true }
-    return ns.db.nameplates
-end
-
-function NP.Ready() return PlatynatorReady() and true or false end
+function NP.Ready() return Ready() end
 function NP.Mode() return current end
+function NP.Reason() return currentReason end
+function NP.LastError() return lastError end
+function NP.InPvP() return InPvP() end
 function NP.Auto() return DB().auto and true or false end
 function NP.Style() return DB().style and true or false end
-function NP.Threat() return DB().threat ~= false end
+function NP.Threat() return DB().threat and true or false end
+function NP.PvP() return DB().pvp and true or false end
+function NP.HealerFriends() return DB().healerFriends ~= false end
 function NP.HasSnapshot() return DB().snapshot ~= nil end
+-- The mode automatic switching would pick right now, and why
+function NP.Suggested()
+    local db = DB()
+    local auto = db.auto
+    db.auto = true
+    local m, why = Decide()
+    db.auto = auto
+    return m, why
+end
+
+local function Changed()
+    Refresh()
+    ns.FireState()
+end
 
 function NP.SetAuto(on)
     DB().auto = on and true or false
-    if on then
-        current = nil
-        Auto()
-    end
-    ns.FireState()
+    if not on and not DB().mode then DB().mode = current or "dps" end
+    Changed()
 end
 
 function NP.SetMode(mode)
-    DB().auto = false
-    Set(mode, true)
-    ns.FireState()
+    if not D().presets[mode] then return end
+    local db = DB()
+    db.auto, db.mode = false, mode
+    Changed()
 end
 
-function NP.SetStyle(on)
-    DB().style = on and true or false
-    if on then ApplyStyle(current or "dps", true) end
-    ns.FireState()
-end
-
-function NP.SetThreat(on)
-    DB().threat = on and true or false
-    if on then ApplyStyle(current or "solo", true) end
-    ns.FireState()
-end
+function NP.SetStyle(on) DB().style = on and true or false; Changed() end
+function NP.SetThreat(on) DB().threat = on and true or false; Changed() end
+function NP.SetPvP(on) DB().pvp = on and true or false; Changed() end
+function NP.SetHealerFriends(on) DB().healerFriends = on and true or false; Changed() end
+function NP.Apply() Refresh(true); ns.FireState() end
 
 function NP.Save() Save(); ns.FireState() end
-function NP.Load() Load() end
-function NP.Tidy() Tidy() end
+function NP.Load() Load(); ns.FireState() end
 function NP.Export()
     if CanImport() then ns.ShowCopy("MLZ UI: Platynator profile (Ctrl+C to copy)", ProfileString()) end
 end
 
-ns.AddCommand("np", "nameplates: tank | dps | solo | auto | off | threat | tidy | style | save | load | export", function(arg)
+local function OnOff(v) return v and "|cff44ff44on|r" or "|cff888888off|r" end
+
+ns.AddCommand("np", "nameplates: auto | tank | healer | dps | solo | style [off] | threat [off] | pvp [off] | save | load | export", function(arg)
     arg = strlower(strtrim(arg or ""))
     DB()
-    if arg == "style" then
-        NP.SetStyle(true)
-        ns.Print("Clean style is on and follows tank/DPS/solo.")
-    elseif arg == "style off" then
-        NP.SetStyle(false)
-        ns.Print("Clean style will no longer be applied. Restore your saved profile in the settings (/mlz) if you want the old look back.")
-    elseif arg == "tidy" then
-        NP.Tidy()
-    elseif arg == "save" then
+    local word, rest = arg:match("^(%S*)%s*(.-)$")
+    local off = rest == "off"
+    if word == "style" then
+        NP.SetStyle(not off)
+        ns.Print("Clean style:", OnOff(not off))
+    elseif word == "threat" then
+        NP.SetThreat(not off)
+        ns.Print("Threat colors:", OnOff(not off))
+    elseif word == "pvp" then
+        NP.SetPvP(not off)
+        ns.Print("PvP tweak (battlegrounds and arenas):", OnOff(not off))
+    elseif word == "friends" then
+        NP.SetHealerFriends(not off)
+        ns.Print("Friendly names for healers:", OnOff(not off))
+    elseif word == "save" then
         NP.Save()
-    elseif arg == "load" then
+    elseif word == "load" then
         NP.Load()
-    elseif arg == "export" then
+    elseif word == "export" then
         NP.Export()
-    elseif arg == "threat off" then
-        NP.SetThreat(false)
-        ns.Print("Threat colors will no longer be changed per mode.")
-    elseif arg == "threat" or arg == "threat on" then
-        NP.SetThreat(true)
-        ns.Print("Threat colors follow the mode (tank / dps / solo).")
-    elseif arg == "tank" or arg == "dps" or arg == "solo" then
-        NP.SetMode(arg)
-        ns.Print("Nameplates:", arg, "(automatic switching is off).")
-    elseif arg == "auto" then
+    elseif D().presets[word] then
+        NP.SetMode(word)
+        ns.Print("Nameplates:", NP.MODE_TEXT[word], "(automatic switching is off, /mlz np auto turns it on).")
+    elseif word == "auto" then
         NP.SetAuto(true)
-        ns.Print("Nameplates follow your role: Defensive Stance / Bear Form = tank, otherwise DPS in a group and SOLO alone.")
-    elseif arg == "off" then
+        ns.Print("Nameplates follow your role: tank, healer or DPS in a group, solo alone.")
+    elseif word == "off" then
         NP.SetAuto(false)
-        ns.Print("Auto stance switching is off.")
+        ns.Print("Automatic switching is off; the mode stays", NP.MODE_TEXT[DB().mode] or "as it is", ".")
     else
-        ns.Print("Nameplates:", current or "unknown", "| auto:", ns.db.nameplates.auto and "on" or "off")
-        ns.Print("Use /mlz np tank, dps, solo, auto, off, threat, tidy, save, load or export.")
+        if not Ready() then ns.Print("Platynator is not loaded.") return end
+        ns.Print(("Nameplates: %s (%s), automatic %s, style %s, threat %s, PvP %s"):format(
+            NP.MODE_TEXT[current or ""] or "unknown", currentReason or "-", OnOff(NP.Auto()),
+            OnOff(NP.Style()), OnOff(NP.Threat()), OnOff(NP.PvP())))
+        if lastError then ns.Print("|cffff8800Note:|r", lastError) end
+        ns.Print("Use /mlz np auto, tank, healer, dps, solo, style, threat, pvp, friends (add 'off' to turn off), save, load or export.")
     end
 end)
 
 ------------------------------------------------------------------------
--- Wizard step: imports the profile string from Data/Nameplates.lua (if one is set)
--- into the current Platynator profile. Without a string the step does nothing.
+-- Wizard step
 ------------------------------------------------------------------------
 local Nameplates = ns.RegisterModule({ key = "nameplates", title = "Nameplates (Platynator)" })
 
 function Nameplates:Preview()
-    local text = ns.data.nameplates.profileString
+    local text = D().profileString
     local items = {}
-    local loaded = C_AddOns.IsAddOnLoaded("Platynator")
+    local loaded = Ready()
+    local db = DB()
 
     local profile = { id = "profile", group = "Platynator", label = "Import MLZ profile" }
     if not loaded then
@@ -388,47 +597,57 @@ function Nameplates:Preview()
     end
     items[#items + 1] = profile
 
-    local style = { id = "style", group = "Platynator", label = "Clean nameplate style (tank / DPS / solo)" }
-    if not loaded then
-        style.old, style.new, style.enabled, style.unavailable = "-", "Platynator not loaded", false, true
-    else
-        local on = (ns.db.nameplates and ns.db.nameplates.style) and true or false
-        style.old, style.new = on and "on" or "off", "on"
-        style.toggle, style.isOn, style.offText = true, on, "off"
-        style.styleOn = true
-        style.enabled = on or ns.Enabled("nameplates", "style", true)
-        style.note = "Minimal enemy nameplates: name and percent inside the bar, cast bar, only your debuffs. Follows your role: tank, DPS in a group, solo alone. Undo restores your old profile; /mlz np style off stops it."
+    local function ToggleRow(id, label, on, default, note)
+        local row = { id = id, group = "Platynator", label = label, flag = id }
+        if not loaded then
+            row.old, row.new, row.enabled, row.unavailable = "-", "Platynator not loaded", false, true
+        else
+            row.old, row.new = on and "on" or "off", "on"
+            row.toggle, row.isOn, row.offText = true, on, "off"
+            row.enabled = on or ns.Enabled("nameplates", id, default)
+            row.note = note
+        end
+        items[#items + 1] = row
     end
-    items[#items + 1] = style
+    ToggleRow("style", "Clean nameplate style", db.style and true or false, true,
+        "Minimal enemy nameplates: name and percent inside the bar, cast bar, crowd control and only your own debuffs. Everything removed is remembered, so turning it off puts it back.")
+    ToggleRow("threat", "Threat colors per role", db.threat and true or false, false,
+        "Colors the enemy health bar by threat: as tank, red = a mob is not on you; as DPS, red = a mob is on you. Off for healers and when solo. Off until you turn it on.")
     return items
 end
 
 function Nameplates:Backup()
-    local snap = { style = ns.db.nameplates and ns.db.nameplates.style or false }
-    if CanImport() then snap.profile = ProfileString() end
+    local db = DB()
+    local snap = { style = db.style and true or false, threat = db.threat and true or false,
+        stash = db.stash and ns.CopyTable(db.stash) or nil, hasStash = true }
+    if CanImport(true) then snap.profile = ProfileString() end
     return snap
 end
 
 function Nameplates:Apply(items)
+    local db = DB()
     for _, item in ipairs(items) do
         if item.value and CanImport() then
-            local ok, err = QuietImport(item.value, PLATYNATOR_CURRENT_PROFILE)
+            if not db.snapshot then db.snapshot = ProfileString() end -- your profile, before the import
+            local ok, err = ImportProfileString(item.value)
             if not ok then error("Platynator import failed: " .. tostring(err)) end
+            db.stash = nil -- the designs were replaced, nothing left to put back
         end
     end
     for _, item in ipairs(items) do
-        if item.styleOn then
-            ns.db.nameplates = ns.db.nameplates or { auto = true }
-            ns.db.nameplates.style = item.enabled and true or false -- unticked = stop applying it
-            if item.enabled then ApplyStyle(current or "dps") end
-        end
+        if item.flag then db[item.flag] = item.enabled and true or false end
     end
+    db.lastKey = nil
+    Refresh(true)
 end
 
 function Nameplates:Restore(snap)
-    ns.db.nameplates = ns.db.nameplates or { auto = true }
-    ns.db.nameplates.style = snap.style and true or false
-    if snap.profile and CanImport() then
-        QuietImport(snap.profile, PLATYNATOR_CURRENT_PROFILE)
-    end
+    local db = DB()
+    db.style = snap.style and true or false
+    db.threat = snap.threat and true or false
+    if snap.hasStash then db.stash = snap.stash end
+    if snap.profile and CanImport(true) then ImportProfileString(snap.profile) end
+    -- the restored profile is exactly what these flags produced; apply again on the next change
+    db.lastKey = nil
+    current = nil
 end

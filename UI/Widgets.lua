@@ -232,8 +232,14 @@ function W.Button(parent, text, width, height, onClick, style)
         self.bg:SetColorTexture(unpack(self.style.bg))
         GameTooltip:Hide()
     end)
-    b:SetScript("OnDisable", function(self) self:SetAlpha(0.4) end)
-    b:SetScript("OnEnable", function(self) self:SetAlpha(1) end)
+    b:SetScript("OnDisable", function(self)
+        self:SetAlpha(0.4)
+        self.bg:SetColorTexture(unpack(self.style.bg)) -- don't stay "hovered" when disabled under the mouse
+    end)
+    b:SetScript("OnEnable", function(self)
+        self:SetAlpha(1)
+        self.bg:SetColorTexture(unpack(self.hovered and self.style.hover or self.style.bg))
+    end)
     b:SetStyle(style)
     b:SetText(text or "")
     if onClick then b:SetScript("OnClick", onClick) end
@@ -277,7 +283,7 @@ end
 ------------------------------------------------------------------------
 function W.Toggle(parent, onChange, label)
     local t = CreateFrame("Button", nil, parent)
-    t:SetSize(40, 20)
+    t:SetSize(46, 20) -- room for "OFF" next to the knob
     t.bg = W.Fill(t, T.off)
     t.border = W.Border(t, { 0, 0, 0, 0.35 })
     t.knob = t:CreateTexture(nil, "ARTWORK")
@@ -298,7 +304,7 @@ function W.Toggle(parent, onChange, label)
         else
             self.bg:SetColorTexture(unpack(T.off))
             self.knob:SetPoint("LEFT", 2, 0)
-            self.state:SetPoint("RIGHT", -4, 0)
+            self.state:SetPoint("RIGHT", -5, 0)
             self.state:SetText("OFF")
             self.state:SetTextColor(0.7, 0.72, 0.76)
         end
@@ -488,11 +494,16 @@ function W.Badge(parent)
     b.dot:SetSize(8, 8)
     b.text = W.Text(b, "MLZUI_FontSmallBold", "", "RIGHT")
     b.text:SetPoint("RIGHT", 0, 0)
+    b.text:SetWordWrap(false)
     b.dot:SetPoint("RIGHT", b.text, "LEFT", -6, 0)
     function b:Set(state, text)
         local s = BADGE[state] or BADGE.info
         self.dot:SetColorTexture(unpack(s[1]))
+        -- natural width, but never wider than the badge (long text is cut with "...")
+        self.text:SetWidth(0)
         self.text:SetText(text or s[2])
+        local maxW = math.max(20, self:GetWidth() - 14)
+        if self.text:GetStringWidth() > maxW then self.text:SetWidth(maxW) end
         self.text:SetTextColor(unpack(state == "off" and T.muted or state == "na" and T.muted or s[1]))
     end
     b:Set("off")

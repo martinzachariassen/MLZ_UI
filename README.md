@@ -6,7 +6,7 @@
 
 Scaling · Edit Mode layout · keybinds · CVars · fading · nameplates · addon settings, all previewed, all undoable.
 
-![Version](https://img.shields.io/badge/version-0.5.0-33ccff)
+![Version](https://img.shields.io/badge/version-0.7.0-33ccff)
 ![Interface](https://img.shields.io/badge/interface-16001-blue)
 ![Language](https://img.shields.io/badge/lua-5.1-000080?logo=lua)
 ![Status](https://img.shields.io/badge/status-early%20development-orange)
@@ -21,7 +21,7 @@ MLZ UI is a World of Warcraft addon that configures your whole interface for you
 
 Instead of silently changing things, it opens an **installation wizard** that shows every change as *old → new*. You tick what you want, press apply, and everything is backed up first. If you don't like the result, `/mlz undo` puts it back.
 
-> **Status:** early development (v0.5.0). It works and is used daily, but expect rough edges and breaking changes. Feedback and issues are welcome.
+> **Status:** early development (v0.7.0). It works and is used daily, but expect rough edges and breaking changes. Feedback and issues are welcome.
 
 ## Features
 
@@ -33,7 +33,10 @@ Instead of silently changing things, it opens an **installation wizard** that sh
 | **Settings (CVars)** | Auto loot, auto self-cast, cast on key down, camera distance, nameplate visibility, disable tutorials and more. Each one is optional. CVars that don't exist in your client are skipped. |
 | **Minimalism / fading** | Hides bars 4-5, micro menu, bags, chat buttons and XP bar until mouseover. Dims bars 2-3 out of combat. Damage meter only shows in a group. Uses `SetAlpha` only, so it causes **no taint** and works in combat. |
 | **Action button colors** | Red = out of range, blue = no mana/rage/energy, grey = unusable, like tullaRange. Short hotkey labels (`S1`, `C1`) and hidden macro names. |
-| **Nameplates** | Imports your saved [Platynator](https://www.curseforge.com/wow/addons/platynator) profile and/or a clean minimal style, switched by role: Defensive Stance / Bear Form = tank, otherwise DPS in a group and SOLO when alone. Threat colors are tuned per mode. |
+| **Nameplates** | Four modes for [Platynator](https://www.curseforge.com/wow/addons/platynator), **Tank / Healer / DPS / Solo**, picked automatically from your role (or set by hand). Healer: friendly names you can't click by mistake, enemy plates dimmed. Tank: bigger target. Changes show at once, with no `/reload` and no chat spam. Optional clean style (only your own debuffs), threat colors per role (off by default), PvP tweak (class colors, keep buffs). Your own Platynator profile is saved first and can be restored. |
+| **Every role and class** | One shared role detection (your choice → spec → talent points → group role → class), set per character with `/mlz role`. Stance, pet and bonus bars get colors and short hotkeys too. |
+| **Quality of life** | Auto-repair (guild money first) and sell grey items at merchants (hold Shift to skip), a mana tick / 5-second rule bar (energy tick for rogues and cats), and an interrupt announce (self, say or group). |
+| **Role profiles** | Save nameplate options, fading, the tick bar and the interrupt announce once per role. They can load automatically when your role changes. |
 | **Other addons** | Applies recommended settings to Prat, Auctionator, AtlasLoot, What's Training?, Bagnon, RestedXP Guides, Deadly Boss Mods and Leatrix Plus/Maps (see below). |
 | **Tweaks** | Minimap size slider, FPS counter, calmer combat text (small Roboto Bold numbers; the font needs a full game restart), hide the quest tracker or just its "All Objectives" line. |
 | **Backup / undo** | A stack of up to 5 backups. Every wizard run is reversible. |
@@ -64,12 +67,13 @@ Click the **minimap button** (the gear) or type `/mlz` to open the **control cen
 |---|---|
 | Overview | One status card per area (on / off / needs attention), a banner if setup or a reload is pending, and quick actions |
 | Layout & scale | UI scale mode, active Edit Mode layout, minimap size slider, pet bar position |
-| Nameplates | Automatic tank/DPS/solo switching, mode, clean style, threat colors, save/restore the Platynator profile |
-| Healer | Healer detection (auto / always / never), current and wanted layout, rebuild the healer layouts |
+| Nameplates | "Right now" card (mode and why), Auto / Tank / Healer / DPS / Solo, friendly names for healers, clean style, threat colors, PvP tweak, save/restore the Platynator profile |
+| Healer | Your role (Auto / Tank / Healer / DPS) and where it comes from, current and wanted layout, rebuild the healer layouts |
 | Minimalism | What fades until hover (one switch per frame), pause fading, clean chat |
 | Action bars & UI | Action button colors and hotkeys, quest tracker, FPS counter, combat text |
 | Other addons | Which supported addons are loaded and how many settings differ |
-| Profiles & backup | Export/import your choices, list of backups, undo the last setup |
+| Quality of life | Merchant repair / sell greys, mana tick bar (move and reset), interrupt announce channel |
+| Profiles & backup | Role profiles, export/import your choices, list of backups, undo the last setup |
 | About & help | How it works, show/hide the minimap button, commands, debug |
 
 The footer always shows whether a **reload is needed** and why, with a Reload UI button.
@@ -85,10 +89,12 @@ Only a few commands are listed (`/mlz help`):
 | `/mlz` | Open the control center |
 | `/mlz install` | Open the installation wizard |
 | `/mlz undo` | Undo the last wizard run |
+| `/mlz role tank\|healer\|dps\|auto` | Set your role for this character (`status` shows it) |
+| `/mlz np auto\|tank\|healer\|dps\|solo` | Nameplate mode; also `style`, `threat`, `pvp`, `friends` (add `off`), `save`, `load`, `export` |
 | `/mlz debug` | Toggle debug output |
 | `/mlz probe` | Collect client info into SavedVariables (for development) |
 
-The older commands (`/mlz np`, `heal`, `fade`, `buttons`, `fps`, `map`, ...) still work but are no longer listed.
+The older commands (`heal`, `fade`, `buttons`, `fps`, `map`, ...) still work but are no longer listed.
 
 ## Supported addons
 
@@ -105,7 +111,7 @@ MLZ UI **configures** these addons if they are installed and loaded. It does not
 | [Deadly Boss Mods](https://www.curseforge.com/wow/addons/deadly-boss-mods) | Warnings at the top center, info/range frames and timer bars on the right, slimmer bars, no separate large bars |
 | [Leatrix Plus](https://www.curseforge.com/wow/addons/leatrix-plus-classic) | Auto-sell grey items, auto-repair, faster loot, hide minimap icon; optional quest automation, role confirm, no bag auto-open |
 | [Leatrix Maps](https://www.curseforge.com/wow/addons/leatrix-maps-classic) | Hide minimap icon |
-| [Platynator](https://www.curseforge.com/wow/addons/platynator) | Profile import, clean style, tank/DPS/solo switched by role |
+| [Platynator](https://www.curseforge.com/wow/addons/platynator) | Tank/healer/DPS/solo modes switched by role, clean style, optional threat colors and PvP tweak, profile save/restore |
 | BugGrabber | Only checked by the health check |
 
 Settings are read from each addon's own SavedVariables, so they depend on the version you have installed. Rows whose key doesn't exist are shown as "not available" and skipped.
@@ -157,7 +163,7 @@ Everything is meant to be edited. Open the file in `Data/`:
 | `Data/Bindings.lua` | Movement setups and base keys |
 | `Data/Layout.lua` | Edit Mode frame positions |
 | `Data/Fade.lua` | What fades, when, and how much |
-| `Data/Nameplates.lua` | Tank/DPS/solo nameplate presets and threat colors |
+| `Data/Nameplates.lua` | Tank/healer/DPS/solo nameplate presets, PvP tweak and threat colors |
 | `Data/Addons.lua` | Settings applied to other addons |
 
 ## Roadmap

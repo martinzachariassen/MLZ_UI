@@ -2,6 +2,8 @@
 -- /mlz probe collects info about the client (APIs, CVars, Edit Mode, bindings) and stores
 -- it in MLZUIDB.probe. After /reload or logout everything is in
 -- WTF/Account/<account>/SavedVariables/MLZ_UI.lua, so we can verify instead of guessing.
+-- At login only a slim version is stored (build, screen, APIs, frames, CVars), so the saved
+-- file stays small. The full dump (Edit Mode, all bindings) is only made by /mlz probe.
 
 local _, ns = ...
 
@@ -26,7 +28,11 @@ local API_LIST = {
     "GetActionInfo", "PlaceAction", "PickupAction", "PickupSpell", "C_Spell.PickupSpell", "PickupItem",
     "PickupMacro", "C_Item.PickupItem", "ClearCursor",
     "GetSpecialization", "C_SpecializationInfo.GetSpecialization", "GetActiveTalentGroup",
-    "C_ClassTalents.GetActiveConfigID",
+    "C_ClassTalents.GetActiveConfigID", "GetTalentTabInfo", "GetNumTalentTabs",
+    "UnitHasEffectivelyTankAura", "UnitGroupRolesAssigned", "GetShapeshiftFormID",
+    "C_Container.GetContainerItemInfo", "C_Container.UseContainerItem", "GetContainerItemInfo",
+    "CanMerchantRepair", "GetRepairAllCost", "RepairAllItems", "CanGuildBankRepair",
+    "CombatLogGetCurrentEventInfo", "C_AddOns.IsAddOnLoaded",
     "InCombatLockdown", "C_Timer.After", "ReloadUI",
 }
 
@@ -37,6 +43,8 @@ local FRAME_LIST = {
     "QuestWatchFrame", "MinimapCluster", "Minimap", "BuffFrame", "DebuffFrame", "ChatFrame1",
     "BagsBar", "MicroMenuContainer", "MicroMenu", "PlayerCastingBarFrame", "CastingBarFrame",
     "DamageMeter", "BossTargetFrameContainer", "StatusTrackingBarManager",
+    "StanceBar", "StanceButton1", "PetActionBar", "PetActionButton1", "BonusActionButton1",
+    "TotemFrame", "PlayerFrameManaBar",
 }
 
 local EXTRA_CVARS = {
@@ -46,6 +54,7 @@ local EXTRA_CVARS = {
     "nameplateMaxDistance", "autoQuestWatch", "ffxGlow", "cameraSmoothStyle",
     "showTargetOfTarget", "enableFloatingCombatText", "alwaysShowActionBars",
     "lockActionBars", "countdownForCooldowns", "chatClassColorOverride", "colorChatNamesByClass",
+    "useCompactPartyFrames", "raidOptionDisplayPets", "raidFramesHealthText",
 }
 
 local function SafeCopy(v, depth)
@@ -103,6 +112,21 @@ function ns.RunProbe(silent)
     p.cvars = {}
     for _, row in ipairs(ns.data.cvars or {}) do p.cvars[row.name] = CVarInfo(row.name) end
     for _, name in ipairs(EXTRA_CVARS) do p.cvars[name] = CVarInfo(name) end
+
+    p.class = select(2, UnitClass("player"))
+    if ns.Role then
+        local role, source = ns.Role()
+        p.role = { role = role, source = source }
+    end
+
+    if silent then
+        -- slim version at login; keep the time of the last full probe so it's clear it's gone
+        p.full = false
+        p.lastFull = ns.db.probe and (ns.db.probe.full and ns.db.probe.time or ns.db.probe.lastFull) or nil
+        ns.db.probe = p
+        return
+    end
+    p.full = true
 
     -- All Enum tables related to Edit Mode
     p.enums = {}
@@ -172,7 +196,6 @@ function ns.RunProbe(silent)
     end
 
     ns.db.probe = p
-    if silent then return end
 
     -- Short summary in chat
     ns.Print(("Build %s (%s), toc %s. Screen %dx%d, UIParent %.0fx%.0f, scale %.3f"):format(

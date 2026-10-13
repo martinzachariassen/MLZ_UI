@@ -18,20 +18,45 @@ local function Presets()
     return {}
 end
 
+-- Number of preset layouts in front of the saved ones. If the preset manager is missing the enum
+-- tells us, and failing that Blizzard has always had two (Modern, Classic).
+local function NumPresets(presets)
+    if presets and #presets > 0 then return #presets end
+    local meta = Enum and Enum.EditModePresetLayoutsMeta
+    return (meta and meta.NumValues) or 2
+end
+
 local function Available()
     return C_EditMode and C_EditMode.GetLayouts and C_EditMode.SaveLayouts and C_EditMode.SetActiveLayout and Enum and Enum.EditModeSystem
 end
+Layout.Available = Available
 
--- Fetches layout info. Returns raw, presets, active layout table
+-- Fetches layout info. Returns raw, presets, active layout table, number of presets
 function Layout:GetInfo()
+    if not (C_EditMode and C_EditMode.GetLayouts) then return nil end
     local ok, raw = pcall(C_EditMode.GetLayouts)
     if not ok or type(raw) ~= "table" then return nil end
     raw.layouts = raw.layouts or {}
     local presets = Presets()
+    local n = NumPresets(presets)
     local active
     local a = raw.activeLayout or 1
-    if a <= #presets then active = presets[a] else active = raw.layouts[a - #presets] end
-    return raw, presets, active
+    if a <= n then active = presets[a] else active = raw.layouts[a - n] end
+    return raw, presets, active, n
+end
+
+-- SetActiveLayout index of a saved layout by name (presets by name too), or nil
+function Layout:IndexOf(name, raw)
+    local presets = Presets()
+    local n = NumPresets(presets)
+    for i, p in ipairs(presets) do
+        if p.layoutName == name then return i end
+    end
+    if not raw then raw = self:GetInfo() end
+    if not raw then return nil end
+    for i, l in ipairs(raw.layouts) do
+        if l.layoutName == name then return n + i end
+    end
 end
 
 local function FindSystem(layoutInfo, spec)
@@ -172,9 +197,10 @@ end
 function Layout:Backup()
     local snap = { barToggles = GetActionBarToggles and { GetActionBarToggles() } or nil }
     if not Available() then return snap end
-    local raw = self:GetInfo()
+    local raw, _, active = self:GetInfo()
     if not raw then return snap end
     snap.activeLayout = raw.activeLayout
+    snap.activeName = active and active.layoutName -- restore by name; indexes shift when layouts are removed
     local _, existing = FindByName(raw.layouts, ns.data.layout.name)
     snap.hadLayout = existing ~= nil
     snap.layoutCopy = existing and ns.CopyTable(existing) or nil
@@ -191,9 +217,17 @@ local function ShowBars(list)
     for _, n in ipairs(list) do want[n] = true end
     if SetActionBarToggles and GetActionBarToggles then
         local t = { GetActionBarToggles() }
-        -- order: bottomLeft (2), bottomRight (3), right (4), left (5), bar 6, 7, 8
-        pcall(SetActionBarToggles, want[2] or t[1], want[3] or t[2], want[4] or t[3], want[5] or t[4],
-            want[6] or t[5], want[7] or t[6], want[8] or t[7])
+        local count = select("#", GetActionBarToggles())
+        -- order: bottomLeft (2), bottomRight (3), right (4), left (5), then bar 6, 7, 8 on clients that
+        -- have them. Older clients return 4 bars + "always show"; that 5th value is passed back unchanged.
+        local args = { want[2] or t[1], want[3] or t[2], want[4] or t[3], want[5] or t[4] }
+        if count >= 7 then
+            args[5], args[6], args[7] = want[6] or t[5], want[7] or t[6], want[8] or t[7]
+            for i = 8, count do args[i] = t[i] end
+        else
+            for i = 5, count do args[i] = t[i] end
+        end
+        pcall(SetActionBarToggles, unpack(args, 1, math.max(4, count)))
     end
     if Settings and Settings.SetValue then
         for n in pairs(want) do pcall(Settings.SetValue, "PROXY_SHOW_ACTIONBAR_" .. n, true) end
@@ -225,6 +259,11 @@ function Layout:WriteSpecs(target, specs)
 
     for _, spec in ipairs(specs) do
         local sys = FindSystem(target, spec)
+        -- Anchoring to a frame this client (or a missing addon) doesn't have would break the layout
+        if sys and not spec.keepAnchor and spec.relTo and spec.relTo ~= "UIParent" and not _G[spec.relTo] then
+            log[#log + 1] = spec.label .. ": skipped, anchor frame " .. spec.relTo .. " does not exist"
+            sys = nil
+        end
         if sys then
             if not spec.keepAnchor then
                 local own = spec.anchorOverride and ns.db.overrides and ns.db.overrides[spec.anchorOverride]
@@ -307,6 +346,7 @@ end
 -- Rebuilds the healer layouts from the saved main layout. Returns ok, message.
 function Layout:RebuildVariants()
     if not Available() then return false, "Edit Mode API missing" end
+    if InCombatLockdown() then return false, "not possible in combat" end
     local raw = self:GetInfo()
     if not raw then return false, "could not read layouts" end
     local _, base = FindByName(raw.layouts, ns.data.layout.name)
@@ -338,7 +378,7 @@ function Layout:Apply(items)
     if doBars then ShowBars(data.showBars) end
     if not doLayout or not Available() then return end
 
-    local raw, presets, active = self:GetInfo()
+    local raw, _, active, numPresets = self:GetInfo()
     if not raw or not active then ns.Print("|cffff4444Could not read Edit Mode layouts.|r") return end
 
     local idx, target = FindByName(raw.layouts, data.name)
@@ -360,19 +400,23 @@ function Layout:Apply(items)
     if doHeal then self:BuildVariants(raw, target) end
     ns.db.layoutLog = log -- ends up in SavedVariables, so we can check the conversion after /reload
 
-    raw.activeLayout = #presets + idx
+    raw.activeLayout = numPresets + idx
     local ok, err = pcall(C_EditMode.SaveLayouts, raw)
     if not ok then ns.Print("|cffff4444SaveLayouts failed:|r", err) return end
-    ok, err = pcall(C_EditMode.SetActiveLayout, #presets + idx)
+    ok, err = pcall(C_EditMode.SetActiveLayout, numPresets + idx)
     if not ok then ns.Print("|cffff4444SetActiveLayout failed:|r", err) end
     ns.Debug("layout saved, frames moved:", moved)
     ns.MarkReload("Edit Mode layout changed")
+    -- A healer should land on the healer layout straight away, not on the next group change
+    if ns.Healer and ns.Healer.Switch then C_Timer.After(1, function() ns.Healer.Switch(true) end) end
 end
 
 -- Changes a single setting (in display units, e.g. 120 %) in the MLZ UI layout and saves.
 -- Used by /mlz map. Returns ok, error message.
+-- The healer layouts get the same change, so the minimap doesn't change size when you start healing.
 function Layout:UpdateOne(id, name, value)
     if not Available() then return false, "Edit Mode API missing" end
+    if InCombatLockdown() then return false, "not possible in combat" end
     local spec
     for _, sp in ipairs(ns.data.layout.frames) do if sp.id == id then spec = sp end end
     if not spec then return false, "unknown frame " .. tostring(id) end
@@ -380,18 +424,34 @@ function Layout:UpdateOne(id, name, value)
     if not raw then return false, "could not read layouts" end
     local _, target = FindByName(raw.layouts, ns.data.layout.name)
     if not target then return false, "The MLZ UI layout does not exist yet (run /mlz install)" end
-    local sys, why = FindSystem(target, spec)
-    if not sys then return false, why end
     local setting = Enum[spec.settingEnum] and Enum[spec.settingEnum][name]
-    for _, st in ipairs(sys.settings or {}) do
-        if st.setting == setting then
-            local new = self:ToRaw(sys.system, sys.systemIndex, setting, value, st.value)
-            if new == nil then return false, "could not convert the value" end
-            st.value = new
-            return pcall(C_EditMode.SaveLayouts, raw)
+    if setting == nil then return false, "unknown setting " .. tostring(name) end
+
+    local function Write(layout)
+        local sys, why = FindSystem(layout, spec)
+        if not sys then return false, why end
+        for _, st in ipairs(sys.settings or {}) do
+            if st.setting == setting then
+                local new = self:ToRaw(sys.system, sys.systemIndex, setting, value, st.value)
+                if new == nil then return false, "could not convert the value" end
+                st.value = new
+                return true
+            end
         end
+        return false, name .. " is not present on the system"
     end
-    return false, name .. " is not present on the system"
+
+    local ok, why = Write(target)
+    if not ok then return false, why end
+    for _, vname in ipairs(self:VariantNames()) do
+        local _, v = FindByName(raw.layouts, vname)
+        if v then Write(v) end
+    end
+    local saved, err = pcall(C_EditMode.SaveLayouts, raw)
+    if not saved then return false, tostring(err) end
+    -- Edit Mode keeps its own copy until a reload; saving there before that would undo this change
+    ns.MarkReload("Edit Mode layout changed")
+    return true
 end
 
 -- Pet bar position: remembers where the pet bar sits in the active Edit Mode layout, so installing
@@ -488,8 +548,12 @@ function Layout:Restore(snap)
     elseif idx then
         table.remove(raw.layouts, idx)
     end
-    raw.activeLayout = snap.activeLayout
+    -- Layouts were removed above, so the old index may point at a different layout now: look it up by name
+    local index = (snap.activeName and self:IndexOf(snap.activeName, raw)) or snap.activeLayout
+    local n = NumPresets(Presets())
+    if index > n + #raw.layouts then index = 1 end
+    raw.activeLayout = index
     pcall(C_EditMode.SaveLayouts, raw)
-    pcall(C_EditMode.SetActiveLayout, snap.activeLayout)
+    pcall(C_EditMode.SetActiveLayout, index)
     ns.MarkReload("Edit Mode layout changed")
 end

@@ -11,10 +11,14 @@ local _, ns = ...
 
 local AB = ns.RegisterModule({ key = "actionbuttons", title = "Action buttons" })
 
+-- Buttons that use action slots: colors, hotkeys and macro names. BonusActionButton is the
+-- stance/form page some older clients use for warriors, druids and rogues.
 local PREFIXES = {
     "ActionButton", "MultiBarBottomLeftButton", "MultiBarBottomRightButton", "MultiBarRightButton",
-    "MultiBarLeftButton", "MultiBar5Button", "MultiBar6Button", "MultiBar7Button",
+    "MultiBarLeftButton", "MultiBar5Button", "MultiBar6Button", "MultiBar7Button", "BonusActionButton",
 }
+-- Stance and pet buttons don't use action slots (Blizzard colors them itself): short hotkeys only
+local HOTKEY_ONLY = { StanceButton = 10, PetActionButton = 10 }
 
 local COLORS = {
     range    = { 0.95, 0.20, 0.20 },  -- out of range
@@ -59,6 +63,15 @@ local function Buttons()
             if b then list[#list + 1] = b end
         end
     end
+    for prefix, n in pairs(HOTKEY_ONLY) do
+        for i = 1, n do
+            local b = _G[prefix .. i]
+            if b then
+                b.mlzNoColor = true
+                list[#list + 1] = b
+            end
+        end
+    end
     return list
 end
 
@@ -81,7 +94,7 @@ local colored = {} -- buttons we have colored, so we can reset them
 
 local function Color(btn, force)
     local cfg = Cfg()
-    if not cfg or not (cfg.range or cfg.mana or cfg.unusable) then return end
+    if not cfg or not (cfg.range or cfg.mana or cfg.unusable) or btn.mlzNoColor then return end
     local icon = btn.icon or btn.Icon
     local action = btn.action
     if not icon or not action then return end
@@ -104,6 +117,7 @@ local COMMANDS = {
     MultiBarBottomRightButton = "MULTIACTIONBAR2BUTTON", MultiBarRightButton = "MULTIACTIONBAR3BUTTON",
     MultiBarLeftButton = "MULTIACTIONBAR4BUTTON", MultiBar5Button = "MULTIACTIONBAR5BUTTON",
     MultiBar6Button = "MULTIACTIONBAR6BUTTON", MultiBar7Button = "MULTIACTIONBAR7BUTTON",
+    BonusActionButton = "ACTIONBUTTON", StanceButton = "SHAPESHIFTBUTTON", PetActionButton = "BONUSACTIONBUTTON",
 }
 
 local KEYNAMES = {
@@ -138,7 +152,8 @@ local function StyleHotkey(btn, hk)
     if btn.mlzHotkeyStyled then return end
     btn.mlzHotkeyStyled = true
     local font = (NumberFontNormal and NumberFontNormal:GetFont()) or STANDARD_TEXT_FONT
-    hk:SetFont(font, 13, "OUTLINE")
+    local w = btn:GetWidth() or 36
+    hk:SetFont(font, (w > 0 and w < 34) and 10 or 13, "OUTLINE") -- stance and pet buttons are smaller
     hk:ClearAllPoints()
     hk:SetPoint("TOPRIGHT", btn, "TOPRIGHT", -2, -3)
     hk:SetJustifyH("RIGHT")
@@ -204,7 +219,7 @@ local function Tick()
     if not cfg or not (cfg.range or cfg.mana or cfg.unusable) then return end
     for i = 1, #buttons do
         local b = buttons[i]
-        if b:IsVisible() then Color(b) end
+        if not b.mlzNoColor and b:IsVisible() then Color(b) end
     end
 end
 

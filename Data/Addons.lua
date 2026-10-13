@@ -110,7 +110,10 @@ ns.data.addons = {
     {
         addon = "RXPGuides", title = "RestedXP Guides",
         root = function()
-            local profile = RXPDB and RXPDB.profileKeys and RXPDB.profileKeys[UnitName("player")]
+            -- AceDB keys characters as "Name - Realm"
+            local keys = RXPDB and RXPDB.profileKeys
+            local name = UnitName("player")
+            local profile = keys and (keys[name .. " - " .. (GetRealmName() or "")] or keys[name])
             return profile and RXPDB.profiles and RXPDB.profiles[profile]
         end,
         rows = {
@@ -170,6 +173,9 @@ ns.data.addons = {
     -- Values are "On" / "Off" strings, as Leatrix stores them. Needs /reload.
     {
         addon = "Leatrix_Plus", title = "Leatrix Plus",
+        -- Leatrix keeps its settings in a private table and writes them over LeaPlusDB at logout,
+        -- so changes made from outside are lost. MLZ shows what differs; you change it in /ltp.
+        manual = "Leatrix overwrites outside changes at logout. Change this in /ltp.",
         root = function() return LeaPlusDB end,
         rows = {
             { id = "sell_junk", label = "Auto-sell grey items", desc = "Sells all grey items when you open a vendor.",
@@ -190,6 +196,7 @@ ns.data.addons = {
     },
     {
         addon = "Leatrix_Maps", title = "Leatrix Maps",
+        manual = "Leatrix overwrites outside changes at logout. Change this in /ltmaps.",
         root = function() return LeaMapsDB end,
         rows = {
             { id = "minimap_icon", label = "Hide Leatrix Maps minimap icon", desc = "Keeps the minimap clean. The map settings are already set up.",

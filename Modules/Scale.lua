@@ -47,20 +47,34 @@ end
 
 -- The actual application. Called on Apply and on login/resolution change if the user has accepted scaling.
 local applying = false
-function Scale:ApplyScale(mode)
-    if applying then return end
-    applying = true
+local function DoApply(self, mode)
     local s = self:Compute(mode)
     local cvarValue = math.max(s, CVAR_MIN)
     if GetCVar("useUiScale") ~= "1" then SetCVar("useUiScale", "1") end
     local current = tonumber(GetCVar("uiScale")) or 0
     if math.abs(current - cvarValue) > 0.0005 then SetCVar("uiScale", ("%.6f"):format(cvarValue)) end
-    if s < CVAR_MIN and math.abs(UIParent:GetScale() - s) > 0.0005 then
+    -- Set UIParent directly as well: below 0.64 the CVar can't go that low, and coming back up from
+    -- e.g. 0.57 to 0.64 the CVar may already say 0.64, so nothing would change without this.
+    if math.abs(UIParent:GetScale() - s) > 0.0005 then
         UIParent:SetScale(s)
     end
-    applying = false
     self:UpdateSafeArea()
     ns.Debug(("scale %.4f (mode %s, height %d)"):format(s, tostring(mode), ScreenHeight()))
+end
+
+function Scale:ApplyScale(mode)
+    if applying then return end
+    applying = true
+    local ok, err = pcall(DoApply, self, mode)
+    applying = false -- always reset, even if something above failed
+    if not ok then ns.Print("|cffff4444Scaling failed:|r", err) end
+end
+
+-- Accepts the listed modes and plain numbers between 0.4 and 1.15
+function Scale:ValidMode(mode)
+    for _, m in ipairs(MODES) do if m.value == mode then return true end end
+    local n = tonumber(mode)
+    return n ~= nil and n >= 0.4 and n <= CVAR_MAX
 end
 
 -- MLZ_Safe: a centered 16:9 container that our own frames can anchor to,
@@ -180,6 +194,10 @@ end
 
 ns.AddCommand("scale", "recalculates and reapplies the scale (optional: auto, 0.64, 0.57, pixel1 ...)", function(arg)
     local mode = (arg and arg ~= "") and arg:lower() or ns.db.scale.mode
+    if not Scale:ValidMode(mode) then
+        ns.Print("Unknown scale", tostring(mode) .. ". Use auto, pixel1 or a number from 0.4 to 1.15.")
+        return
+    end
     Scale:SetMode(mode, function()
         ns.Print(("Scale set to %.3f (%s)."):format(Scale:Compute(ns.db.scale.mode), ModeText(ns.db.scale.mode)))
     end)
