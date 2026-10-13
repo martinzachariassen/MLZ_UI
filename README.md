@@ -2,198 +2,193 @@
 
 # MLZ UI
 
-**A one-click setup wizard for a clean, minimal, pixel-perfect World of Warcraft UI.**
+**A clean, minimal World of Warcraft UI in one guided setup. Every change previewed, every change undoable.**
 
-Scaling · Edit Mode layout · keybinds · CVars · fading · nameplates · addon settings, all previewed, all undoable.
+![Version](https://img.shields.io/badge/version-0.7.0-33a0ff?style=flat-square)
+![Interface](https://img.shields.io/badge/interface-16001-20242b?style=flat-square)
+![Lua](https://img.shields.io/badge/lua-5.1-000080?style=flat-square&logo=lua)
+![Dependencies](https://img.shields.io/badge/dependencies-none-4ad173?style=flat-square)
+![Taint](https://img.shields.io/badge/combat-taint--free-4ad173?style=flat-square)
+![Status](https://img.shields.io/badge/status-early%20development-ffb040?style=flat-square)
 
-![Version](https://img.shields.io/badge/version-0.7.0-33ccff)
-![Interface](https://img.shields.io/badge/interface-16001-blue)
-![Language](https://img.shields.io/badge/lua-5.1-000080?logo=lua)
-![Status](https://img.shields.io/badge/status-early%20development-orange)
+<img src="docs/screenshots/control-center.png" alt="MLZ UI control center, Overview page" width="880">
 
 </div>
 
 ---
 
-## What is this?
+## Why MLZ UI
 
-MLZ UI is a World of Warcraft addon that configures your whole interface for you, without replacing Blizzard's UI the way ElvUI does. It uses the **default UI, Edit Mode and your existing addons**, and sets them up the way the author plays.
+MLZ UI sets up the **Blizzard UI you already have** (Edit Mode, CVars, keybinds and your existing addons) instead of replacing it the way full UI suites do.
 
-Instead of silently changing things, it opens an **installation wizard** that shows every change as *old → new*. You tick what you want, press apply, and everything is backed up first. If you don't like the result, `/mlz undo` puts it back.
+- **Preview first.** A setup wizard shows every change as *now → will become*. You pick what you want.
+- **Always reversible.** A backup is taken before anything changes. `/mlz undo` puts it back.
+- **No taint, no libraries.** Protected frames are only faded with `SetAlpha`, and anything blocked in combat waits until combat ends. Plain Lua, no external dependencies.
+- **Data, not code.** All choices live in plain tables under [`Data/`](Data), so you can change them without touching the logic.
 
-> **Status:** early development (v0.7.0). It works and is used daily, but expect rough edges and breaking changes. Feedback and issues are welcome.
+## Screenshots
 
-## Features
+<table>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/wizard.png" alt="Setup wizard, keybinds step"></td>
+    <td width="50%"><img src="docs/screenshots/nameplates.png" alt="Control center, nameplates page"></td>
+  </tr>
+  <tr>
+    <td align="center"><sub><b>Setup wizard.</b> Every row shows what it is now and what it will become.</sub></td>
+    <td align="center"><sub><b>Nameplates.</b> Tank, Healer, DPS and Solo modes that follow your role.</sub></td>
+  </tr>
+  <tr>
+    <td colspan="2"><img src="docs/screenshots/minimap-menu.png" alt="Minimap button tooltip and quick menu"></td>
+  </tr>
+  <tr>
+    <td colspan="2" align="center"><sub><b>Minimap button.</b> A live status summary on hover and a quick menu on right-click.</sub></td>
+  </tr>
+</table>
 
-| Area | What it does |
-|---|---|
-| **Pixel-perfect scale** | Calculates UI scale from your screen height (`scale = k * 768 / height`). Stores the *mode*, not the number, so it recalculates if your resolution changes. Handles scales below Blizzard's 0.64 CVar limit. |
-| **Edit Mode layout** | Creates a dedicated Edit Mode layout (bars stacked at bottom center, player/target flanking, swing timers, cast bar, corners kept for glance-only info). Your other layouts are untouched. |
-| **Keybinds** | ESDF or WASD movement, a reach-sorted set of base keys, and Shift/Ctrl variants for bars 2 and 3. With WASD, Shift+1/2/3 switch stance/form (stance bar buttons 1-3), and bar 2 buttons 1-3 move to Shift+G/V/T. Detects conflicts and moves displaced actions (e.g. Character panel) to an ALT variant. |
-| **Settings (CVars)** | Auto loot, auto self-cast, cast on key down, camera distance, nameplate visibility, disable tutorials and more. Each one is optional. CVars that don't exist in your client are skipped. |
-| **Minimalism / fading** | Hides bars 4-5, micro menu, bags, chat buttons and XP bar until mouseover. Dims bars 2-3 out of combat. Damage meter only shows in a group. Uses `SetAlpha` only, so it causes **no taint** and works in combat. |
-| **Action button colors** | Red = out of range, blue = no mana/rage/energy, grey = unusable, like tullaRange. Short hotkey labels (`S1`, `C1`) and hidden macro names. |
-| **Nameplates** | Four modes for [Platynator](https://www.curseforge.com/wow/addons/platynator), **Tank / Healer / DPS / Solo**, picked automatically from your role (or set by hand). Healer: friendly names you can't click by mistake, enemy plates dimmed. Tank: bigger target. Changes show at once, with no `/reload` and no chat spam. Optional clean style (only your own debuffs), threat colors per role (off by default), PvP tweak (class colors, keep buffs). Your own Platynator profile is saved first and can be restored. |
-| **Every role and class** | One shared role detection (your choice → spec → talent points → group role → class), set per character with `/mlz role`. Stance, pet and bonus bars get colors and short hotkeys too. |
-| **Quality of life** | Auto-repair (guild money first) and sell grey items at merchants (hold Shift to skip), a mana tick / 5-second rule bar (energy tick for rogues and cats), and an interrupt announce (self, say or group). |
-| **Role profiles** | Save nameplate options, fading, the tick bar and the interrupt announce once per role. They can load automatically when your role changes. |
-| **Other addons** | Applies recommended settings to Prat, Auctionator, AtlasLoot, What's Training?, Bagnon, RestedXP Guides, Deadly Boss Mods and Leatrix Plus/Maps (see below). |
-| **Tweaks** | Minimap size slider, FPS counter, calmer combat text (small Roboto Bold numbers; the font needs a full game restart), hide the quest tracker or just its "All Objectives" line. |
-| **Backup / undo** | A stack of up to 5 backups. Every wizard run is reversible. |
-| **Export / import** | Share your choices as a string with `/mlz export` and `/mlz import`. |
-| **Health check** | Warns after login if an addon it configures is installed but not loaded (e.g. switched off by mistake). `/mlz health` also lists supported addons you don't have. |
+<sub>These are interface previews rendered from <a href="docs/mockups"><code>docs/mockups</code></a> with the addon's exact colors, fonts and copy. They will be replaced by in-game captures.</sub>
 
-## Installation
+## Highlights
 
-1. Download or clone this repo.
-2. Put the `MLZ_UI` folder in your AddOns directory:
-   - **macOS:** `/Applications/World of Warcraft/_<flavor>_/Interface/AddOns/`
-   - **Windows:** `C:\Program Files (x86)\World of Warcraft\_<flavor>_\Interface\AddOns\`
-3. Restart the game, or type `/reload`.
-4. On first login the wizard opens automatically. You can reopen it any time with `/mlz install`.
+**Setup**
+- Pixel-perfect UI scale, recalculated when your resolution changes
+- A dedicated Edit Mode layout. Your other layouts are never touched.
+- ESDF or WASD keybinds in three layers (none, Shift, Ctrl), with conflict detection
+- Opt-in CVars: auto loot, cast on key down, camera distance and more
 
-```sh
-cd "/Applications/World of Warcraft/_<flavor>_/Interface/AddOns"
-git clone git@github.com:martinzachariassen/MLZ_UI.git
-```
+**In play**
+- Minimalism: bars, bags and menus fade until you hover, and bars dim out of combat
+- Action buttons colored by range, mana and usability, with short hotkey labels
+- Role detection (talents, spec, group or your choice) that drives the layouts and nameplates
+- Auto-repair, sell greys, a mana tick bar and an interrupt announce
 
-Check `## Interface: 16001` in [`MLZ_UI.toc`](MLZ_UI.toc) matches your client. If it shows as "out of date", enable *Load out of date AddOns* or update the number.
+**Ecosystem**
+- Recommended settings for Prat, Bagnon, Auctionator, DBM, Leatrix and more
+- Platynator nameplate modes per role, plus an optional clean style
+- Role profiles, export/import strings and a health check for missing addons
 
-## Usage
+## Quick start
 
-Click the **minimap button** (the gear) or type `/mlz` to open the **control center**. It is a dark, flat window with a sidebar of pages. Every setting is a row with a short description, a hover tooltip and a switch, segmented button or slider. Changes apply at once without chat spam. When something can't be used on your setup (for example Platynator is not loaded), the row says why instead of showing a dead control.
+1. Download or clone the repo into your AddOns folder:
+   ```sh
+   cd "/Applications/World of Warcraft/_<flavor>_/Interface/AddOns"   # Windows: C:\Program Files (x86)\World of Warcraft\_<flavor>_\Interface\AddOns
+   git clone git@github.com:martinzachariassen/MLZ_UI.git
+   ```
+2. Start the game or `/reload`. The setup wizard opens on first login.
+3. Open the control center at any time with `/mlz` or the minimap button.
 
-| Page | What you see and change |
-|---|---|
-| Overview | One status card per area (on / off / needs attention), a banner if setup or a reload is pending, and quick actions |
-| Layout & scale | UI scale mode, active Edit Mode layout, minimap size slider, pet bar position |
-| Nameplates | "Right now" card (mode and why), Auto / Tank / Healer / DPS / Solo, friendly names for healers, clean style, threat colors, PvP tweak, save/restore the Platynator profile |
-| Healer | Your role (Auto / Tank / Healer / DPS) and where it comes from, current and wanted layout, rebuild the healer layouts |
-| Minimalism | What fades until hover (one switch per frame), pause fading, clean chat |
-| Action bars & UI | Action button colors and hotkeys, quest tracker, FPS counter, combat text |
-| Other addons | Which supported addons are loaded and how many settings differ |
-| Quality of life | Merchant repair / sell greys, mana tick bar (move and reset), interrupt announce channel |
-| Profiles & backup | Role profiles, export/import your choices, list of backups, undo the last setup |
-| About & help | How it works, show/hide the minimap button, commands, debug |
+> [!NOTE]
+> MLZ UI targets `## Interface: 16001`. If your client marks it as out of date, enable *Load out of date AddOns* or update the number in [`MLZ_UI.toc`](MLZ_UI.toc).
 
-The footer always shows whether a **reload is needed** and why, with a Reload UI button.
+## Commands
 
-**Minimap button:** left-click opens or closes the control center. Right-click opens a quick menu (nameplate mode, healer detection, pause fading, FPS, reload). Shift-click reloads the UI. Drag it to move it around the minimap. The tooltip shows a live summary of what is on. It turns amber-dotted when a reload is needed. Hide it under *About & help*, and bring it back with `/mlz minimap`. On clients with the addon compartment, MLZ UI is listed there too.
-
-The **setup wizard** uses the same look: a clickable progress strip of the steps at the top, *Now > Will become* columns (a green arrow means the row will change), and a switch to turn a whole step on or off.
-
-Only a few commands are listed (`/mlz help`):
-
-| Command | Description |
+| Command | What it does |
 |---|---|
 | `/mlz` | Open the control center |
-| `/mlz install` | Open the installation wizard |
+| `/mlz install` | Open the setup wizard |
 | `/mlz undo` | Undo the last wizard run |
-| `/mlz role tank\|healer\|dps\|auto` | Set your role for this character (`status` shows it) |
-| `/mlz np auto\|tank\|healer\|dps\|solo` | Nameplate mode; also `style`, `threat`, `pvp`, `friends` (add `off`), `save`, `load`, `export` |
-| `/mlz debug` | Toggle debug output |
-| `/mlz probe` | Collect client info into SavedVariables (for development) |
-
-The older commands (`heal`, `fade`, `buttons`, `fps`, `map`, ...) still work but are no longer listed.
+| `/mlz role tank\|healer\|dps\|auto` | Set your role for this character |
+| `/mlz np auto\|tank\|healer\|dps\|solo` | Nameplate mode (also `style`, `threat`, `pvp`, `friends`, `save`, `load`, `export`) |
+| `/mlz export` · `/mlz import` | Share your choices as a string |
+| `/mlz health` | Check which supported addons are installed and loaded |
+| `/mlz help` | List every command |
 
 ## Supported addons
 
-MLZ UI **configures** these addons if they are installed and loaded. It does not install or update them yet (see the roadmap).
+MLZ UI **configures** these addons when they are installed and loaded. It does not install them.
 
 | Addon | What gets set |
 |---|---|
-| [Prat 3.0](https://www.curseforge.com/wow/addons/prat-3-0) | Timestamp format, hide minimize/voice/channel buttons, scroll speed, chat fade time |
-| [Auctionator](https://www.curseforge.com/wow/addons/auctionator) | Hide splash screen, auto-select next item, remember last duration |
+| [Platynator](https://www.curseforge.com/wow/addons/platynator) | Role-based modes, clean style, threat colors, PvP tweak, profile save/restore |
+| [Prat 3.0](https://www.curseforge.com/wow/addons/prat-3-0) | Timestamps, hidden chat buttons, scroll speed, fade time |
+| [Bagnon](https://www.curseforge.com/wow/addons/bagnon) | Columns, darker background, softer item glow, fewer auto-opens |
+| [Deadly Boss Mods](https://www.curseforge.com/wow/addons/deadly-boss-mods) | Warnings top center, timers and info frames on the right, slimmer bars |
+| [Leatrix Plus](https://www.curseforge.com/wow/addons/leatrix-plus-classic) · [Maps](https://www.curseforge.com/wow/addons/leatrix-maps-classic) | Junk selling, repair, faster loot, hidden minimap icons |
+| [Auctionator](https://www.curseforge.com/wow/addons/auctionator) | No splash screen, auto-select next item, remember duration |
 | [AtlasLoot Classic](https://www.curseforge.com/wow/addons/atlasloot-classic-edition) | Optionally hide the minimap button |
-| [What's Training?](https://www.curseforge.com/wow/addons/whats-training) | Hide known weapon skills, show beside trainer window |
-| [Bagnon](https://www.curseforge.com/wow/addons/bagnon) | Bag and bank columns, darker background, softer item glow, no auto-open for crafting/socketing |
-| [RestedXP Guides](https://www.restedxp.com/) | Lock frames, optional guide window scale, optional fixed column on the right (MLZ UI's own setting) |
-| [Deadly Boss Mods](https://www.curseforge.com/wow/addons/deadly-boss-mods) | Warnings at the top center, info/range frames and timer bars on the right, slimmer bars, no separate large bars |
-| [Leatrix Plus](https://www.curseforge.com/wow/addons/leatrix-plus-classic) | Auto-sell grey items, auto-repair, faster loot, hide minimap icon; optional quest automation, role confirm, no bag auto-open |
-| [Leatrix Maps](https://www.curseforge.com/wow/addons/leatrix-maps-classic) | Hide minimap icon |
-| [Platynator](https://www.curseforge.com/wow/addons/platynator) | Tank/healer/DPS/solo modes switched by role, clean style, optional threat colors and PvP tweak, profile save/restore |
-| BugGrabber | Only checked by the health check |
+| [What's Training?](https://www.curseforge.com/wow/addons/whats-training) | Hide known weapon skills, dock beside the trainer |
+| [RestedXP Guides](https://www.restedxp.com/) | Lock frames, guide scale, optional fixed column |
 
-Settings are read from each addon's own SavedVariables, so they depend on the version you have installed. Rows whose key doesn't exist are shown as "not available" and skipped.
+Settings that don't exist in your installed version are shown as *not available* and skipped.
 
-In the wizard, rows that are already on start ticked; untick one to turn it off. Rows that depend on another row (e.g. frame placements on the layout row, moved actions on their key) are greyed out when that row is unticked.
+<details>
+<summary><b>Full feature reference</b></summary>
 
-## What it uses and what it gives
+| Area | What it does |
+|---|---|
+| **Pixel-perfect scale** | Calculates the scale from screen height (`k * 768 / height`). Stores the *mode*, not the number, and handles scales below Blizzard's 0.64 CVar limit. |
+| **Edit Mode layout** | Bars stacked bottom center, player/target flanking, swing timers and cast bar aligned, corners kept for glance-only info. Separate healer layouts for dungeons and raids. |
+| **Keybinds** | 12 reach-sorted base keys per movement setup. With WASD, Shift+1/2/3 switch stance or form, and bar 2 buttons 1-3 move to Shift+G/V/T. Displaced actions (e.g. Character panel) move to Alt. |
+| **Settings (CVars)** | Each CVar is optional. CVars your client doesn't have are skipped. |
+| **Minimalism** | Bars 4-5, micro menu, bags, chat buttons and XP bar hidden until hover. Bars 2-3 dimmed out of combat. Damage meter only in a group. |
+| **Action buttons** | Red = out of range, blue = no resource, grey = unusable. Short hotkeys (`S1`, `C1`) and hidden macro names. Stance, pet and bonus bars included. |
+| **Nameplates** | Tank / Healer / DPS / Solo picked from your role. Healer: unclickable friendly names, dimmed enemies. Tank: bigger target. Applies at once, no `/reload`. |
+| **Quality of life** | Auto-repair (guild money first), sell greys (hold Shift to skip), mana tick / 5-second rule bar (energy tick for rogues and cats), interrupt announce. |
+| **Role profiles** | Nameplates, fading, tick bar and interrupt announce saved per role, loaded automatically when your role changes. |
+| **Tweaks** | Minimap size, FPS counter, calmer combat text (Roboto Bold), hide the quest tracker or its header. |
+| **Backup / undo** | A stack of up to 5 backups. Every wizard run is reversible. |
+| **Health check** | Warns after login if a configured addon is installed but not loaded. |
 
-**Uses**
-- Blizzard's own APIs: `C_EditMode`, `C_AddOns`, CVars, secure item buttons, binding functions.
-- The saved variables of the addons listed above.
-- Its own SavedVariables, `MLZUIDB`, for your choices, backups and DB version. It has a migration system for future changes.
-- No libraries and no external dependencies. Plain Lua, a few thousand lines.
+</details>
 
-**Gives**
-- A complete, consistent UI setup in a few clicks, with a preview and full undo.
-- No taint: it never hides or shows protected frames. Anything blocked in combat is queued and runs when combat ends.
-- All the choices live in plain Lua tables under `Data/`, so you can change them without touching any logic.
+<details>
+<summary><b>Control center pages</b></summary>
 
-## Project layout
+| Page | What you see and change |
+|---|---|
+| Overview | A status card per area, a banner when setup or a reload is pending, quick actions |
+| Layout & scale | Scale mode, active Edit Mode layout, minimap size, pet bar position |
+| Nameplates | Current mode and why, mode picker, friendly names, clean style, threat colors, PvP tweak, profile save/restore |
+| Healer | Your role and where it comes from, current and wanted layout, rebuild healer layouts |
+| Minimalism | One switch per faded frame, pause fading, clean chat |
+| Action bars & UI | Button colors and hotkeys, quest tracker, FPS counter, combat text |
+| Quality of life | Repair / sell greys, mana tick bar, interrupt announce |
+| Other addons | Which supported addons are loaded and how many settings differ |
+| Profiles & backup | Role profiles, export/import, backups, undo |
+| About & help | How it works, minimap button, commands, debug |
 
-```
-MLZ_UI/
-├── MLZ_UI.toc
-├── Core.lua            namespace, SavedVariables, event bus, combat queue, slash commands
-├── Probe.lua           client introspection for development
-├── Data/               what to apply (CVars, bindings, layout, fade, nameplates, addons)
-├── Modules/            how to apply it (one module per area, all with Preview/Apply/Backup/Restore)
-├── Media/              Roboto font for headings
-└── UI/                 flat widget kit, setup wizard, control center, minimap button
-```
+The footer always shows whether a reload is needed and why.
 
-Each module registers itself with `ns.RegisterModule` and implements:
+</details>
 
-- `:Preview()` returns the list of changes shown in the wizard
-- `:Backup(items)` saves the old values
-- `:Apply(items)` applies the selected changes
-- `:Restore(snapshot)` is called by `/mlz undo`
+<details>
+<summary><b>Customizing</b></summary>
 
-Adding a feature is mostly adding a data file and a module.
-
-## Customizing
-
-Everything is meant to be edited. Open the file in `Data/`:
+Everything the wizard offers is defined in `Data/`:
 
 | File | Controls |
 |---|---|
-| `Data/CVars.lua` | Game settings the wizard offers |
-| `Data/Bindings.lua` | Movement setups and base keys |
-| `Data/Layout.lua` | Edit Mode frame positions |
-| `Data/Fade.lua` | What fades, when, and how much |
-| `Data/Nameplates.lua` | Tank/healer/DPS/solo nameplate presets, PvP tweak and threat colors |
-| `Data/Addons.lua` | Settings applied to other addons |
+| [`Data/CVars.lua`](Data/CVars.lua) | Game settings |
+| [`Data/Bindings.lua`](Data/Bindings.lua) | Movement setups, base keys, layers, stance and pet keys |
+| [`Data/Layout.lua`](Data/Layout.lua) | Edit Mode frame positions |
+| [`Data/Fade.lua`](Data/Fade.lua) | What fades, when and how much |
+| [`Data/Nameplates.lua`](Data/Nameplates.lua) | Nameplate presets, PvP tweak, threat colors |
+| [`Data/Addons.lua`](Data/Addons.lua) | Settings applied to other addons |
+
+</details>
 
 ## Roadmap
 
-The next big step is turning MLZ UI from "configures your addons" into an **addon manager** that also gets them onto your machine.
-
-- [ ] **Addon manager:** list the addons MLZ UI knows about, with installed / missing / outdated state
-- [ ] **Install:** download and install supported addons from within the wizard
-- [ ] **Update:** check for new versions and update the addons it manages
-- [ ] **One-step setup:** a fresh install ends up with all addons installed *and* configured
-- [ ] **Per-addon profiles:** more addons and more settings per addon
-- [ ] **Version-aware settings:** adapt to changes in other addons' SavedVariables
-- [ ] Screenshots and a short demo in this README
-- [ ] Packaged releases (CurseForge / Wago / GitHub Releases)
-
-**Note on how this will work:** the game's Lua sandbox can't download files or write to the AddOns folder, so installing and updating needs a small **companion app** outside the game. The in-game addon will keep doing the configuration and show status; the companion will do the download and install. The design is still open and nothing here is implemented yet.
+- [x] Setup wizard with preview and undo
+- [x] Control center, minimap button and role profiles
+- [x] Interface previews in this README
+- [ ] In-game screenshots and a short demo
+- [ ] **Addon manager**: installed / missing / outdated state for supported addons
+- [ ] Install and update supported addons through a small companion app (the game's Lua sandbox can't write files)
+- [ ] Version-aware settings for other addons
+- [ ] Packaged releases on CurseForge, Wago and GitHub Releases
 
 ## Contributing
 
-Issues and pull requests are welcome, especially for:
+Issues and pull requests are welcome, especially settings for more addons (start in [`Data/Addons.lua`](Data/Addons.lua)), bug reports with `/mlz probe` output and the Lua error text, and layout or keybind ideas.
 
-- Settings for more addons (`Data/Addons.lua` is a good place to start)
-- Bug reports with the output of `/mlz probe` and any Lua error text
-- Layout and keybind ideas
+- How the code fits together: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
+- Conventions, design language and workflow: [`CLAUDE.md`](CLAUDE.md)
 
-To develop, symlink the folder into your AddOns directory, use `/reload` to test and turn on `/mlz debug`. Installing [BugGrabber + BugSack](https://www.curseforge.com/wow/addons/bugsack) helps a lot.
+For development, symlink the folder into AddOns, turn on `/mlz debug` and install [BugGrabber + BugSack](https://www.curseforge.com/wow/addons/bugsack).
 
 ## License
 
-No license has been added yet. Until one is, all rights are reserved by the author.
+No license has been added yet. Until one is, all rights are reserved by the author. Roboto is licensed under the Apache License 2.0 (see [`Media/Roboto-LICENSE.txt`](Media/Roboto-LICENSE.txt)).
 
 ## Credits
 
