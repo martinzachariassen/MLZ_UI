@@ -147,6 +147,10 @@ end
 local function Desired(mode, inPvP)
     local d, want = D(), {}
     for k, v in pairs(d.presets[mode] or {}) do want[k] = v end
+    -- Tank and healer modes already say it all; only DPS modes differ by archetype
+    if mode == "dps" or mode == "solo" then
+        for k, v in pairs(d.archetypePresets[(ns.LiveArchetype())] or {}) do want[k] = v end
+    end
     if mode == "healer" and DB().healerFriends ~= false then
         for k, v in pairs(d.healerFriends) do want[k] = v end
     end
@@ -159,6 +163,7 @@ end
 local function AllKeys()
     local d, keys = D(), {}
     for _, p in pairs(d.presets) do for k in pairs(p) do keys[k] = true end end
+    for _, p in pairs(d.archetypePresets) do for k in pairs(p) do keys[k] = true end end
     for k in pairs(d.healerFriends) do keys[k] = true end
     for k in pairs(d.pvp) do keys[k] = true end
     return keys
@@ -344,6 +349,21 @@ local function TuneThreat(design, mode, stash, on, inPvP)
     if not on then stash.threat = nil end
 end
 
+-- A built-in design (name starts with "_") can't be edited. While one is the profile's style, Platynator keeps
+-- a copy of it in designs["_custom"]. Take that copy under our own name and point the enemy assignments at it,
+-- so the clean style and threat colors work on a fresh Platynator profile too. Returns the new name, or nil.
+local function AdoptBuiltin(profile, name)
+    if profile.style ~= name or type(profile.designs) ~= "table" then return nil end
+    local copy = profile.designs["_custom"]
+    if type(copy) ~= "table" then return nil end
+    local own = D().ownDesign
+    profile.designs[own] = ns.CopyTable(copy)
+    for _, a in ipairs(profile.design_assignments or {}) do
+        if a.style == name then a.style = own end
+    end
+    return own
+end
+
 -- Returns the profile copy to import, and a note if the design couldn't be changed
 local function Build(mode, inPvP)
     local db = DB()
@@ -354,7 +374,10 @@ local function Build(mode, inPvP)
     local name = EnemyDesignName(live)
     local hadStash = db.stash and db.stash[name] ~= nil
     if not (db.style or db.threat or hadStash) then return profile end
-    if name:sub(1, 1) == "_" then return profile, "builtin" end
+    if name:sub(1, 1) == "_" then
+        name = AdoptBuiltin(profile, name)
+        if not name then return profile, "builtin" end
+    end
     local design = type(profile.designs) == "table" and profile.designs[name]
     if type(design) ~= "table" then return profile, "missing" end
 
@@ -382,7 +405,7 @@ local function Decide()
 end
 
 local NOTES = {
-    builtin = "Your enemy design is one of Platynator's built-in designs, which can't be changed. Make a copy of it in /platy and assign it to enemies to use the clean style or threat colors.",
+    builtin = "Your enemy design is one of Platynator's built-in designs and MLZ UI could not copy it. Make a copy of it in /platy and assign it to enemies to use the clean style or threat colors.",
     missing = "The enemy design was not found in the current Platynator profile, so the clean style and threat colors are not applied.",
     conflict = "Platynator is loaded too and draws its own nameplates. Pick Platynator as the engine, or turn Platynator off in the AddOns list.",
 }
@@ -440,8 +463,8 @@ local function Refresh(force)
         return false
     end
     pending = nil
-    local key = table.concat({ mode, tostring(db.style), tostring(db.threat), tostring(inPvP),
-        tostring(db.healerFriends ~= false), tostring(PLATYNATOR_CURRENT_PROFILE) }, "|")
+    local key = table.concat({ mode, tostring((ns.LiveArchetype())), tostring(db.style), tostring(db.threat),
+        tostring(inPvP), tostring(db.healerFriends ~= false), tostring(PLATYNATOR_CURRENT_PROFILE) }, "|")
     if not force and key == db.lastKey then
         current = mode
         return true
@@ -696,18 +719,13 @@ function Nameplates:Preview()
     items[#items + 1] = row
 
     if platy then
+        -- Only offered when a profile string is pasted into Data/Nameplates.lua. Without one there is nothing to import.
         local text = D().profileString
-        local profile = { id = "profile", group = "Platynator", label = "Import MLZ profile", requires = "engine" }
-        if not text then
-            profile.old, profile.new, profile.enabled, profile.unavailable = "-", "no saved profile", false, true
-            profile.note = "No Platynator profile is saved in MLZ UI yet, so there is nothing to import. The clean style below works without one."
-        else
-            profile.old, profile.new = "current profile", "MLZ profile"
-            profile.value = text
-            profile.enabled = ns.Enabled("nameplates", "profile", true)
-            profile.note = "Replaces the settings of your current Platynator profile. Undo puts the old profile back."
+        if text then
+            items[#items + 1] = { id = "profile", group = "Platynator", label = "Import MLZ profile", requires = "engine",
+                old = "current profile", new = "MLZ profile", value = text, enabled = ns.Enabled("nameplates", "profile", true),
+                note = "Replaces the settings of your current Platynator profile. Undo puts the old profile back." }
         end
-        items[#items + 1] = profile
         local on = db.style and true or false
         items[#items + 1] = { id = "style", group = "Platynator", label = "Clean nameplate style", flag = "style",
             requires = "engine", old = on and "on" or "off", new = "on", toggle = true, isOn = on, offText = "off",
@@ -734,6 +752,7 @@ end
 
 function Nameplates:Apply(items)
     local db = DB()
+    local failed
     for _, item in ipairs(items) do
         if item.engine then db.engine = item.engine end
     end
@@ -741,8 +760,11 @@ function Nameplates:Apply(items)
         if item.value and CanImport() then
             if not db.snapshot then db.snapshot = ProfileString() end -- your profile, before the import
             local ok, err = ImportProfileString(item.value)
-            if not ok then error("Platynator import failed: " .. tostring(err)) end
-            db.stash = nil -- the designs were replaced, nothing left to put back
+            if ok then
+                db.stash = nil -- the designs were replaced, nothing left to put back
+            else
+                failed = "Platynator refused the MLZ profile: " .. tostring(err)
+            end
         end
     end
     for _, item in ipairs(items) do
@@ -750,6 +772,7 @@ function Nameplates:Apply(items)
     end
     db.lastKey = nil
     Refresh(true)
+    return failed
 end
 
 function Nameplates:Restore(snap)

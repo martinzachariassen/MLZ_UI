@@ -21,19 +21,34 @@ ns.data.nameplates = {
             not_target_alpha = 1,          -- every mob fully visible, so you can see what is loose
             obscured_combat_alpha = 0.7,   -- mobs behind objects are still easy to see
             target_scale = 1.15,           -- your target stands out in a big pull
+            cast_scale = 1.15,             -- a casting mob grows, so you see what to taunt or interrupt
+            not_in_combat_alpha = 1,       -- mobs outside your pull stay readable: you decide the next pull
         },
         healer = {
             not_target_alpha = 0.6,        -- enemies are dimmed: your eyes belong on the raid frames
             obscured_combat_alpha = 0.4,
+            not_in_combat_alpha = 0.6,     -- mobs that are not in the pull fade out
         },
         dps = {
             not_target_alpha = 0.8,        -- fades non-targets, focus on your target
             obscured_combat_alpha = 0.4,
+            cast_scale = 1.1,
+            not_in_combat_alpha = 0.7,
         },
         solo = {
             not_target_alpha = 0.9,        -- calm: you often fight several mobs, keep them all readable
             obscured_combat_alpha = 0.5,
+            not_in_combat_alpha = 1,       -- grinding: every mob around you is a possible pull
         },
+    },
+
+    -- Added on top of the mode when your archetype is a DPS one (see Data/Classes.lua). Ranged and
+    -- caster classes dim enemies they can't reach with a spell; melee dims less, since a mob a few
+    -- steps away is still one step from a hit.
+    archetypePresets = {
+        MELEE = { out_of_range_alpha = 0.8 },
+        RANGED = { out_of_range_alpha = 0.6 },
+        CASTER = { out_of_range_alpha = 0.6 },
     },
 
     -- Healer extra ("Friendly names for healers"): friendly players get a nameplate (name) so you can
@@ -65,6 +80,8 @@ ns.data.nameplates = {
 
     -- Design used for enemies when it can't be read from Platynator's design assignments
     enemyDesign = "Enemy Nameplates",
+    -- Name of the copy MLZ UI makes when your enemy design is one of Platynator's built-in ones
+    ownDesign = "MLZ UI enemy",
 
     -- Clean style: built from your own enemy design (so your font, anchors and colors are kept).
     -- What is removed is remembered, so turning the style off puts it back.

@@ -24,14 +24,14 @@ end
 -- Returns a list of { title, installed }
 local function Problems(onlyInstalled)
     local list, seen = {}, {}
-    local function Check(addon, title)
-        if seen[title] or ns.IsAddOnLoaded(addon) then return end
-        local exists = Installed(addon)
+    local function Check(addon, title, alt)
+        if seen[title] or ns.IsAddOnLoaded(addon) or (alt and ns.IsAddOnLoaded(alt)) then return end
+        local exists = Installed(addon) or (alt ~= nil and Installed(alt))
         if onlyInstalled and not exists then return end
         seen[title] = true
         list[#list + 1] = { title = title, addon = addon, installed = exists }
     end
-    for _, entry in ipairs(ns.data.addons) do Check(entry.addon, entry.title) end
+    for _, entry in ipairs(ns.data.addons) do Check(entry.addon, entry.title, entry.alt) end
     for _, entry in ipairs(EXTRA) do
         if not entry.when or entry.when() then Check(entry.addon, entry.title) end
     end
@@ -56,7 +56,7 @@ function ns.Recommendations()
     for _, rec in ipairs(ns.data.recommended or {}) do
         list[#list + 1] = {
             title = rec.title, addon = rec.addon, why = rec.why,
-            installed = Installed(rec.addon),
+            installed = Installed(rec.addon) or (rec.alt ~= nil and Installed(rec.alt)),
             forRole = rec.roles ~= nil and rec.roles[role] == true,
         }
     end

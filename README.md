@@ -27,6 +27,28 @@ MLZ UI sets up the **Blizzard UI you already have** (Edit Mode, CVars, keybinds 
 - **No taint, no libraries.** Protected frames are only faded with `SetAlpha`, and anything blocked in combat waits until combat ends. Plain Lua, no external dependencies.
 - **Data, not code.** All choices live in plain tables under [`Data/`](Data), so you can change them without touching the logic.
 
+## How it works
+
+1. **Install and log in.** The setup wizard opens on first login. It reads your class, talents and form, and guesses your role.
+2. **Preview.** Each step lists settings as *now → will become*. Settings that are already right are folded away. Tick what you want, or use "Use recommended" or "Looks only".
+3. **Apply.** MLZ UI takes a backup first, then sets Edit Mode, CVars, keybinds, fading and the settings of the addons you have installed. Some addons need a `/reload`. The footer tells you when.
+4. **Live with it.** `/mlz` opens the control center: one status line per area, one switch per setting, and everything applies at once. If you change your mind, `/mlz undo` puts the last run back.
+
+The wizard has 10 steps:
+
+| Step | What it sets up |
+|---|---|
+| 1. Your character | Your role. Detected from talents, form or group, and you can override it |
+| 2. UI scale | Pixel-perfect scale for your resolution |
+| 3. Screen layout | A dedicated Edit Mode layout: bars bottom center, player and target on the sides |
+| 4. Game settings | Opt-in CVars in groups: loot, combat, unit frames, action bars, camera, combat text, nameplates, raid frames, threat |
+| 5. Keybinds | ESDF or WASD, 12 keys on three layers, with conflicts shown in red |
+| 6. Minimalism | Bars, bags and menus fade until you hover |
+| 7. Action buttons | Range, mana and usability colors, short hotkeys, no macro names |
+| 8. Interface tweaks | Minimap size, FPS counter, combat text, tooltips, chat style |
+| 9. Other addons | The settings of the addons below, filtered for your role |
+| 10. Nameplates | Engine and mode, clean style, threat colors |
+
 ## Supported game version
 
 **WoW Forever is the main supported client.** MLZ UI is built, tested and tuned for it (`## Interface: 16001`). Other Classic clients may load the addon, but they are not tested. The About page in the control center tells you if your client is not WoW Forever.
@@ -66,10 +88,18 @@ If the guess is wrong, set your role by hand with `/mlz role`, on the Your role 
     <td align="center"><sub><b>Nameplates.</b> Tank, Healer, DPS and Solo modes that follow your role.</sub></td>
   </tr>
   <tr>
-    <td colspan="2"><img src="docs/screenshots/minimap-menu.png" alt="Minimap button tooltip and quick menu"></td>
+    <td width="50%"><img src="docs/screenshots/addons.png" alt="Setup wizard, other addons step, healer"></td>
+    <td width="50%"><img src="docs/screenshots/minimap-menu.png" alt="Minimap button tooltip and quick menu"></td>
   </tr>
   <tr>
-    <td colspan="2" align="center"><sub><b>Minimap button.</b> A live status summary on hover and a quick menu on right-click.</sub></td>
+    <td align="center"><sub><b>Other addons.</b> Only the rows that fit your role. Here: a healer.</sub></td>
+    <td align="center"><sub><b>Minimap button.</b> Live status on hover, quick menu on right-click.</sub></td>
+  </tr>
+  <tr>
+    <td colspan="2"><img src="docs/screenshots/control-center.png" alt="Control center overview"></td>
+  </tr>
+  <tr>
+    <td colspan="2" align="center"><sub><b>Control center.</b> One status line per area. Click a line to change it.</sub></td>
   </tr>
 </table>
 
@@ -88,7 +118,7 @@ If the guess is wrong, set your role by hand with `/mlz role`, on the Your role 
 - Action buttons colored by range, mana and usability, with short hotkey labels
 - Role detection (talents, spec, form, group or your choice; DPS until your talents decide) that drives the layouts and nameplates, with melee, ranged and caster DPS told apart
 - Class-aware key hints, stance and pet keys, and reminders for all 9 classes
-- Our own flat nameplates: health, cast bar, quest marker, your debuffs and threat colors per role
+- Our own flat nameplates: health, cast bar, quest marker, your debuffs and threat colors per role. Platynator is optional
 - Auto-repair, sell greys, a mana tick bar and an interrupt announce
 - Reminders for missing self buffs, low reagents and ammo, and worn gear (out of combat only)
 - XP per hour and time to the next level while leveling
@@ -101,8 +131,8 @@ If the guess is wrong, set your role by hand with `/mlz role`, on the Your role 
 - One tip at a time on the overview, based on what you have turned on
 
 **Ecosystem**
-- Recommended settings for Prat, Bagnon, Questie, Details!, DBM, BigWigs, Leatrix and more
-- Optional: Platynator as the nameplate engine, with modes per role and a clean style
+- Recommended settings for 16 addons, many of them per role: a healer and a tank do not get the same Questie, DBM or Details setup
+- Optional: Platynator as the nameplate engine, with modes per role and archetype and a clean style
 - Role profiles, export/import strings and a health check for missing addons
 
 ## Quick start
@@ -125,14 +155,28 @@ If the guess is wrong, set your role by hand with `/mlz role`, on the Your role 
 | `/mlz` | Open the control center |
 | `/mlz install` | Open the setup wizard |
 | `/mlz undo` | Undo the last wizard run |
+| `/mlz backups` | List saved backups |
 | `/mlz role tank\|healer\|dps\|auto` | Set your role for this character |
-| `/mlz np auto\|tank\|healer\|dps\|solo` | Nameplate mode (also `engine mlz\|platynator\|off`, `style`, `threat`, `pvp`, `friends`, `save`, `load`, `export`) |
+| `/mlz heal on\|off\|auto\|build` | Healer layouts: status, switch them, or rebuild |
+| `/mlz np auto\|tank\|healer\|dps\|solo` | Nameplate mode (also `engine mlz\|platynator\|off`, `style`, `threat`, `pvp`, `save`, `load`, `export`) |
 | `/mlz export` · `/mlz import` | Share your choices as a string |
-| `/mlz health` | Check which supported addons are installed and loaded |
-| `/mlz xp` | XP per hour and time to level (`/mlz xp reset` starts counting again) |
 | `/mlz keys` | A keyboard map of your keybinds, with the SHIFT, CTRL and ALT layers |
 | `/mlz tour` | Show where the hidden bars and buttons are |
-| `/mlz help` | List every command |
+| `/mlz scale [auto\|0.64\|...]` | Recalculate and reapply the UI scale |
+| `/mlz map [percent]` | Minimap size, for example `/mlz map 120` |
+| `/mlz fade` | Turn all fading off or on until the next `/reload` |
+| `/mlz buttons` | Action button colors on or off |
+| `/mlz fps` | Show or hide the FPS counter |
+| `/mlz quests` · `/mlz tracker` | Hide or show the quest tracker, or only its "All Objectives" line |
+| `/mlz pet save\|reset\|show` | Remember or reset the pet bar position |
+| `/mlz xp` | XP per hour and time to level (`/mlz xp reset` starts counting again) |
+| `/mlz addons` | Which supported addons are loaded and how many of their settings differ |
+| `/mlz health` | Which supported addons are switched off or not installed |
+| `/mlz minimap` | Show or hide the minimap button |
+| `/mlz debug` · `/mlz probe` | Verbose output, and a dump of client facts into SavedVariables |
+| `/mlz help` | List the main commands (the table above has all of them) |
+
+The minimap button: left-click opens the control center, right-click opens a quick menu (nameplate mode, your role, pause fading, FPS counter, settings, wizard, My keybinds, Where did things go?, Reload UI), Shift-click reloads, drag moves it. It is also in the addon compartment.
 
 ## Supported addons
 
@@ -140,24 +184,23 @@ MLZ UI **configures** these addons when they are installed and loaded. It does n
 
 | Addon | What gets set |
 |---|---|
-| [Platynator](https://www.curseforge.com/wow/addons/platynator) (optional) | Only when picked as the nameplate engine: role-based modes, clean style, threat colors, PvP tweak, profile save/restore |
-| [Prat 3.0](https://www.curseforge.com/wow/addons/prat-3-0) | Timestamps, hidden chat buttons, scroll speed, fade time |
+| [Platynator](https://www.curseforge.com/wow/addons/platynator) (optional) | Only when picked as the nameplate engine. Modes per role (alpha, target and cast scale, fade when not in your pull), out-of-range fade per DPS archetype, clean style (also on Platynator's built-in designs, through a copy), threat colors, PvP tweak, profile save and restore |
+| [Prat 3.0](https://www.curseforge.com/wow/addons/prat-3-0) | Timestamps, hidden chat buttons, scroll speed (CTRL for more), fade time, no levels or group numbers in names |
 | [Bagnon](https://www.curseforge.com/wow/addons/bagnon) | Columns, darker background, softer item glow, fewer auto-opens |
-| [Deadly Boss Mods](https://www.curseforge.com/wow/addons/deadly-boss-mods) | Warnings top center, timers and info frames on the right, slimmer bars |
-| [Leatrix Plus](https://www.curseforge.com/wow/addons/leatrix-plus-classic) · [Maps](https://www.curseforge.com/wow/addons/leatrix-maps-classic) | Junk selling, repair, faster loot, hidden minimap icons |
-| [Auctionator](https://www.curseforge.com/wow/addons/auctionator) | No splash screen, auto-select next item, remember duration |
+| [Baganator](https://www.curseforge.com/wow/addons/baganator) (needs Syndicator) | Junk greyed out, unusable items marked, fewer auto-opens, no flashing new items |
+| [Deadly Boss Mods](https://www.curseforge.com/wow/addons/deadly-boss-mods) | Warnings top center, timers and info frames on the right, slimmer bars, quiet chat, no flash on minor warnings. Healers hide interrupt warnings. Optional for DPS: interrupts for target and focus only, range radar for ranged and casters |
+| [Details!](https://www.curseforge.com/wow/addons/details) | Hidden when solo, class colors, bar height, fewer saved fights, hidden minimap button |
+| [Questie](https://www.curseforge.com/wow/addons/questie) | Hidden minimap button, finished objectives hidden. The tracker is hidden in combat for healers and ranged classes, and shrunk for tanks and melee |
+| [Clique](https://www.curseforge.com/wow/addons/clique) | Your click bindings shown in unit frame tooltips. Your bindings are never touched |
+| [TomTom](https://www.curseforge.com/wow/addons/tomtom) | Locked arrow, no arrival time, same-zone waypoints only, optional hidden coordinate box |
+| [Postal](https://www.curseforge.com/wow/addons/postal) | No chat line for every opened letter, one name suggestion list |
+| [Auctionator](https://www.curseforge.com/wow/addons/auctionator) | No splash screen, auto-select next item, remember duration, quiet posting |
 | [AtlasLoot Classic](https://www.curseforge.com/wow/addons/atlasloot-classic-edition) | Optionally hide the minimap button |
 | [What's Training?](https://www.curseforge.com/wow/addons/whats-training) | Hide known weapon skills, dock beside the trainer |
-| [RestedXP Guides](https://www.restedxp.com/) | Lock frames, guide scale, optional fixed column |
-| [Questie](https://www.curseforge.com/wow/addons/questie) | Hidden minimap button, tracker hidden in combat, finished objectives hidden |
-| [Baganator](https://www.curseforge.com/wow/addons/baganator) | Junk greyed out, unusable items marked, fewer auto-opens |
-| [BigWigs](https://www.curseforge.com/wow/addons/big-wigs) | Same places as DBM: warnings top center, timers on the right, slimmer bars |
-| [Details!](https://www.curseforge.com/wow/addons/details) | Hidden when solo, class colors, hidden minimap button |
-| [Clique](https://www.curseforge.com/wow/addons/clique) | Your click bindings shown in unit frame tooltips |
-| [TomTom](https://www.curseforge.com/wow/addons/tomtom) | Locked arrow, optional hidden coordinate box |
-| [Postal](https://www.curseforge.com/wow/addons/postal) | No chat line for every opened letter |
+| [RestedXP Guides](https://www.restedxp.com/) | Lock frames, hidden minimap button, no level-up emote, optional guide scale |
+| [Leatrix Plus](https://www.curseforge.com/wow/addons/leatrix-plus-classic) · [Maps](https://www.curseforge.com/wow/addons/leatrix-maps-classic) | Shows which settings differ from what MLZ UI suggests (junk selling, repair, faster loot, hidden minimap icons). Leatrix rewrites its own settings at logout, so you change them in `/ltp` and `/ltm` |
 
-Settings that don't exist in your installed version are shown as *not available* and skipped.
+Rows that only fit one role or archetype show only for you. Settings that don't exist in your installed version are shown as *not available* and skipped.
 
 <details>
 <summary><b>Full feature reference</b></summary>

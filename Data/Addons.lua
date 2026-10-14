@@ -1,15 +1,20 @@
 -- MLZ UI: Settings for other addons (Prat, Auctionator, AtlasLoot, WhatsTraining, Bagnon, Baganator,
--- RXPGuides, Questie, Deadly Boss Mods, BigWigs, Leatrix Plus, Leatrix Maps, Details!, Clique, TomTom, Postal)
+-- RXPGuides, Questie, Deadly Boss Mods, Leatrix Plus, Leatrix Maps, Details!, Clique, TomTom, Postal)
 -- Edit this file to change what the wizard step "Other addons" sets. MLZ UI never downloads or
 -- updates these addons; it only configures the ones that are installed and loaded.
 --
 -- Each addon has:
 --   addon   = folder name, used for the "is it loaded?" check
+--   alt     = (optional) a second folder name, for ports that install under another name
+--   requires = (optional) folder name of an addon this one needs; rows say why they can't be used without it
+--   manual  = (optional) text: rows are shown but never written (the addon overwrites outside changes)
 --   title   = heading in the wizard
 --   live    = true if the addon reads these settings while it runs, so no reload is asked for
 --   root    = function returning the table that `path` starts from (nil = not available yet)
 --   rows    = { id, label, desc, path = { "key", "subkey" }, value, enabled }
 --             `enabled = false` means the row is listed but off until you tick it.
+--             `roles = { HEALER = true }` and `archetypes = { CASTER = true, RANGED = true }` limit a row to
+--             the role or archetype you picked (TANK, HEALER, DAMAGER / TANK, HEALER, MELEE, RANGED, CASTER).
 --             A row can have its own `root`. Instead of path/value a row can set several keys at
 --             once: set = { { path = {...}, value = ... }, ... } and show = "%s %s" (format for the
 --             wizard, one %s per key in order).
@@ -34,20 +39,6 @@ end
 local function BagnonRoot() return Bagnon_Sets end
 local function BagnonGlobal() return Bagnon_Sets and Bagnon_Sets.global end
 
--- BigWigs core and plugins are load on demand (boss zone or /bw). Once loaded, use the plugin's AceDB
--- profile; before that, the raw namespace table in BigWigs3DB (only there after BigWigs ran once).
-local function BigWigsPlugin(name)
-    return function()
-        local core = BigWigs
-        local plugin = core and core.GetPlugin and core:GetPlugin(name, true)
-        if plugin and plugin.db then return plugin.db.profile end
-        local loader = BigWigsLoader and BigWigsLoader.db
-        local space = BigWigs3DB and BigWigs3DB.namespaces and BigWigs3DB.namespaces["BigWigs_Plugins_" .. name]
-        if not (loader and loader.GetCurrentProfile and space and space.profiles) then return nil end
-        return space.profiles[loader:GetCurrentProfile()]
-    end
-end
-
 ns.data.addons = {
     {
         addon = "Prat-3.0", title = "Prat (chat)",
@@ -64,6 +55,12 @@ ns.data.addons = {
               root = PratModule("Scroll"), path = { "normscrollspeed" }, value = 3 },
             { id = "fade", label = "Chat fade time (s)", desc = "Chat text fades after 45 seconds instead of 120.",
               root = PratModule("Fading"), path = { "duration" }, value = 45 },
+            { id = "ctrl_scroll", label = "Ctrl + scroll speed", desc = "Holding CTRL while you scroll jumps 10 lines instead of 3.",
+              root = PratModule("Scroll"), path = { "ctrlscrollspeed" }, value = 10 },
+            { id = "levels", label = "No levels in player names", desc = "Chat names show [Name] instead of [Name:60].",
+              root = PratModule("PlayerNames"), path = { "level" }, value = false },
+            { id = "subgroup", label = "No raid group numbers", desc = "Raid chat names don't get the group number added.",
+              root = PratModule("PlayerNames"), path = { "subgroup" }, value = false },
         },
     },
     {
@@ -77,14 +74,19 @@ ns.data.addons = {
               path = { "selling_auto_select_next" }, value = true },
             { id = "lastduration", label = "Remember last duration", desc = "Uses the duration you picked last time when posting.",
               path = { "save_last_duration_as_default" }, value = true },
+            { id = "chatlog", label = "Quiet posting", desc = "No chat line for every auction you post.",
+              path = { "auction_chat_log" }, value = false },
         },
     },
+    -- AtlasLoot.db IS the active profile table (AtlasLoot.lua: self.db = self.dbRaw.profile). The minimap button
+    -- reads `shown` at load and sets `hide` from it, so both have to be written.
     {
         addon = "AtlasLootClassic", title = "AtlasLoot",
-        root = function() return AtlasLoot and AtlasLoot.db and AtlasLoot.db.profile end,
+        root = function() return AtlasLoot and AtlasLoot.db end,
         rows = {
-            { id = "minimap", label = "Hide minimap button", desc = "You can still open it with /al.",
-              path = { "minimap", "hide" }, value = true, enabled = false },
+            { id = "minimap", label = "Hide minimap button", show = "shown: %s  hide: %s", desc = "You can still open it with /al.",
+              set = { { path = { "minimap", "shown" }, value = false }, { path = { "minimap", "hide" }, value = true } },
+              enabled = false },
         },
     },
     {
@@ -120,6 +122,8 @@ ns.data.addons = {
               root = BagnonRoot, path = { "display", "socketing" }, value = false },
             { id = "open_mail", label = "No auto-open at the mailbox", desc = "Bags stay closed when you open your mail.",
               root = BagnonRoot, path = { "display", "mailInfo" }, value = false, enabled = false },
+            { id = "open_auction", label = "No auto-open at the auction house", desc = "Bags stay closed when you open the auction house. Off by default.",
+              root = BagnonRoot, path = { "display", "auctioneer" }, value = false, enabled = false },
             { id = "count_guild", label = "Hide guild bank counts in tooltips", desc = "Keeps item tooltips shorter. Off by default: tick it if you want it.",
               root = BagnonRoot, path = { "countGuild" }, value = false, enabled = false },
         },
@@ -127,7 +131,7 @@ ns.data.addons = {
     -- Baganator (needs Syndicator). Settings live in BAGANATOR_CONFIG.Profiles[<current profile>] and are
     -- not rewritten at logout. Baganator only redraws through its private setter: needs /reload.
     {
-        addon = "Baganator", title = "Baganator (bags)",
+        addon = "Baganator", requires = "Syndicator", title = "Baganator (bags)",
         root = function()
             local profiles = BAGANATOR_CONFIG and BAGANATOR_CONFIG.Profiles
             return profiles and profiles[BAGANATOR_CURRENT_PROFILE or "DEFAULT"]
@@ -141,6 +145,8 @@ ns.data.addons = {
               path = { "auto_open", "tradeskill" }, value = false },
             { id = "open_sockets", label = "No auto-open when socketing", desc = "Bags stay closed when you open the socketing window.",
               path = { "auto_open", "sockets" }, value = false },
+            { id = "flashing", label = "No flashing new items", desc = "Newly looted items don't pulse in your bags.",
+              path = { "new_items_flashing" }, value = false },
         },
     },
     {
@@ -157,6 +163,10 @@ ns.data.addons = {
               path = { "windowScale" }, value = 1.1, enabled = false },
             { id = "lock_frames", label = "Lock frames", desc = "Locks the guide window against dragging.",
               path = { "lockFrames" }, value = true },
+            { id = "minimap", label = "Hide minimap button", desc = "Keeps the minimap clean. Open the guide from the world map button or /rxp.",
+              path = { "enableMinimapButton" }, value = false },
+            { id = "levelup_emote", label = "No level-up emote", desc = "Stops the automatic emote other players see when you level up alone.",
+              path = { "enableLevelUpAnnounceSolo" }, value = false },
         },
     },
     -- Questie (AceDB). Defaults: Modules/Options/QuestieOptionsDefaults.lua. Questie keeps no private copy,
@@ -167,9 +177,17 @@ ns.data.addons = {
         rows = {
             { id = "minimap", label = "Hide minimap button", desc = "Keeps the minimap clean. Open the settings with /questie.",
               path = { "minimap", "hide" }, value = true },
-            { id = "tracker_combat", label = "Hide quest tracker in combat",
+            -- Questie refuses both at once (hide and minimize exclude each other), so each role gets one of them.
+            -- Healers and ranged classes watch the raid or the target, so the list goes away. Tanks and melee
+            -- keep the header, so the quest list is one click away in a quiet moment.
+            { id = "tracker_combat", label = "Hide quest tracker in combat", show = "hide: %s  minimize: %s",
+              archetypes = { HEALER = true, RANGED = true, CASTER = true },
               desc = "Same as the Blizzard quest tracker under Minimalism: the fight gets the space, the list comes back after.",
-              path = { "hideTrackerInCombat" }, value = true },
+              set = { { path = { "hideTrackerInCombat" }, value = true }, { path = { "minimizeTrackerInCombat" }, value = false } } },
+            { id = "tracker_minimize", label = "Shrink quest tracker in combat", show = "minimize: %s  hide: %s",
+              archetypes = { TANK = true, MELEE = true },
+              desc = "Only the header stays during a fight, so the tracker doesn't cover the pull. It opens again after.",
+              set = { { path = { "minimizeTrackerInCombat" }, value = true }, { path = { "hideTrackerInCombat" }, value = false } } },
             { id = "done_objectives", label = "Hide finished objectives",
               desc = "The tracker only lists what is still left to do in each quest.",
               path = { "hideCompletedQuestObjectives" }, value = true },
@@ -205,6 +223,28 @@ ns.data.addons = {
               desc = "Next to the range frame.",
               set = { { path = { "RangeFrameRadarPoint" }, value = "RIGHT" }, { path = { "RangeFrameRadarX" }, value = -330 },
                       { path = { "RangeFrameRadarY" }, value = 300 } } },
+            -- Quiet chat. DBM prints most of these on every pull. Keys checked in DeadlyBossMods CoreOptions.lua.
+            { id = "chat_warnings", label = "No warnings in chat", show = "%s  %s",
+              desc = "Warnings and special warnings stay on screen and are not repeated as chat lines.",
+              set = { { path = { "ShowWarningsInChat" }, value = false }, { path = { "ShowSWarningsInChat" }, value = false } } },
+            { id = "chat_noise", label = "Fewer DBM chat lines", show = "%s  %s  %s",
+              desc = "No version list, no pizza timer message, no guild kill messages.",
+              set = { { path = { "ShowAllVersions" }, value = false }, { path = { "ShowPizzaMessage" }, value = false },
+                      { path = { "ShowGuildMessages" }, value = false } } },
+            { id = "flash", label = "No screen flash on minor warnings", show = "%s  %s",
+              desc = "Special warning levels 1 and 2 don't flash the screen. Higher levels still do.",
+              set = { { path = { "SpecialWarningFlash1" }, value = false }, { path = { "SpecialWarningFlash2" }, value = false } } },
+            -- DBM has no setting for "only my role". These are the filters that exist, set for the role you picked.
+            { id = "interrupt_healer", label = "Hide interrupt warnings", show = "%s  %s", roles = { HEALER = true },
+              desc = "Healers don't interrupt, so the boss and trash interrupt warnings are hidden.",
+              set = { { path = { "FilterBInterruptHealer" }, value = true }, { path = { "FilterTInterruptHealer" }, value = true } } },
+            { id = "interrupt_focus", label = "Interrupt warnings for target and focus only", show = "%s  %s",
+              roles = { DAMAGER = true }, enabled = false,
+              desc = "Interrupt warnings only show for your target or focus. Off by default: tick it if the warnings feel like noise.",
+              set = { { path = { "FilterBTargetFocus" }, value = true }, { path = { "FilterTTargetFocus" }, value = true } } },
+            { id = "ranged_frames", label = "Range frame as radar", archetypes = { RANGED = true, CASTER = true },
+              desc = "Ranged players use the range frame often, so it shows as a radar instead of a list.",
+              path = { "RangeFrameFrames" }, value = "radar", enabled = false },
         },
     },
     {
@@ -221,34 +261,6 @@ ns.data.addons = {
                       { path = { "Scale" }, value = 0.9 } } },
             { id = "huge", label = "No separate large bars", desc = "Bars stay in one stack instead of jumping to the center of the screen at 10 seconds.",
               path = { "HugeBarsEnabled" }, value = false },
-        },
-    },
-    -- BigWigs: the same places as Deadly Boss Mods above. Positions are { point, relPoint, x, y } on UIParent
-    -- (bars add the frame name). BigWigs resets values outside its own ranges, so stay inside them:
-    -- message font 14-200, emphasized 20-200, bar width 120-550, height 10-100.
-    {
-        addon = "BigWigs", title = "BigWigs",
-        root = BigWigsPlugin("Messages"),
-        rows = {
-            { id = "warn", label = "Warnings", show = "%s",
-              desc = "Normal warnings at the top center, above the cast bar, font 18 instead of 20.",
-              set = { { path = { "normalPosition" }, value = { "TOP", "TOP", 0, -230 } },
-                      { path = { "fontSize" }, value = 18 } } },
-            { id = "emph", label = "Emphasized warnings", show = "%s  %spt",
-              desc = "Big warnings just below the normal ones instead of in the middle of the screen, font 28 instead of 44.",
-              set = { { path = { "emphPosition" }, value = { "TOP", "TOP", 0, -290 } },
-                      { path = { "emphFontSize" }, value = 28 } } },
-            { id = "bars", label = "Timer position", show = "%s  up: %s",
-              desc = "Bars hang from the right edge above the damage meter and stack upward.",
-              root = BigWigsPlugin("Bars"),
-              set = { { path = { "normalPosition" }, value = { "BOTTOMRIGHT", "BOTTOMRIGHT", -100, 360, "UIParent" } },
-                      { path = { "growup" }, value = true } } },
-            { id = "size", label = "Timer size", show = "%sx%s",
-              desc = "Slimmer bars: 170x16 instead of 180x18.",
-              root = BigWigsPlugin("Bars"),
-              set = { { path = { "normalWidth" }, value = 170 }, { path = { "normalHeight" }, value = 16 } } },
-            { id = "emphasize", label = "No separate large bars", desc = "Bars stay in one stack instead of jumping to the center of the screen near the end.",
-              root = BigWigsPlugin("Bars"), path = { "emphasize" }, value = false },
         },
     },
     -- Leatrix Plus: only what MLZ UI doesn't already do. Not touched on purpose:
@@ -275,11 +287,15 @@ ns.data.addons = {
               path = { "AutoConfirmRole" }, value = "On", enabled = false },
             { id = "no_bag_auto", label = "No bag auto-open", desc = "Bags stay closed at vendors, bank and mail. Off by default.",
               path = { "NoBagAutomation" }, value = "On", enabled = false },
+            { id = "hide_errors", label = "Hide red error text", desc = "No red 'Ability is not ready yet' lines in the middle of the screen. Off by default.",
+              path = { "HideErrorMessages" }, value = "On", enabled = false },
+            { id = "release_pvp", label = "Release in battlegrounds", desc = "Releases your spirit by itself when you die in a battleground. Off by default.",
+              path = { "AutoReleasePvP" }, value = "On", enabled = false },
         },
     },
     {
         addon = "Leatrix_Maps", title = "Leatrix Maps",
-        manual = "Leatrix overwrites outside changes at logout. Change this in /ltmaps.",
+        manual = "Leatrix overwrites outside changes at logout. Change this in /ltm.",
         root = function() return LeaMapsDB end,
         rows = {
             { id = "minimap_icon", label = "Hide Leatrix Maps minimap icon", desc = "Keeps the minimap clean. The map settings are already set up.",
@@ -305,12 +321,18 @@ ns.data.addons = {
                       { path = { "hide_on_context", 3, "value" }, value = 0 } } },
             { id = "class_colors", label = "Class colors on bars", desc = "Bars are colored by class, so you can tell players apart at a glance.",
               path = { "row_info", "texture_class_colors" }, value = true },
+            { id = "bar_height", label = "Bar height", desc = "16 pixels per bar instead of 14, easier to read at a glance.",
+              path = { "row_info", "height" }, value = 16 },
+            -- Details copies live settings over its profile at logout, so writing the live Details table persists
+            { id = "segments", label = "Fights kept", desc = "Keeps the last 15 fights instead of 25, so the list stays short.",
+              root = function() return Details end, path = { "segments_amount" }, value = 15 },
         },
     },
     -- Clique 5.x: per-character options in Clique.settings (db.char). Bindings are left alone on purpose:
     -- they depend on your spells, so you set them up in Clique itself.
+    -- The Forever port of Clique is installed as CliqueForever, but still defines the global `Clique`.
     {
-        addon = "Clique", title = "Clique (click-casting)",
+        addon = "Clique", alt = "CliqueForever", title = "Clique (click-casting)",
         root = function() return Clique and Clique.settings end,
         rows = {
             { id = "tooltip", label = "Show bindings in tooltips",
@@ -325,6 +347,14 @@ ns.data.addons = {
         rows = {
             { id = "arrow_lock", label = "Lock the arrow", desc = "The waypoint arrow can't be dragged away by accident.",
               path = { "arrow", "lock" }, value = true },
+            { id = "arrow_tta", label = "No arrival time on the arrow", desc = "The arrow shows the distance only, not an estimated time.",
+              path = { "arrow", "showtta" }, value = false },
+            { id = "minimap_other", label = "No waypoints from other zones on the minimap",
+              desc = "The minimap only shows waypoints in the zone you are in.",
+              path = { "minimap", "otherzone" }, value = false },
+            { id = "map_other", label = "No waypoints from other zones on the world map",
+              desc = "The world map only shows waypoints for the zone you are looking at.",
+              path = { "worldmap", "otherzone" }, value = false },
             { id = "block", label = "Hide the coordinate box",
               desc = "Removes the small box with your coordinates. The world map still shows them. Off by default: tick it if you never read it.",
               path = { "block", "enable" }, value = false, enabled = false },
@@ -340,19 +370,24 @@ ns.data.addons = {
               path = { "OpenAll", "SpamChat" }, value = false },
             { id = "select_chat", label = "Quiet select", desc = "Opening selected mail doesn't print a chat line for every letter.",
               path = { "Select", "SpamChat" }, value = false },
+            { id = "autocomplete", label = "One name suggestion list", desc = "Postal's address book is used when you type a name. Blizzard's own list stays closed, so you don't get two popups.",
+              path = { "BlackBook", "DisableBlizzardAutoComplete" }, value = true },
         },
     },
 }
 
 -- Addons worth a look that the player doesn't have yet. Shown on the "Other addons" page and in
 -- /mlz health, never as a popup. MLZ UI never installs anything.
---   addon = folder name, title = shown name, why = one line on what it does for the player
+--   addon = folder name (alt = a second folder name, as in the list above), title = shown name,
+--   why = one line on what it does for the player
 --   roles = (optional) only highlighted for these roles; without it, it is for everyone
 ns.data.recommended = {
     { addon = "Questie", title = "Questie",
       why = "Shows quest givers and objectives on the map, so you spend less time searching." },
-    { addon = "Clique", title = "Clique", roles = { HEALER = true },
+    { addon = "Clique", alt = "CliqueForever", title = "Clique", roles = { HEALER = true },
       why = "Heal by clicking party and raid frames, no target switching." },
+    { addon = "DBM-Core", title = "Deadly Boss Mods",
+      why = "Boss timers and warnings in dungeons and raids, so you don't need to read the boss guide first." },
     { addon = "Details", title = "Details!",
       why = "Shows damage, healing and threat per player after each fight." },
     { addon = "TomTom", title = "TomTom",

@@ -27,7 +27,7 @@
             <div class="side-btn"><span data-icon="overview"></span>Overview</div>
             <div class="side-btn"><span data-icon="layout"></span>Layout &amp; scale</div>
             <div class="side-btn sel"><span data-icon="nameplates"></span>Nameplates</div>
-            <div class="side-btn"><span data-icon="healer"></span>Healer</div>
+            <div class="side-btn"><span data-icon="healer"></span>Your role</div>
             <div class="side-btn"><span data-icon="fade"></span>Minimalism</div>
             <div class="side-btn"><span data-icon="buttons"></span>Action bars &amp; UI</div>
             <div class="side-btn"><span data-icon="qol"></span>Helpers</div>
@@ -40,12 +40,19 @@
         <main class="page">
             <div class="page-inner">
                 <div class="f-title page-title">Nameplates</div>
-                <div class="f-body muted page-sub">Platynator settings that follow your role. Changes show at once, no reload needed.</div>
+                <div class="f-body muted page-sub">Nameplates that follow your role. Changes show at once.</div>
 
                 <div class="card pcard">
-                    <div class="pcard-head"><div class="f-head">Right now</div></div>
+                    <div class="pcard-head">
+                        <div class="f-head">Engine</div>
+                        <div class="f-small muted">Who draws your nameplates. Modes, threat colors and the PvP tweak work with both MLZ and Platynator.</div>
+                    </div>
                     <div class="row div">
-                        <div class="lbl"><div class="f-body">Platynator</div><div class="f-small">MLZ UI changes your Platynator profile through Platynator's own import.</div></div>
+                        <div class="lbl"><div class="f-body">Nameplates drawn by</div><div class="f-small">Switching applies at once, no reload.</div></div>
+                        <div class="seg"><span class="sel" style="width:80px">MLZ</span><span style="width:80px">Platynator</span><span style="width:80px">Off</span></div>
+                    </div>
+                    <div class="row">
+                        <div class="lbl"><div class="f-body">Right now</div><div class="f-small">MLZ UI draws the plates. Blizzard's own plate is only made invisible.</div></div>
                         <span class="badge on"><i></i>Working</span>
                     </div>
                     <div class="row">
@@ -57,11 +64,11 @@
                 <div class="card pcard">
                     <div class="pcard-head">
                         <div class="f-head">Mode</div>
-                        <div class="f-small muted">Auto: Tank while you tank. Healer or DPS in a group, depending on your role. Solo when you are not in a group.</div>
+                        <div class="f-small muted">Auto: Tank while you tank (Defensive Stance / Bear Form with tank talents, or the group's tank). Healer or DPS in a group, depending on your role. Solo when you are not in a group.</div>
                     </div>
                     <div class="row div">
                         <div class="lbl"><div class="f-body">Mode</div><div class="f-small">Picking a mode turns Auto off.</div></div>
-                        <div class="seg"><span class="sel" style="width:60px">Auto</span><span style="width:62px">Tank</span><span style="width:62px">Healer</span><span style="width:62px">DPS</span><span style="width:62px">Solo</span></div>
+                        <div class="seg"><span class="sel" style="width:62px">Auto</span><span style="width:62px">Tank</span><span style="width:62px">Healer</span><span style="width:62px">DPS</span><span style="width:62px">Solo</span></div>
                     </div>
                 </div>
 
@@ -69,10 +76,6 @@
                     <div class="pcard-head"><div class="f-head">Options</div></div>
                     <div class="row div">
                         <div class="lbl"><div class="f-body">Friendly names for healers</div><div class="f-small">In Healer mode friendly players get a name above their head, but it can't be clicked.</div></div>
-                        <div class="toggle on"></div>
-                    </div>
-                    <div class="row hl">
-                        <div class="lbl"><div class="f-body">Clean nameplate style</div><div class="f-small">Minimal enemy nameplates: name and percent in the bar, cast bar, crowd control and only your own debuffs.</div></div>
                         <div class="toggle on"></div>
                     </div>
                     <div class="row">

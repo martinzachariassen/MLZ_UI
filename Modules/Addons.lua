@@ -7,8 +7,16 @@ local _, ns = ...
 
 local Addons = ns.RegisterModule({ key = "addons", title = "Other addons" })
 
-local function Loaded(folder)
-    return ns.IsAddOnLoaded(folder)
+local function Loaded(entry)
+    return ns.IsAddOnLoaded(entry.addon) or (entry.alt ~= nil and ns.IsAddOnLoaded(entry.alt))
+end
+
+-- A row can be limited to roles ({ TANK = true }) and/or archetypes ({ CASTER = true, RANGED = true }).
+-- It uses the role you picked in the wizard, not the live one, so a stance change never swaps addon settings.
+local function ForMe(row)
+    if row.roles and not row.roles[(ns.Role())] then return false end
+    if row.archetypes and not row.archetypes[(ns.Archetype())] then return false end
+    return true
 end
 
 -- A row sets one key (path/value) or several (set = { { path, value }, ... }).
@@ -110,29 +118,46 @@ local function Find(id)
     end
 end
 
+-- Text when an addon it depends on is missing (entry.requires = folder name), else nil
+local function MissingDependency(entry)
+    if entry.requires and not ns.IsAddOnLoaded(entry.requires) then
+        return entry.requires .. " is not loaded"
+    end
+end
+
+local function PreviewRow(entry, row)
+    local id = entry.addon .. ":" .. row.id
+    local item = { id = id, group = entry.title, label = row.label, note = row.desc }
+    local missing = MissingDependency(entry)
+    if missing then
+        item.old, item.new = "-", missing
+        item.enabled, item.unavailable, item.attention = false, true, true
+        return item
+    end
+    local values = Read(entry, row)
+    if not values then
+        item.old, item.new = "-", "not available"
+        item.enabled, item.unavailable = false, true
+        return item
+    end
+    item.old = Format(row, function(i) return values[i].v end)
+    item.new = Format(row, function(_, part) return part.value end)
+    item.enabled = ns.Enabled("addons", id, row.enabled ~= false)
+    item.alreadySet = Matches(row, values)
+    if entry.manual and not item.alreadySet then
+        -- shown so you know what to change, but never written
+        item.enabled, item.unavailable = false, true
+        item.note = entry.manual .. (row.desc and ("  " .. row.desc) or "")
+    end
+    return item
+end
+
 function Addons:Preview()
     local items = {}
     for _, entry in ipairs(ns.data.addons) do
-        if Loaded(entry.addon) then
+        if Loaded(entry) then
             for _, row in ipairs(entry.rows) do
-                local id = entry.addon .. ":" .. row.id
-                local item = { id = id, group = entry.title, label = row.label, note = row.desc }
-                local values = Read(entry, row)
-                if not values then
-                    item.old, item.new = "-", "not available"
-                    item.enabled, item.unavailable = false, true
-                else
-                    item.old = Format(row, function(i) return values[i].v end)
-                    item.new = Format(row, function(_, part) return part.value end)
-                    item.enabled = ns.Enabled("addons", id, row.enabled ~= false)
-                    item.alreadySet = Matches(row, values)
-                    if entry.manual and not item.alreadySet then
-                        -- shown so you know what to change, but never written
-                        item.enabled, item.unavailable = false, true
-                        item.note = entry.manual .. (row.desc and ("  " .. row.desc) or "")
-                    end
-                end
-                items[#items + 1] = item
+                if ForMe(row) then items[#items + 1] = PreviewRow(entry, row) end
             end
         end
     end
@@ -169,7 +194,7 @@ function Addons:Backup(items)
 end
 
 function Addons:Apply(items)
-    local changed, needReload = 0, false
+    local changed, failed, needReload = 0, 0, false
     for _, item in ipairs(items) do
         local entry, row = Find(item.id)
         if entry and not item.unavailable and not entry.manual then
@@ -179,13 +204,18 @@ function Addons:Apply(items)
                     parent[key] = type(part.value) == "table" and ns.CopyTable(part.value) or part.value
                     changed = changed + 1
                     if not entry.live then needReload = true end
+                else
+                    failed = failed + 1
                 end
             end
         end
     end
-    ns.Debug("Addon settings set:", changed)
+    ns.Debug("Addon settings set:", changed, "failed:", failed)
     -- Most addons read their saved settings only when they load; entries marked live don't
     if needReload then ns.MarkReload("addon settings") end
+    if failed > 0 then
+        return failed == 1 and "1 addon setting could not be written." or (failed .. " addon settings could not be written.")
+    end
 end
 
 function Addons:Restore(snap)
@@ -213,16 +243,24 @@ end
 function Addons:Summary()
     local list = {}
     for _, entry in ipairs(ns.data.addons) do
-        local s = { title = entry.title, addon = entry.addon, loaded = Loaded(entry.addon) and true or false,
-            differ = 0, total = 0, rows = #entry.rows, missing = {}, manual = entry.manual }
-        if s.loaded then
+        local s = { title = entry.title, addon = entry.addon, loaded = Loaded(entry) and true or false,
+            differ = 0, total = 0, rows = 0, missing = {}, manual = entry.manual }
+        for _, row in ipairs(entry.rows) do
+            if ForMe(row) then s.rows = s.rows + 1 end
+        end
+        local missing = s.loaded and MissingDependency(entry)
+        if missing then
+            s.missing[1] = entry.title .. " - " .. missing
+        elseif s.loaded then
             for _, row in ipairs(entry.rows) do
-                local ok, values = pcall(Read, entry, row)
-                if ok and values then
-                    s.total = s.total + 1
-                    if not Matches(row, values) then s.differ = s.differ + 1 end
-                else
-                    s.missing[#s.missing + 1] = row.label .. " - " .. (ok and Reason(entry, row) or tostring(values))
+                if ForMe(row) then
+                    local ok, values = pcall(Read, entry, row)
+                    if ok and values then
+                        s.total = s.total + 1
+                        if not Matches(row, values) then s.differ = s.differ + 1 end
+                    else
+                        s.missing[#s.missing + 1] = row.label .. " - " .. (ok and Reason(entry, row) or tostring(values))
+                    end
                 end
             end
         end

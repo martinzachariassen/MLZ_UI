@@ -1,0 +1,115 @@
+<!doctype html>
+<!-- Mockup of the setup wizard, Keybinds step (UI/Installer.lua). Render: see CLAUDE.md > Screenshots -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>MLZ UI - Setup wizard</title>
+<link rel="stylesheet" href="theme.css">
+<script src="icons.js"></script>
+<style>
+    html, body { width: 1000px; height: 780px; }
+    .stage { width: 1000px; height: 780px; }
+    .wiz { width: 760px; height: 620px; }
+    .wiz-body { position: relative; flex: 1; min-height: 0; padding: 0 16px; display: flex; flex-direction: column; }
+
+    .progress { display: flex; gap: 4px; height: 18px; align-items: center; margin-top: 9px; }
+    .progress i { flex: 1; height: 4px; background: var(--off); }
+    .progress i.done { background: var(--green); }
+    .progress i.here { background: var(--accent); height: 6px; }
+
+    .head { display: flex; justify-content: space-between; align-items: baseline; margin: 10px 4px 0; }
+    .desc { margin: 10px 4px 0; width: 720px; }
+    .desc .f-body { line-height: 1.4; }
+    .stepbar { display: flex; justify-content: space-between; align-items: center; margin: 10px 4px 10px; }
+    .stepbar .lbl { display: flex; align-items: center; gap: 8px; }
+    .stepbar .btn { height: 22px; width: 90px; padding: 0; }
+
+    .list { flex: 1; min-height: 0; background: var(--panel); border: 1px solid var(--border); margin-bottom: 76px; padding: 4px 8px; position: relative; overflow: hidden; }
+    .cols { position: relative; height: 22px; border-bottom: 1px solid var(--border); }
+    .cols span { position: absolute; top: 6px; color: var(--muted); }
+    .grp { position: relative; height: 30px; border-bottom: 1px solid var(--border); margin: 0 4px; }
+    .grp span { position: absolute; left: 0; bottom: 5px; color: var(--accent); }
+    .r { position: relative; height: 22px; display: flex; align-items: center; font-size: 11px; }
+    .r.z { background: rgba(255,255,255,.025); }
+    .r.hl { background: rgba(51,160,255,.10); }
+    .r > * { position: absolute; white-space: nowrap; }
+    .r .check { left: 6px; }
+    .r .c-label { left: 32px; }
+    .r .c-old { left: 270px; }
+    .r .c-arrow { left: 450px; font: 700 11px/1 var(--head); }
+    .r .c-new { left: 468px; }
+    .foot-row { height: 22px; display: flex; align-items: center; padding-left: 4px; font-size: 11px; }
+
+    .legend { position: absolute; left: 18px; bottom: 54px; }
+    .nav { position: absolute; left: 16px; right: 16px; bottom: 14px; display: flex; gap: 8px; }
+    .nav .btn { height: 28px; }
+</style>
+</head>
+<body>
+<div class="stage">
+<div class="window wiz">
+    <div class="titlebar">
+        <div class="gear" data-gear></div>
+        <span class="f-head">MLZ UI - Setup wizard</span><span class="ver">v0.7.0</span>
+        <div class="close f-head">X</div>
+    </div>
+
+    <div class="wiz-body">
+        <div class="progress">
+            <i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i>
+            <i class="done"></i><i class="done"></i><i class="done"></i><i class="here"></i><i></i>
+        </div>
+
+        <div class="head">
+            <span class="f-title">9. Other addons</span>
+            <span class="f-sbold muted">STEP 9 OF 10</span>
+        </div>
+
+        <div class="desc">
+            <div class="f-body">Settings for supported addons that are installed and loaded; the rest are skipped. Rows that only apply to a role show for that role: you see the <span class="gold">healer</span> ones.
+                Some addons only pick up the changes after a reload.</div>
+        </div>
+
+        <div class="stepbar">
+            <div class="lbl"><div class="toggle on"></div><span class="f-body">Use this step</span></div>
+            <div><span class="btn subtle">Tick all</span> <span class="btn subtle">Untick all</span></div>
+        </div>
+
+        <div class="list">
+            <div class="cols">
+                <span class="f-sbold" style="left:32px">SETTING</span>
+                <span class="f-sbold" style="left:270px">NOW</span>
+                <span class="f-sbold" style="left:468px">WILL BECOME</span>
+            </div>
+
+            <div class="grp"><span class="f-head">Deadly Boss Mods</span></div>
+            <div class="r"><span class="check on"></span><span class="c-label white">Warnings</span><span class="c-old muted">CENTER 0,260  20pt</span><span class="c-arrow green">&gt;</span><span class="c-new green">TOP 0,-230  18pt</span></div>
+            <div class="r z"><span class="check on"></span><span class="c-label white">No warnings in chat</span><span class="c-old muted">true  true</span><span class="c-arrow green">&gt;</span><span class="c-new green">false  false</span></div>
+            <div class="r hl"><span class="check on"></span><span class="c-label white">Hide interrupt warnings&nbsp;&nbsp;<span class="muted">healer</span></span><span class="c-old muted">false  false</span><span class="c-arrow green">&gt;</span><span class="c-new green">true  true</span></div>
+
+            <div class="grp"><span class="f-head">Questie (quests)</span></div>
+            <div class="r"><span class="check on"></span><span class="c-label white">Hide quest tracker in combat</span><span class="c-old muted">hide: false  minimize: false</span><span class="c-arrow green">&gt;</span><span class="c-new green">hide: true  minimize: false</span></div>
+            <div class="r z"><span class="check on"></span><span class="c-label white">Hide minimap button</span><span class="c-old muted">false</span><span class="c-arrow green">&gt;</span><span class="c-new green">true</span></div>
+
+            <div class="grp"><span class="f-head">Details! (meter)</span></div>
+            <div class="r"><span class="check on"></span><span class="c-label white">Hide when solo</span><span class="c-old muted">false  alpha 100%</span><span class="c-arrow green">&gt;</span><span class="c-new green">true  alpha 0%</span></div>
+            <div class="r z"><span class="check on"></span><span class="c-label white">Bar height</span><span class="c-old muted">14</span><span class="c-arrow green">&gt;</span><span class="c-new green">16</span></div>
+
+            <div class="grp"><span class="f-head">Postal (mail)</span></div>
+            <div class="r"><span class="check on"></span><span class="c-label white">Quiet open all</span><span class="c-old muted">true</span><span class="c-arrow green">&gt;</span><span class="c-new green">false</span></div>
+
+            <div class="foot-row accent">21 settings are already right (click to show)&nbsp;&nbsp;&gt;</div>
+        </div>
+
+        <div class="f-small muted legend">Ticked = included &nbsp;&nbsp;&nbsp; <span class="green">Green</span> = will change</div>
+        <div class="nav">
+            <span class="btn" style="width:110px">Back</span>
+            <span style="flex:1"></span>
+            <span class="btn subtle" style="width:130px">Skip this step</span>
+            <span class="btn primary" style="width:150px">Next</span>
+        </div>
+    </div>
+</div>
+</div>
+</body>
+</html>

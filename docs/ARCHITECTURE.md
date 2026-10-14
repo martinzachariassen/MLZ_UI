@@ -86,6 +86,17 @@ Rules:
 
 Feature-only modules (`Vendor`, `ManaTick`, `Interrupt`, `Health`, `Plates`, `Reminders`, `XPRate`) don't register. They hook events through `ns.On` and expose a small table on `ns` (e.g. `ns.Vendor`) for the control center.
 
+## Settings for other addons
+
+`Data/Addons.lua` has one entry per addon and `Modules/Addons.lua` reads, backs up, writes and restores the rows. Settings go straight into the addon's own saved variables, so a row only works for the version you have installed. Check key names against the addon's source before you add one.
+
+- **Entry:** `addon` (folder name), optional `alt` (a port that installs under another folder name, e.g. `CliqueForever`), `title`, `root` (function returning the table that `path` starts from), `live = true` when the addon reads the value while it runs (no reload), and `manual = "text"` when the addon overwrites outside changes at logout (the rows are shown but never written).
+- **Row:** `id`, `label`, `desc`, and either `path` + `value` or `set = { { path, value }, ... }` with `show` for the wizard text. `enabled = false` lists the row but leaves it unticked.
+- **Role filter:** a row can carry `roles = { HEALER = true }` (TANK, HEALER, DAMAGER) and/or `archetypes = { CASTER = true }` (TANK, HEALER, MELEE, RANGED, CASTER). It then only shows for that role. The filter uses the role you picked in the wizard (`ns.Role`, `ns.Archetype`), not the live one, so a stance change never swaps another addon's settings. Two rows that exclude each other in the addon (Questie hide and minimize in combat) get one row per role.
+- **Errors:** `Apply` counts keys it could not write and returns a short text, so the wizard shows the step as PARTLY.
+
+Platynator does not go through this table. `Modules/Nameplates.lua` builds a changed copy of the current profile and imports it through Platynator's own API. `presets` in `Data/Nameplates.lua` set keys per mode, and `archetypePresets` add keys for DPS modes depending on your archetype.
+
 ## Apply and undo flow
 
 ```
@@ -133,7 +144,7 @@ Use these before writing your own.
 `Modules/Nameplates.lua` is the brain: it picks the mode from your role and owns the wizard step. The engine (`MLZUIDB.nameplates.engine`) decides who draws:
 
 - `mlz`: `Modules/Plates.lua` draws its own frames as children of each nameplate. Blizzard's `UnitFrame` only gets alpha 0, forbidden plates are skipped, and everything is event driven with one `OnUpdate` for cast bars and debuff timers. Nothing is registered while another engine is picked.
-- `platynator`: the profile import path described at the top of `Modules/Nameplates.lua`.
+- `platynator`: the profile import path described at the top of `Modules/Nameplates.lua`. The clean style and threat colors edit the enemy design in the profile copy. If that design is one of Platynator's built-in ones (name starts with `_`), `AdoptBuiltin` takes the copy Platynator keeps in `designs["_custom"]` under our own name (`ownDesign` in `Data/Nameplates.lua`) and points the enemy assignments at it. The wizard row "Import MLZ profile" only shows when `profileString` in `Data/Nameplates.lua` is set.
 - `off`: Blizzard's plates, untouched.
 
 The only game setting MLZ nameplates change is `nameplateShowFriends` (plus friendly click-through) in Healer mode. The old value is kept in `nameplates.friendsBase` and put back when you leave Healer mode or switch engines.
