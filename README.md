@@ -58,7 +58,7 @@ MLZ UI sets up the **Blizzard UI you already have** (Edit Mode, CVars, keybinds 
 **In play**
 - Minimalism: bars, bags and menus fade until you hover, and bars dim out of combat
 - Action buttons colored by range, mana and usability, with short hotkey labels
-- Role detection (talents, spec, group or your choice) that drives the layouts and nameplates
+- Role detection (talents, spec, group or your choice; DPS until your talents decide) that drives the layouts and nameplates
 - Our own flat nameplates: health, cast bar, quest marker, your debuffs and threat colors per role
 - Auto-repair, sell greys, a mana tick bar and an interrupt announce
 

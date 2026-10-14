@@ -9,7 +9,7 @@ ns.data.nameplates = {
     --   tank   = you are tanking right now (Defensive Stance / Bear Form with tank talents, a tank aura,
     --            or the group made you the tank)
     --   healer = healer talents, in a party or raid
-    --   dps    = everyone else in a party or raid
+    --   dps    = everyone else in a party or raid (also a leveling character with no role yet)
     --   solo   = not tanking and not in a group (questing / grinding)
     modes = { "tank", "healer", "dps", "solo" },
     modeText = { tank = "Tank", healer = "Healer", dps = "DPS", solo = "Solo" },

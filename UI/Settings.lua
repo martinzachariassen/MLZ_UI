@@ -20,7 +20,7 @@ local function M(key) return ns.modules[key] end
 
 local ROLE_TEXT = ns.ROLE_TEXT
 local MODE_TEXT = ns.NP.MODE_TEXT
-local SOURCE_TEXT = { forced = "set by you", class = "class", spec = "spec", talents = "talents", group = "group role", unknown = "unknown" }
+local SOURCE_TEXT = { forced = "set by you", class = "class", spec = "spec", talents = "talents", group = "group role", default = "until your talents decide", unknown = "unknown" }
 local function FadeModeText(mode)
     local t = ns.modules.fade.MODE_TEXT[mode] or tostring(mode)
     return t:sub(1, 1):upper() .. t:sub(2)
@@ -54,7 +54,7 @@ end
 
 -- "My role" choice: used on the overview and the healer page
 local ROLE_OPTIONS = {
-    { value = "auto", text = "Auto", tip = "Read from your talents (or spec / group role). Tank also needs Bear Form for druids." },
+    { value = "auto", text = "Auto", tip = "Read from your spec, talents or group role. You count as DPS until you have 11 points in one talent tree. Tank also needs Bear Form for druids." },
     { value = "TANK", text = "Tank" }, { value = "HEALER", text = "Healer" }, { value = "DAMAGER", text = "DPS" },
 }
 local function GetRoleChoice() return ns.GetRoleForce() or "auto" end

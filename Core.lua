@@ -205,13 +205,17 @@ end
 
 ------------------------------------------------------------------------
 -- Role: one answer for every module (healer layouts, nameplates, overview, role profiles).
--- ns.Role()     -> "TANK" | "HEALER" | "DAMAGER" | nil  (what you are: forced choice, spec, talents, group role)
+-- ns.Role()     -> "TANK" | "HEALER" | "DAMAGER"  (what you are: forced choice, spec, talents, group role).
+--                  A leveling character with no clear role yet counts as DAMAGER.
 -- ns.LiveRole() -> same, but a tank spec that isn't tanking right now (cat form, battle stance on a
 --                  non-protection warrior) counts as DAMAGER. Used by nameplates.
 ------------------------------------------------------------------------
 local PURE_DPS = { MAGE = true, WARLOCK = true, ROGUE = true, HUNTER = true }
 local HEAL_TABS = { DRUID = { [3] = true }, PRIEST = { [1] = true, [2] = true }, PALADIN = { [1] = true }, SHAMAN = { [3] = true } }
 local TANK_TABS = { WARRIOR = { [3] = true }, PALADIN = { [2] = true }, DRUID = { [2] = true } }
+-- Early points often go into a healer tree while leveling (Divine Strength, Furor, Wand Specialization),
+-- so talents only decide the role once one tree has real investment.
+local TALENT_MIN_POINTS = 11
 ns.ROLE_TEXT = { TANK = "Tank", HEALER = "Healer", DAMAGER = "DPS" }
 
 local function PlayerClass()
@@ -248,7 +252,7 @@ local function TalentRole(class)
         local p = TabPoints(tab)
         if p > bestPoints then best, bestPoints = tab, p end
     end
-    if not best then return end -- no points spent (low level)
+    if not best or bestPoints < TALENT_MIN_POINTS then return end -- low level: not decided yet
     if HEAL_TABS[class] and HEAL_TABS[class][best] then return "HEALER" end
     if TANK_TABS[class] and TANK_TABS[class][best] then return "TANK" end
     return "DAMAGER"
@@ -285,7 +289,7 @@ function ns.GetRoleForce()
     return c.roleForce
 end
 
--- Returns role, source ("forced" | "spec" | "talents" | "group" | "class")
+-- Returns role, source ("forced" | "class" | "spec" | "talents" | "group" | "default"). Never nil.
 function ns.Role()
     local force = ns.GetRoleForce()
     if force then return force, "forced" end
@@ -297,7 +301,7 @@ function ns.Role()
     if r then return r, "talents" end
     r = GroupRole()
     if r then return r, "group" end
-    return nil, "unknown"
+    return "DAMAGER", "default" -- no spec, too few talents, no group role: leveling, so DPS
 end
 
 local function InBearForm()
@@ -318,8 +322,9 @@ function ns.LiveRole()
         if InBearForm() then return "TANK", "Bear Form + Feral talents" end
         return "DAMAGER", "Feral, not in Bear Form"
     end
+    if source == "default" then return "DAMAGER", "no role yet, counts as DPS" end
     if role then return role, (source == "forced" and "set by you") or ("from " .. source) end
-    return nil, "no role found"
+    return nil, "no role found" -- safety net, ns.Role() always returns a role
 end
 
 -- v: "TANK" | "HEALER" | "DAMAGER" | nil (auto)
