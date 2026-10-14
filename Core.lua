@@ -418,7 +418,10 @@ local migrations = {
         end
     end,
     -- v5: new optional keys, nothing to convert. reminders = { buffs, reagents, durability }
-    -- (Modules/Reminders.lua fills in defaults), tweaks.tooltipClass and tweaks.tooltipTarget.
+    -- (Modules/Reminders.lua fills in defaults), tweaks.tooltipClass, tooltipTarget, squareMinimap,
+    -- flatChatInput, chatFont, minimapRotateWas (the rotation setting from before the square minimap)
+    -- tourSeen (the "where did things go?" tour has run once), tweaks.chatClassNames and chatClassWas
+    -- (the per chat type "color names" choice from before MLZ UI changed it).
     [5] = function(db)
         if db.reminders ~= nil and type(db.reminders) ~= "table" then db.reminders = nil end
     end,
@@ -534,7 +537,7 @@ end
 
 -- Everything else is controlled from the settings window (/mlz); the other commands still
 -- work but are not listed.
-local LISTED = { install = true, undo = true, debug = true, probe = true, minimap = true, role = true, np = true }
+local LISTED = { install = true, undo = true, debug = true, probe = true, minimap = true, role = true, np = true, keys = true, tour = true }
 
 -- Runs a command from code (used by the settings window)
 function ns.RunCommand(name, arg)

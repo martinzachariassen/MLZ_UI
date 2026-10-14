@@ -180,6 +180,8 @@ local function BuildMenu()
     Divider()
     Item("Open settings", function() ns.Settings:Open() end, nil, nil, true)
     Item("Setup wizard", function() if ns.Installer then ns.Installer:Open() end end, nil, nil, true)
+    Item("My keybinds", function() if ns.Keys then ns.Keys.Open() end end, nil, nil, true)
+    Item("Where did things go?", function() if ns.Tour then ns.Tour.Start() end end, nil, nil, true)
     f.reloadItem = Item("Reload UI", function() ReloadUI() end, nil, nil, true)
 
     f:SetHeight(y + 6)
@@ -301,6 +303,9 @@ function MB:SetHidden(hide)
 end
 
 function MB:IsHidden() return Cfg().hide and true or false end
+
+-- Called when the minimap shape changes (square minimap in Tweaks)
+MB.Position = Position
 
 ns.On("PLAYER_LOGIN", function()
     Create()

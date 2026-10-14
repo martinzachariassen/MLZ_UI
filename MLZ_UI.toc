@@ -19,6 +19,7 @@ Data\Fade.lua
 Data\Nameplates.lua
 Data\Addons.lua
 Data\Reminders.lua
+Data\Tips.lua
 
 Modules\Backup.lua
 Modules\Scale.lua
@@ -44,3 +45,5 @@ UI\Widgets.lua
 UI\Installer.lua
 UI\Settings.lua
 UI\MinimapButton.lua
+UI\Keys.lua
+UI\Tour.lua

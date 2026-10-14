@@ -15,17 +15,22 @@ MLZ_UI/
 │   ├── Layout.lua
 │   ├── Fade.lua
 │   ├── Nameplates.lua
-│   └── Addons.lua
+│   ├── Addons.lua
+│   ├── Reminders.lua     Self buffs, reagents and the durability limit per class
+│   └── Tips.lua          Tips for the overview card
 ├── Modules/              HOW to set it (one feature per file)
 │   ├── Backup.lua        Backup stack, apply order, undo (loads first)
 │   ├── Scale.lua  Settings.lua  Bindings.lua  Layout.lua  Healer.lua
 │   ├── Fade.lua  ActionButtons.lua  Tweaks.lua  Plates.lua  Nameplates.lua  Addons.lua
-│   └── Health.lua  Vendor.lua  ManaTick.lua  Interrupt.lua  Profile.lua
+│   ├── Health.lua  Vendor.lua  ManaTick.lua  Interrupt.lua  Profile.lua
+│   └── Reminders.lua  XPRate.lua
 ├── UI/
 │   ├── Widgets.lua       Theme tokens (W.T, W.C), fonts and every widget
 │   ├── Installer.lua     Setup wizard
-│   ├── Settings.lua      Control center (/mlz)
-│   └── MinimapButton.lua Minimap button, tooltip, quick menu
+│   ├── Settings.lua      Control center (/mlz), including the overview tips
+│   ├── MinimapButton.lua Minimap button, tooltip, quick menu
+│   ├── Keys.lua          Keyboard map of your keybinds (/mlz keys)
+│   └── Tour.lua          "Where did things go?" tour over the faded frames (/mlz tour)
 ├── Media/                Roboto Bold + license
 └── docs/
     ├── ARCHITECTURE.md
@@ -75,7 +80,7 @@ Rules:
 - `Restore` must work on a snapshot from an older version of the addon, or skip it safely.
 - Anything that touches protected frames or bindings goes through `ns.RunOutOfCombat`.
 
-Feature-only modules (`Vendor`, `ManaTick`, `Interrupt`, `Health`, `Plates`) don't register. They hook events through `ns.On` and expose a small table on `ns` (e.g. `ns.Vendor`) for the control center.
+Feature-only modules (`Vendor`, `ManaTick`, `Interrupt`, `Health`, `Plates`, `Reminders`, `XPRate`) don't register. They hook events through `ns.On` and expose a small table on `ns` (e.g. `ns.Vendor`) for the control center.
 
 ## Apply and undo flow
 

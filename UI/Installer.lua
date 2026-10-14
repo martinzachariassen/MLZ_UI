@@ -203,6 +203,13 @@ function Installer:Build()
         if ns.Settings then ns.Settings:Open() end
     end)
     f.settings:SetPoint("BOTTOMLEFT", 16, 14)
+    -- After a run: point at the frames that are now hidden, so nobody wonders where they went
+    f.tour = W.Button(f, "Show me around", 140, 28, function()
+        f:Hide()
+        if ns.Tour then ns.Tour.Start() end
+    end)
+    f.tour:SetPoint("LEFT", f.settings, "RIGHT", 8, 0)
+    f.tour.tipText = "A short tour of the bars and buttons that now stay hidden until you need them."
 
     self.rows = {}
 end
@@ -605,6 +612,7 @@ function Installer:Go(index)
     local done = page.kind == "done"
     f.back:SetShown(not done)
     f.settings:SetShown(done)
+    f.tour:SetShown(done and self.appliedAny and ns.Tour and ns.Tour.HasSteps() or false)
     f.next:SetShown(not done)
     f.skip:SetShown(page.kind == "module")
     f.quick:SetShown(page.kind == "intro")

@@ -27,7 +27,8 @@ local function FadeModeText(mode)
 end
 local AB_SHORT = { range = "range", mana = "mana", unusable = "unusable", hotkeys = "short keys", macroNames = "no macro names" }
 local TW_SHORT = { trackerHeader = "no tracker header", trackerHide = "tracker hidden", fps = "FPS counter", cleanCombatFont = "combat font",
-    tooltipClass = "class colored tooltips", tooltipTarget = "tooltip target" }
+    tooltipClass = "class colored tooltips", tooltipTarget = "tooltip target", chatClassNames = "class colors in chat",
+    squareMinimap = "square minimap", flatChatInput = "flat chat input", chatFont = "Roboto chat" }
 
 local function OpenWizard(stepKey)
     if InCombatLockdown() then
@@ -261,6 +262,67 @@ function S.Summary()
     for _, fn in ipairs(SECTIONS) do
         local ok, err = pcall(fn, Add)
         if not ok then ns.Debug("summary:", err) end
+    end
+    return list
+end
+
+------------------------------------------------------------------------
+-- Tips for the overview card: things that need you now first, then Data/Tips.lua
+------------------------------------------------------------------------
+local TIP_NEEDS = {
+    vendor = function() return ns.Vendor.Get("repair") or ns.Vendor.Get("sell") end,
+    buttons = function()
+        local ab = M("actionbuttons")
+        for _, o in ipairs(ab.options) do
+            if ab:IsOn(o.id) then return true end
+        end
+    end,
+    leveling = function() return ns.XPRate and ns.XPRate.Stats() ~= nil end,
+}
+
+local function TipNeeds(needs)
+    if not needs then return true end
+    local id = needs:match("^fade:(.+)$")
+    if id then return M("fade"):IsOn(id) end
+    local fn = TIP_NEEDS[needs]
+    if not fn then return false end
+    local ok, r = pcall(fn)
+    return ok and r and true or false
+end
+
+local function TipAction(action)
+    if action == "tour" then
+        if not (ns.Tour and ns.Tour.HasSteps()) then return end
+        return "Show me around", function() S.frame:Hide() ns.Tour.Start() end
+    elseif action == "keys" then
+        if not ns.Keys then return end
+        return "Show my keys", function() ns.Keys.Open() end
+    elseif action == "fadePause" then
+        local fade = M("fade")
+        return ns.fadePaused and "Resume fading" or "Pause fading", function() fade:SetPaused(not ns.fadePaused) end
+    end
+    local key = action and action:match("^page:(.+)$")
+    if key then return "Open", function() S:Select(key) end end
+end
+
+function S.Tips()
+    local list = {}
+    local function Add(text, action)
+        local button, fn = TipAction(action)
+        list[#list + 1] = { text = text, button = button, fn = fn }
+    end
+    if ns.db.installed and not ns.db.tourSeen and ns.Tour and ns.Tour.HasSteps() then
+        Add("Some bars and buttons are hidden now. A short tour shows where they went.", "tour")
+    end
+    local R = ns.Reminders
+    local missing = R and R.Missing and select(2, pcall(R.Missing))
+    if type(missing) == "table" and #missing > 0 then
+        local names = {}
+        for _, m in ipairs(missing) do names[#names + 1] = m.text end
+        list[#list + 1] = { text = C.amber .. "Before you head out: " .. C.r .. table.concat(names, ", ") .. "." }
+    end
+    for _, t in ipairs(ns.data.tips or {}) do
+        if TipNeeds(t.needs) then Add(t.text, t.action) end
     end
     return list
 end
@@ -649,7 +711,49 @@ PAGES[#PAGES + 1] = { key = "overview", title = "Overview", icon = "Interface\\I
     end
     p.y = top + 50 + PAD + #SECTIONS * STATUS_H + 8
 
+    -- One tip at a time, below the status list
+    local TIP_H = 58
+    local tip = W.Card(p.content)
+    tip:SetWidth(PAGE_W)
+    tip:SetHeight(TIP_H)
+    tip:SetPoint("TOPLEFT", list, "BOTTOMLEFT", 0, -PAD)
+    local strip = tip:CreateTexture(nil, "ARTWORK")
+    strip:SetColorTexture(unpack(T.accent))
+    strip:SetPoint("TOPLEFT", 1, -1)
+    strip:SetPoint("BOTTOMLEFT", 1, 1)
+    strip:SetWidth(3)
+    local head = W.Text(tip, "MLZUI_FontSmallBold", "TIP")
+    head:SetTextColor(unpack(T.muted))
+    head:SetPoint("TOPLEFT", PAD, -10)
+    tip.text = W.Text(tip, "GameFontHighlight", "")
+    tip.text:SetPoint("TOPLEFT", head, "BOTTOMLEFT", 0, -4)
+    tip.text:SetWidth(PAGE_W - 2 * PAD - 280)
+    tip.text:SetWordWrap(true)
+    local tipIndex = 1
+    tip.nextBtn = W.Button(tip, "Next tip", 90, 24, function()
+        tipIndex = tipIndex + 1
+        p:Refresh()
+    end, "subtle")
+    tip.nextBtn:SetPoint("RIGHT", -PAD, 0)
+    tip.action = W.Button(tip, "", 150, 24, function(self) if self.fn then self.fn() end end)
+    tip.action:SetPoint("RIGHT", tip.nextBtn, "LEFT", -8, 0)
+    p.y = p.y + PAD + TIP_H
+
+    local function FillTip()
+        local list = S.Tips()
+        if #list == 0 then tip:Hide() return end
+        tip:Show()
+        if tipIndex > #list then tipIndex = 1 end
+        local t = list[tipIndex]
+        tip.text:SetText(t.text)
+        tip.action:SetShown(t.button ~= nil)
+        tip.action:SetText(t.button or "")
+        tip.action.fn = t.fn
+        tip.nextBtn:SetShown(#list > 1)
+    end
+
     p:OnRefresh(function()
+        FillTip()
         local action = true
         if not ns.db.installed then
             banner:Set(T.amber, "MLZ UI is not set up yet. The setup wizard walks you through it and takes a backup first.",
@@ -854,6 +958,17 @@ PAGES[#PAGES + 1] = { key = "fade", title = "Minimalism", icon = "Interface\\Ico
     p:Card("Pause")
     p:Toggle("Pause all fading", "Shows everything again until you turn this off or reload. Handy for a quick look.",
         function() return ns.fadePaused end, function(on) fade:SetPaused(on) end)
+    p:Buttons({
+        { text = "Show me around", width = 150, fn = function()
+            if InCombatLockdown() then
+                S:Notify("The tour can't run in combat. Try again after combat.", "warn")
+                return
+            end
+            S.frame:Hide()
+            ns.Tour.Start()
+        end, refresh = function(b) b:SetEnabled(ns.Tour and ns.Tour.HasSteps() or false) end,
+          tip = "Draws a box around each hidden frame and says how to bring it back." },
+    })
 
     p:Card("Hide until needed", "Keybinds keep working when a bar is invisible.")
     local missing = {}
@@ -892,11 +1007,8 @@ PAGES[#PAGES + 1] = { key = "buttons", title = "Action bars & UI", icon = "Inter
             p:Card(group)
             last = group
         end
-        local opts
-        if group == "Tooltips" then
-            opts = { avail = function() if not tw.TooltipsAvailable() then return "Tooltip hooks not available" end end }
-        end
-        p:Toggle(o.label, o.desc, function() return tw:IsOn(o.id) end, function(on) tw:Set(o.id, on) end, opts)
+        p:Toggle(o.label, o.desc, function() return tw:IsOn(o.id) end, function(on) tw:Set(o.id, on) end,
+            o.avail and { avail = o.avail } or nil)
     end
 end }
 

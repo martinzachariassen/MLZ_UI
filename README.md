@@ -63,7 +63,13 @@ MLZ UI sets up the **Blizzard UI you already have** (Edit Mode, CVars, keybinds 
 - Auto-repair, sell greys, a mana tick bar and an interrupt announce
 - Reminders for missing self buffs, low reagents and ammo, and worn gear (out of combat only)
 - XP per hour and time to the next level while leveling
-- Class colored names and a "Target:" line in unit tooltips
+- Class colored names and a "Target:" line in unit tooltips, and class colored names in chat
+- Optional style: square minimap with a 1px border, flat chat input box, Roboto chat font
+
+**Understanding your UI**
+- A short tour after setup that points at each hidden frame and says how to bring it back
+- A keyboard map of every keybind (`/mlz keys`), with action icons and free keys
+- One tip at a time on the overview, based on what you have turned on
 
 **Ecosystem**
 - Recommended settings for Prat, Bagnon, Questie, Details!, DBM, BigWigs, Leatrix and more
@@ -95,6 +101,8 @@ MLZ UI sets up the **Blizzard UI you already have** (Edit Mode, CVars, keybinds 
 | `/mlz export` · `/mlz import` | Share your choices as a string |
 | `/mlz health` | Check which supported addons are installed and loaded |
 | `/mlz xp` | XP per hour and time to level (`/mlz xp reset` starts counting again) |
+| `/mlz keys` | A keyboard map of your keybinds, with the SHIFT, CTRL and ALT layers |
+| `/mlz tour` | Show where the hidden bars and buttons are |
 | `/mlz help` | List every command |
 
 ## Supported addons
@@ -136,7 +144,7 @@ Settings that don't exist in your installed version are shown as *not available*
 | **Nameplates** | MLZ nameplates (or Platynator). Tank / Healer / DPS / Solo picked from your role. Healer: unclickable friendly names, dimmed enemies. Tank: bigger target, your debuffs on every mob. Quest marker, cast bar, level only when it matters. Applies at once, no `/reload`. |
 | **Quality of life** | Auto-repair (guild money first), sell greys (hold Shift to skip), mana tick / 5-second rule bar (energy tick for rogues and cats), interrupt announce. Reminder icons for missing self buffs (not in cities), low reagents and ammo, and gear at 25% durability or less. XP per hour and time to level. |
 | **Role profiles** | Nameplates, fading, tick bar and interrupt announce saved per role, loaded automatically when your role changes. |
-| **Tweaks** | Minimap size, FPS counter, calmer combat text (Roboto Bold), hide the quest tracker or its header, class colors and a target line in unit tooltips. |
+| **Tweaks** | Minimap size, FPS counter, calmer combat text (Roboto Bold), hide the quest tracker or its header, class colors and a target line in unit tooltips, class colored names in chat (your old choice per chat type comes back when you turn it off). Style: square minimap with a 1px border (rotation off while square, skipped when Leatrix Plus styles the minimap), flat chat input box, Roboto chat font. |
 | **Backup / undo** | A stack of up to 5 backups. Every wizard run is reversible. |
 | **Health check** | Warns after login if a configured addon is installed but not loaded. |
 
@@ -147,12 +155,12 @@ Settings that don't exist in your installed version are shown as *not available*
 
 | Page | What you see and change |
 |---|---|
-| Overview | One status line per area, and a banner only when setup or a reload is pending |
+| Overview | One status line per area, a tip card, and a banner only when setup or a reload is pending |
 | Layout & scale | Scale mode, screen layout (Edit Mode), minimap size, pet bar position |
 | Nameplates | Engine (MLZ, Platynator or off), current mode and why, mode picker, friendly names, threat colors, PvP tweak, what the plates show, size, Platynator profile save/restore |
 | Role & healing | Your role and where it comes from, healer layouts now and for your role, rebuild healer layouts |
 | Minimalism | One switch per faded frame, pause fading, clean chat |
-| Action bars & UI | Button colors and hotkeys, quest tracker, FPS counter, combat text, tooltips |
+| Action bars & UI | Button colors and hotkeys, quest tracker, FPS counter, combat text, tooltips, style |
 | Quality of life | Repair / sell greys, mana tick bar, interrupt announce, reminders, XP per hour |
 | Other addons | Which supported addons are loaded and how many settings differ, plus addons worth a look for your role |
 | Profiles & backup | Role profiles, export/import, backups, undo |

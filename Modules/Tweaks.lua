@@ -1,8 +1,10 @@
 -- MLZ UI: Tweaks
 --   * Hide the "All Objectives" line at the top of the quest tracker, or the whole tracker
 --   * Minimap size (slider in the settings window, saved in the Edit Mode layout)
+--   * FPS counter, combat text font, unit tooltips, class colored names in chat
+--   * Style: square minimap, flat chat input box, Roboto chat font
 --
--- Only changes alpha/scale on unprotected Blizzard frames, so it is safe and causes no taint.
+-- Only touches unprotected Blizzard frames (tracker, minimap, chat, tooltip), so it causes no taint.
 
 local _, ns = ...
 
@@ -21,7 +23,40 @@ local OPTIONS = {
       desc = "Player names in the mouseover tooltip use their class color, so you see the class at a glance." },
     { id = "tooltipTarget", label = "Show what a unit is targeting", group = "Tooltips",
       desc = 'Adds a "Target:" line to the mouseover tooltip. Shows "you" in amber when it targets you.' },
+    { id = "chatClassNames", label = "Class colors on names in chat", group = "Chat",
+      desc = "Player names in say, party, raid, guild, whispers and channels use their class color." },
+    { id = "squareMinimap", label = "Square minimap with a thin border", group = "Style", default = false,
+      desc = "A square map with a 1px border instead of the round ring. Minimap rotation stays off while it is square." },
+    { id = "flatChatInput", label = "Flat chat input box", group = "Style",
+      desc = "The box you type chat in gets a dark flat background and a thin border instead of the textured frame." },
+    { id = "chatFont", label = "Roboto font in chat", group = "Style", default = false,
+      desc = "Chat text uses Roboto Bold, the font of the MLZ UI headings. The size you picked stays the same." },
 }
+
+-- Rows that can't be used return the reason (shown in amber in the settings window and the wizard)
+local function TooltipsAvailable()
+    if TooltipDataProcessor and TooltipDataProcessor.AddTooltipPostCall then return true end
+    return (_G.GameTooltip and _G.GameTooltip:HasScript("OnTooltipSetUnit")) and true or false
+end
+Tweaks.TooltipsAvailable = TooltipsAvailable
+
+-- Leatrix Plus has its own minimap styling (square shape, border). Don't fight it.
+local function LeatrixMinimap()
+    return ns.IsAddOnLoaded("Leatrix_Plus") and type(_G.LeaPlusDB) == "table" and _G.LeaPlusDB.MinimapModder == "On"
+end
+
+local AVAIL = {
+    tooltipClass = function() if not TooltipsAvailable() then return "Tooltip hooks not available" end end,
+    tooltipTarget = function() if not TooltipsAvailable() then return "Tooltip hooks not available" end end,
+    chatClassNames = function()
+        if type(_G.ChatTypeInfo) ~= "table" then return "Chat colors not found" end
+    end,
+    squareMinimap = function()
+        if not (_G.Minimap and _G.Minimap.SetMaskTexture) then return "Minimap not found" end
+        if LeatrixMinimap() then return "Leatrix Plus styles the minimap" end
+    end,
+}
+for _, o in ipairs(OPTIONS) do o.avail = AVAIL[o.id] end
 
 -- The combat font is read once when the game starts, so a change only shows after a restart.
 -- fontAtStart remembers what this session started with, so the note stays until then.
@@ -219,9 +254,204 @@ local function HookTooltips()
         tooltipHooked = false
     end
 end
-Tweaks.TooltipsAvailable = function()
-    if TooltipDataProcessor and TooltipDataProcessor.AddTooltipPostCall then return true end
-    return (_G.GameTooltip and _G.GameTooltip:HasScript("OnTooltipSetUnit")) and true or false
+
+------------------------------------------------------------------------
+-- Class colored names in chat
+-- The game keeps this per chat type (Chat settings > "Color names"), so the player's own choice is
+-- saved in ns.db.chatClassWas before we change it and put back when the option is turned off.
+------------------------------------------------------------------------
+local CHAT_TYPES = { "SAY", "YELL", "EMOTE", "WHISPER", "WHISPER_INFORM", "PARTY", "PARTY_LEADER", "RAID",
+    "RAID_LEADER", "RAID_WARNING", "INSTANCE_CHAT", "INSTANCE_CHAT_LEADER", "GUILD", "OFFICER" }
+for i = 1, 10 do CHAT_TYPES[#CHAT_TYPES + 1] = "CHANNEL" .. i end
+
+local function SetNameColor(chatType, on)
+    local info = _G.ChatTypeInfo[chatType]
+    if not info then return end
+    info.colorNameByClass = on
+    -- stores it like the Chat settings checkbox does, where the client has it
+    if _G.SetChatColorNameByClass then ns.Try(_G.SetChatColorNameByClass, chatType, on) end
+end
+
+local function ChatClassNames()
+    if type(_G.ChatTypeInfo) ~= "table" then return end
+    local c = Cfg()
+    if c and c.chatClassNames then
+        local was = ns.db.chatClassWas
+        if not was then
+            was = {}
+            for _, t in ipairs(CHAT_TYPES) do
+                local info = _G.ChatTypeInfo[t]
+                if info then was[t] = info.colorNameByClass and true or false end
+            end
+            ns.db.chatClassWas = was
+        end
+        for _, t in ipairs(CHAT_TYPES) do SetNameColor(t, true) end
+        return
+    end
+    local was = ns.db.chatClassWas
+    if not was then return end
+    for t, on in pairs(was) do SetNameColor(t, on) end
+    ns.db.chatClassWas = nil
+end
+
+-- The saved per-type choice arrives from the game after login and can undo ours: set it again
+ns.TryOn("UPDATE_CHAT_COLOR_NAME_BY_CLASS", function(_, chatType, on)
+    local c = Cfg()
+    if not (c and c.chatClassNames) or on or type(chatType) ~= "string" then return end
+    for _, t in ipairs(CHAT_TYPES) do
+        if t == chatType then SetNameColor(t, true) return end
+    end
+end)
+
+------------------------------------------------------------------------
+-- Style: square minimap, flat chat input box, Roboto chat font
+-- Only unprotected frames (Minimap, chat). Turning an option off puts Blizzard's look back.
+------------------------------------------------------------------------
+local SQUARE_MASK = "Interface\\ChatFrame\\ChatFrameBackground"
+local ROUND_MASK = "Interface\\Masks\\CircleMaskScalable" -- the default mask of the Edit Mode minimap
+local CHAT_FONT = "Interface\\AddOns\\MLZ_UI\\Media\\Roboto-Bold.ttf"
+local RINGS = { "MinimapCompassTexture", "MinimapCompassTextureUnderlay", "MinimapBorder" }
+
+local squareOn, squareBorder, maskHooked, settingMask = false, nil, false, false
+
+local function SetMask(texture)
+    settingMask = true
+    pcall(_G.Minimap.SetMaskTexture, _G.Minimap, texture)
+    settingMask = false
+end
+
+local function RingAlpha(a)
+    for _, name in ipairs(RINGS) do
+        local t = _G[name]
+        if t and t.SetAlpha then t:SetAlpha(a) end
+    end
+end
+
+-- A square mask can't rotate. Remember the player's setting so it comes back with the round map.
+local function KeepRotationOff()
+    if GetCVar and GetCVar("rotateMinimap") == "1" then
+        if ns.db.minimapRotateWas == nil then ns.db.minimapRotateWas = "1" end
+        ns.Try(SetCVar, "rotateMinimap", "0")
+    end
+end
+
+local function SquareMinimap()
+    local map = _G.Minimap
+    if not (map and map.SetMaskTexture) then return end
+    local c = Cfg()
+    if c and c.squareMinimap and not LeatrixMinimap() then
+        if not maskHooked then
+            maskHooked = true
+            -- Blizzard sets the mask again on some updates; keep it square while the option is on
+            hooksecurefunc(map, "SetMaskTexture", function()
+                if squareOn and not settingMask then SetMask(SQUARE_MASK) end
+            end)
+        end
+        squareOn = true
+        SetMask(SQUARE_MASK)
+        RingAlpha(0)
+        KeepRotationOff()
+        if not squareBorder then
+            squareBorder = CreateFrame("Frame", nil, map)
+            squareBorder:SetPoint("TOPLEFT", -1, 1)
+            squareBorder:SetPoint("BOTTOMRIGHT", 1, -1)
+            squareBorder:EnableMouse(false)
+            ns.W.Border(squareBorder, ns.W.T.border)
+        end
+        squareBorder:Show()
+        -- Minimap button libraries ask this to place icons along the edge
+        if not _G.GetMinimapShape then
+            _G.GetMinimapShape = function() return squareOn and "SQUARE" or "ROUND" end
+        end
+        return
+    end
+    if squareOn then
+        squareOn = false
+        SetMask(ROUND_MASK)
+        RingAlpha(1)
+        if squareBorder then squareBorder:Hide() end
+    end
+    if ns.db.minimapRotateWas then
+        ns.Try(SetCVar, "rotateMinimap", ns.db.minimapRotateWas)
+        ns.db.minimapRotateWas = nil
+    end
+end
+
+-- Every chat window, including whisper windows opened later
+local function EachChatFrame(fn)
+    local list = _G.CHAT_FRAMES
+    if type(list) ~= "table" or #list == 0 then
+        list = {}
+        for i = 1, (NUM_CHAT_WINDOWS or 10) do list[i] = "ChatFrame" .. i end
+    end
+    for _, name in ipairs(list) do
+        local f = _G[name]
+        if f then fn(f, name) end
+    end
+end
+
+local EDIT_ART = { "Left", "Mid", "Right", "FocusLeft", "FocusMid", "FocusRight" }
+local flatBoxes = {} -- edit box -> our backdrop
+
+local function FlatChatInput()
+    local c = Cfg()
+    local on = c and c.flatChatInput
+    EachChatFrame(function(_, name)
+        local boxName = name .. "EditBox"
+        local box = _G[boxName]
+        if not box or (not on and not flatBoxes[box]) then return end
+        for _, part in ipairs(EDIT_ART) do
+            local t = _G[boxName .. part]
+            if t and t.SetAlpha then t:SetAlpha(on and 0 or 1) end
+        end
+        local bg = flatBoxes[box]
+        if on and not bg then
+            -- A lower frame level puts the backdrop under the box's own text
+            bg = CreateFrame("Frame", nil, box)
+            bg:SetFrameLevel(math.max(0, box:GetFrameLevel() - 1))
+            bg:SetPoint("TOPLEFT", 4, -4)
+            bg:SetPoint("BOTTOMRIGHT", -4, 4)
+            ns.W.Fill(bg, ns.W.T.input)
+            ns.W.Border(bg, ns.W.T.border)
+            flatBoxes[box] = bg
+        end
+        if bg then bg:SetShown(on and true or false) end
+    end)
+end
+
+local fontChanged = false
+local function ChatFont()
+    local c = Cfg()
+    local on = c and c.chatFont
+    if not on and not fontChanged then return end
+    local base = _G.ChatFontNormal and _G.ChatFontNormal:GetFont()
+    local want = on and CHAT_FONT or base
+    if not want then return end
+    EachChatFrame(function(f)
+        local file, size, flags = f:GetFont()
+        if size and file ~= want then f:SetFont(want, size, flags or "") end
+    end)
+    fontChanged = on and true or false
+end
+
+local function Style()
+    local wasSquare = squareOn
+    pcall(SquareMinimap)
+    -- our minimap button sits on the edge, which moved
+    if wasSquare ~= squareOn and ns.MinimapButton and ns.MinimapButton.Position then pcall(ns.MinimapButton.Position) end
+    pcall(FlatChatInput)
+    pcall(ChatFont)
+end
+
+-- New whisper windows are made after login: style them too
+local chatHooked = false
+local function HookNewChatWindows()
+    if chatHooked or not _G.FCF_OpenTemporaryWindow then return end
+    chatHooked = true
+    hooksecurefunc("FCF_OpenTemporaryWindow", function()
+        local c = Cfg()
+        if c and (c.flatChatInput or c.chatFont) then C_Timer.After(0, Style) end
+    end)
 end
 
 function Tweaks:Refresh()
@@ -230,6 +460,9 @@ function Tweaks:Refresh()
     pcall(TrackerVisibility)
     pcall(Fps)
     pcall(HookTooltips)
+    pcall(ChatClassNames)
+    Style()
+    pcall(HookNewChatWindows)
 end
 
 -- Public API (settings window)
@@ -335,6 +568,8 @@ function Tweaks:Preview()
         if o.id == "trackerHeader" and not hasTracker then
             item.unavailable, item.new, item.enabled = true, "header not found", false
         end
+        local why = o.avail and o.avail()
+        if why then item.unavailable, item.new, item.enabled = true, why:lower(), false end
         items[#items + 1] = item
     end
     return items
