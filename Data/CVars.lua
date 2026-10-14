@@ -19,6 +19,16 @@ ns.data.cvars = {
       desc = "Dismounts from a flying mount when you cast a spell." },
     { name = "autoClearAFK", value = "1", label = "Clear AFK automatically", enabled = true,
       desc = "Removes AFK status when you start playing again." },
+    { name = "lootUnderMouse", value = "1", label = "Loot window at the mouse", enabled = true,
+      desc = "Opens the loot window where your mouse is, so you don't have to move across the screen." },
+    { name = "instantQuestText", value = "1", label = "Instant quest text", enabled = true,
+      desc = "Shows the whole quest text at once instead of letter by letter." },
+    { name = "autoQuestWatch", value = "1", label = "Track new quests", enabled = true,
+      desc = "Adds a quest to the tracker when you accept it, so you can see what is left." },
+    { name = "interactOnLeftClick", value = "0", label = "Left click only targets", enabled = false,
+      desc = "Left click selects an NPC without talking to it or attacking. Right click still interacts. Personal taste, off by default." },
+    { name = "deselectOnClick", value = "0", label = "Sticky targeting", enabled = false,
+      desc = "Clicking empty ground no longer clears your target. Only a new target or ESC does. Personal taste, off by default." },
 
     -- Combat
     { name = "ActionButtonUseKeyDown", value = "1", label = "Cast on key down", enabled = true,
@@ -26,6 +36,25 @@ ns.data.cvars = {
     { name = "SpellQueueWindow", value = "200", label = "Spell queue window (ms)", enabled = false,
       choices = { "100", "150", "200", "250", "300", "400" },
       desc = "How early you can press the next spell before the previous one finishes. Default 400. Lower = more precise, requires low ping. Click the value to change it." },
+
+    -- Unit frames: read the numbers instead of guessing from the bar
+    { name = "statusText", value = "1", label = "Health and mana as text", enabled = true,
+      desc = "Shows health and mana as text on your unit frames (older clients)." },
+    { name = "statusTextDisplay", value = "NUMERIC", label = "Health and mana text", enabled = true,
+      choices = { "NUMERIC", "PERCENT", "BOTH" },
+      desc = "Shows health and mana on your unit frames as numbers, percent or both. Click the value to change it." },
+    { name = "breakUpLargeNumbers", value = "1", label = "Readable large numbers", enabled = true,
+      desc = "Writes 12,345 instead of 12345." },
+    { name = "showTargetOfTarget", value = "1", label = "Target of target", enabled = true,
+      desc = "Shows who your target is targeting. On an enemy, that is who it is attacking." },
+    { name = "showTargetCastbar", value = "1", label = "Target cast bar", enabled = true,
+      desc = "Shows what your target is casting under the target frame, so you know when to interrupt." },
+    { name = "showVKeyCastbar", value = "1", label = "Cast bar above the target", enabled = true,
+      desc = "Shows your target's cast bar above its head as well." },
+    { name = "buffDurations", value = "1", label = "Buff durations", enabled = true,
+      desc = "Shows the time left under each buff and debuff on your character." },
+    { name = "xpBarText", value = "1", label = "XP numbers always visible", enabled = true,
+      desc = "Shows XP as numbers on the XP bar without hovering it." },
 
     -- Action bars
     { name = "lockActionBars", value = "0", label = "Unlock action bars", enabled = true,
@@ -53,6 +82,8 @@ ns.data.cvars = {
       desc = "Size of floating numbers. Default 1. Click the value to change it." },
     { name = "WorldTextGravity", value = "0.5", label = "Combat text gravity", enabled = true,
       desc = "How fast numbers move away. Lower = calmer." },
+    { name = "floatingCombatTextReactives", value = "1", label = "Reactive ability alerts", enabled = true,
+      desc = "Short text when a reactive ability becomes usable, like Overpower or Revenge." },
 
     -- Nameplates (stacking and friendly plates are handled by Platynator, see the Nameplates page)
     { name = "nameplateMaxDistance", value = "41", label = "Nameplate distance", enabled = true,
@@ -87,6 +118,10 @@ ns.data.cvars = {
     -- Screen effects
     { name = "doNotFlashLowHealthWarning", value = "1", label = "Disable low health flash", enabled = true,
       desc = "Turns off the pulsing red screen edge when your health is low." },
+    { name = "ffxGlow", value = "0", label = "Disable full screen glow", enabled = false,
+      desc = "Removes the soft bloom over the whole screen. Sharper image and a little more FPS. Personal taste, off by default." },
+    { name = "cameraReduceUnexpectedMovement", value = "1", label = "Calmer camera", enabled = false,
+      desc = "Reduces camera movement you didn't cause, like bobbing and shaking." },
 
     -- Quality of life
     { name = "autoLootRate", value = "0", label = "Instant auto loot", enabled = true,
@@ -107,6 +142,8 @@ ns.data.cvars = {
       desc = "Turns off background ambience sounds." },
     { name = "Sound_EnableMusic", value = "0", label = "Mute music", enabled = false,
       desc = "Turns off game music." },
+    { name = "Sound_EnableSoundWhenGameIsInBg", value = "1", label = "Sound in the background", enabled = true,
+      desc = "Keeps game sound on when you tab out, so you still hear ready checks, whispers and queue pops." },
     { name = "Sound_EnableErrorSpeech", value = "0", label = "Disable error speech", enabled = true,
       desc = "Removes the voice that says 'Not enough mana', 'Out of range' etc." },
     { name = "showTutorials", value = "0", label = "Disable tutorials", enabled = true,
