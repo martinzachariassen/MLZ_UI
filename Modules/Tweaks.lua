@@ -17,6 +17,10 @@ local OPTIONS = {
       desc = "Small FPS and ping text in the bottom-right corner. Clicks pass through it." },
     { id = "cleanCombatFont", label = "Clean combat text font", group = "Combat text",
       desc = "Uses Roboto Bold for floating damage and healing numbers." },
+    { id = "tooltipClass", label = "Class colors in unit tooltips", group = "Tooltips",
+      desc = "Player names in the mouseover tooltip use their class color, so you see the class at a glance." },
+    { id = "tooltipTarget", label = "Show what a unit is targeting", group = "Tooltips",
+      desc = 'Adds a "Target:" line to the mouseover tooltip. Shows "you" in amber when it targets you.' },
 }
 
 -- The combat font is read once when the game starts, so a change only shows after a restart.
@@ -160,11 +164,72 @@ local function Fps()
     UpdateFps()
 end
 
+------------------------------------------------------------------------
+-- Unit tooltips: class colored names and a "Target:" line
+-- Hooked once; each call checks the settings, so turning an option off needs no unhook.
+-- The tooltip is rebuilt every time it shows, so there is nothing to restore.
+------------------------------------------------------------------------
+local function ClassColor(unit)
+    if not UnitIsPlayer(unit) then return nil end
+    local _, class = UnitClass(unit)
+    local colors = _G.CUSTOM_CLASS_COLORS or _G.RAID_CLASS_COLORS
+    return class and colors and colors[class]
+end
+
+local function OnTooltipUnit(tooltip)
+    local c = Cfg()
+    if not (c and (c.tooltipClass or c.tooltipTarget)) or tooltip ~= _G.GameTooltip then return end
+    local _, unit = tooltip:GetUnit()
+    if not unit then return end
+    if c.tooltipClass then
+        local color = ClassColor(unit)
+        local line = _G.GameTooltipTextLeft1
+        if color and line then line:SetTextColor(color.r, color.g, color.b) end
+    end
+    if c.tooltipTarget and UnitExists(unit .. "target") then
+        local target = unit .. "target"
+        local text
+        if UnitIsUnit(target, "player") then
+            text = ns.W.C.amber .. "you" .. ns.W.C.r
+        else
+            local name = UnitName(target) or "?"
+            local color = ClassColor(target)
+            text = color and ("|c" .. (color.colorStr or "ffffffff") .. name .. "|r") or name
+        end
+        tooltip:AddLine(ns.W.C.grey .. "Target:|r " .. text)
+        tooltip:Show() -- resize to fit the new line
+    end
+end
+
+local tooltipHooked = false
+local function HookTooltips()
+    if tooltipHooked then return end
+    local c = Cfg()
+    if not (c and (c.tooltipClass or c.tooltipTarget)) then return end -- hook only once it is wanted
+    tooltipHooked = true
+    local function Safe(tooltip)
+        local ok, err = pcall(OnTooltipUnit, tooltip)
+        if not ok then ns.Error("tooltip", err) end
+    end
+    if TooltipDataProcessor and TooltipDataProcessor.AddTooltipPostCall and Enum and Enum.TooltipDataType then
+        TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Unit, Safe)
+    elseif _G.GameTooltip and _G.GameTooltip:HasScript("OnTooltipSetUnit") then
+        _G.GameTooltip:HookScript("OnTooltipSetUnit", Safe)
+    else
+        tooltipHooked = false
+    end
+end
+Tweaks.TooltipsAvailable = function()
+    if TooltipDataProcessor and TooltipDataProcessor.AddTooltipPostCall then return true end
+    return (_G.GameTooltip and _G.GameTooltip:HasScript("OnTooltipSetUnit")) and true or false
+end
+
 function Tweaks:Refresh()
     if not Cfg() then return end
     pcall(TrackerHeader)
     pcall(TrackerVisibility)
     pcall(Fps)
+    pcall(HookTooltips)
 end
 
 -- Public API (settings window)

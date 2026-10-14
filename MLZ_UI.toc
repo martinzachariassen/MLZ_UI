@@ -18,6 +18,7 @@ Data\Layout.lua
 Data\Fade.lua
 Data\Nameplates.lua
 Data\Addons.lua
+Data\Reminders.lua
 
 Modules\Backup.lua
 Modules\Scale.lua
@@ -35,6 +36,8 @@ Modules\Health.lua
 Modules\Vendor.lua
 Modules\ManaTick.lua
 Modules\Interrupt.lua
+Modules\Reminders.lua
+Modules\XPRate.lua
 Modules\Profile.lua
 
 UI\Widgets.lua

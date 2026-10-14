@@ -9,7 +9,7 @@ ns.version = "0.7.0"
 ns.modules = {}       -- registered modules, in load order (see MLZ_UI.toc), also indexed by key
 ns.data = {}          -- data tables (Data/*.lua)
 
-local DB_VERSION = 4
+local DB_VERSION = 5
 
 ------------------------------------------------------------------------
 -- Output
@@ -416,6 +416,11 @@ local migrations = {
         if type(np) == "table" and np.engine == nil and (np.lastKey or np.snapshot or np.style) then
             np.engine = "platynator"
         end
+    end,
+    -- v5: new optional keys, nothing to convert. reminders = { buffs, reagents, durability }
+    -- (Modules/Reminders.lua fills in defaults), tweaks.tooltipClass and tweaks.tooltipTarget.
+    [5] = function(db)
+        if db.reminders ~= nil and type(db.reminders) ~= "table" then db.reminders = nil end
     end,
 }
 

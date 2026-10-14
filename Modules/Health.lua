@@ -29,7 +29,7 @@ local function Problems(onlyInstalled)
         local exists = Installed(addon)
         if onlyInstalled and not exists then return end
         seen[title] = true
-        list[#list + 1] = { title = title, installed = exists }
+        list[#list + 1] = { title = title, addon = addon, installed = exists }
     end
     for _, entry in ipairs(ns.data.addons) do Check(entry.addon, entry.title) end
     for _, entry in ipairs(EXTRA) do
@@ -48,10 +48,32 @@ function ns.HealthOff()
     return names
 end
 
+-- Recommended addons from Data/Addons.lua with their state for this character.
+-- Returns a list of { title, why, installed, forRole } in data order.
+function ns.Recommendations()
+    local role = ns.Role and ns.Role() or "DAMAGER"
+    local list = {}
+    for _, rec in ipairs(ns.data.recommended or {}) do
+        list[#list + 1] = {
+            title = rec.title, addon = rec.addon, why = rec.why,
+            installed = Installed(rec.addon),
+            forRole = rec.roles ~= nil and rec.roles[role] == true,
+        }
+    end
+    return list
+end
+
 local function Report()
     local list = Problems(false)
+    local listed, worth = {}, {}
+    for _, p in ipairs(list) do listed[p.addon] = true end
+    for _, r in ipairs(ns.Recommendations()) do
+        -- supported addons that are missing are already named under "Not installed"
+        if not r.installed and not listed[r.addon] then worth[#worth + 1] = r.title end
+    end
     if #list == 0 then
-        ns.Print("All supported addons are loaded.")
+        ns.Print("All supported addons are loaded."
+            .. (#worth > 0 and (" Worth a look: " .. table.concat(worth, ", ") .. ".") or ""))
         return
     end
     local off, missing = {}, {}
@@ -60,6 +82,7 @@ local function Report()
     end
     if #off > 0 then ns.Print("Switched off in the addon list: " .. table.concat(off, ", ") .. ".") end
     if #missing > 0 then ns.Print("Not installed: " .. table.concat(missing, ", ") .. ".") end
+    if #worth > 0 then ns.Print("Worth a look: " .. table.concat(worth, ", ") .. ".") end
 end
 
 ns.AddCommand("health", "lists supported addons that are switched off or not installed", Report)

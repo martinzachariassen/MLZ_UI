@@ -1,5 +1,5 @@
--- MLZ UI: Settings for other addons (Prat, Auctionator, AtlasLoot, WhatsTraining, Bagnon, RXPGuides,
--- Deadly Boss Mods, Leatrix Plus, Leatrix Maps)
+-- MLZ UI: Settings for other addons (Prat, Auctionator, AtlasLoot, WhatsTraining, Bagnon, Baganator,
+-- RXPGuides, Questie, Deadly Boss Mods, BigWigs, Leatrix Plus, Leatrix Maps, Details!, Clique, TomTom, Postal)
 -- Edit this file to change what the wizard step "Other addons" sets. MLZ UI never downloads or
 -- updates these addons; it only configures the ones that are installed and loaded.
 --
@@ -33,6 +33,20 @@ end
 -- (inventory, bank, vault, guild); the rest sit directly on Bagnon_Sets.
 local function BagnonRoot() return Bagnon_Sets end
 local function BagnonGlobal() return Bagnon_Sets and Bagnon_Sets.global end
+
+-- BigWigs core and plugins are load on demand (boss zone or /bw). Once loaded, use the plugin's AceDB
+-- profile; before that, the raw namespace table in BigWigs3DB (only there after BigWigs ran once).
+local function BigWigsPlugin(name)
+    return function()
+        local core = BigWigs
+        local plugin = core and core.GetPlugin and core:GetPlugin(name, true)
+        if plugin and plugin.db then return plugin.db.profile end
+        local loader = BigWigsLoader and BigWigsLoader.db
+        local space = BigWigs3DB and BigWigs3DB.namespaces and BigWigs3DB.namespaces["BigWigs_Plugins_" .. name]
+        if not (loader and loader.GetCurrentProfile and space and space.profiles) then return nil end
+        return space.profiles[loader:GetCurrentProfile()]
+    end
+end
 
 ns.data.addons = {
     {
@@ -110,6 +124,25 @@ ns.data.addons = {
               root = BagnonRoot, path = { "countGuild" }, value = false, enabled = false },
         },
     },
+    -- Baganator (needs Syndicator). Settings live in BAGANATOR_CONFIG.Profiles[<current profile>] and are
+    -- not rewritten at logout. Baganator only redraws through its private setter: needs /reload.
+    {
+        addon = "Baganator", title = "Baganator (bags)",
+        root = function()
+            local profiles = BAGANATOR_CONFIG and BAGANATOR_CONFIG.Profiles
+            return profiles and profiles[BAGANATOR_CURRENT_PROFILE or "DEFAULT"]
+        end,
+        rows = {
+            { id = "grey_junk", label = "Grey out junk", desc = "Junk items are drawn in grey, so the useful ones stand out.",
+              path = { "icon_grey_junk" }, value = true },
+            { id = "unusable", label = "Mark items you can't use", desc = "Items your class can't use get a red tint.",
+              path = { "icon_mark_unusable" }, value = true },
+            { id = "open_crafting", label = "No auto-open when crafting", desc = "Bags stay closed when you open a profession window.",
+              path = { "auto_open", "tradeskill" }, value = false },
+            { id = "open_sockets", label = "No auto-open when socketing", desc = "Bags stay closed when you open the socketing window.",
+              path = { "auto_open", "sockets" }, value = false },
+        },
+    },
     {
         addon = "RXPGuides", title = "RestedXP Guides",
         root = function()
@@ -124,6 +157,25 @@ ns.data.addons = {
               path = { "windowScale" }, value = 1.1, enabled = false },
             { id = "lock_frames", label = "Lock frames", desc = "Locks the guide window against dragging.",
               path = { "lockFrames" }, value = true },
+        },
+    },
+    -- Questie (AceDB). Defaults: Modules/Options/QuestieOptionsDefaults.lua. Questie keeps no private copy,
+    -- so changes survive logout. Most options only redraw through Questie's own setters: needs /reload.
+    {
+        addon = "Questie", title = "Questie (quests)",
+        root = function() return Questie and Questie.db and Questie.db.profile end,
+        rows = {
+            { id = "minimap", label = "Hide minimap button", desc = "Keeps the minimap clean. Open the settings with /questie.",
+              path = { "minimap", "hide" }, value = true },
+            { id = "tracker_combat", label = "Hide quest tracker in combat",
+              desc = "Same as the Blizzard quest tracker under Minimalism: the fight gets the space, the list comes back after.",
+              path = { "hideTrackerInCombat" }, value = true },
+            { id = "done_objectives", label = "Hide finished objectives",
+              desc = "The tracker only lists what is still left to do in each quest.",
+              path = { "hideCompletedQuestObjectives" }, value = true },
+            { id = "map_icons_tracked", label = "Map icons only for tracked quests",
+              desc = "The map only shows icons for quests in your tracker. Off by default: tick it if the map feels busy.",
+              path = { "hideUntrackedQuestsMapIcons" }, value = true, enabled = false },
         },
     },
     -- Deadly Boss Mods. Positions are in UIParent units (same as the Edit Mode layout, 1200 units tall).
@@ -171,6 +223,34 @@ ns.data.addons = {
               path = { "HugeBarsEnabled" }, value = false },
         },
     },
+    -- BigWigs: the same places as Deadly Boss Mods above. Positions are { point, relPoint, x, y } on UIParent
+    -- (bars add the frame name). BigWigs resets values outside its own ranges, so stay inside them:
+    -- message font 14-200, emphasized 20-200, bar width 120-550, height 10-100.
+    {
+        addon = "BigWigs", title = "BigWigs",
+        root = BigWigsPlugin("Messages"),
+        rows = {
+            { id = "warn", label = "Warnings", show = "%s",
+              desc = "Normal warnings at the top center, above the cast bar, font 18 instead of 20.",
+              set = { { path = { "normalPosition" }, value = { "TOP", "TOP", 0, -230 } },
+                      { path = { "fontSize" }, value = 18 } } },
+            { id = "emph", label = "Emphasized warnings", show = "%s  %spt",
+              desc = "Big warnings just below the normal ones instead of in the middle of the screen, font 28 instead of 44.",
+              set = { { path = { "emphPosition" }, value = { "TOP", "TOP", 0, -290 } },
+                      { path = { "emphFontSize" }, value = 28 } } },
+            { id = "bars", label = "Timer position", show = "%s  up: %s",
+              desc = "Bars hang from the right edge above the damage meter and stack upward.",
+              root = BigWigsPlugin("Bars"),
+              set = { { path = { "normalPosition" }, value = { "BOTTOMRIGHT", "BOTTOMRIGHT", -100, 360, "UIParent" } },
+                      { path = { "growup" }, value = true } } },
+            { id = "size", label = "Timer size", show = "%sx%s",
+              desc = "Slimmer bars: 170x16 instead of 180x18.",
+              root = BigWigsPlugin("Bars"),
+              set = { { path = { "normalWidth" }, value = 170 }, { path = { "normalHeight" }, value = 16 } } },
+            { id = "emphasize", label = "No separate large bars", desc = "Bars stay in one stack instead of jumping to the center of the screen near the end.",
+              root = BigWigsPlugin("Bars"), path = { "emphasize" }, value = false },
+        },
+    },
     -- Leatrix Plus: only what MLZ UI doesn't already do. Not touched on purpose:
     --   camera zoom, hotkey/macro text (MLZ sets those), chat tweaks (Prat), minimap clutter (already hidden).
     -- Values are "On" / "Off" strings, as Leatrix stores them. Needs /reload.
@@ -206,4 +286,79 @@ ns.data.addons = {
               path = { "ShowMinimapIcon" }, value = "Off" },
         },
     },
+    -- Details! copies its live settings over the saved profile at logout, so we write the live objects:
+    -- `Details` for global options and window 1 for per-window options. Needs /reload to redraw.
+    {
+        addon = "Details", title = "Details! (meter)",
+        root = function()
+            local d = Details
+            if not (d and d.GetInstance and (not d.IsLoaded or d.IsLoaded())) then return nil end
+            return d:GetInstance(1)
+        end,
+        rows = {
+            { id = "minimap", label = "Hide minimap button", desc = "Keeps the minimap clean. Open Details with /details.",
+              root = function() return Details end, path = { "minimap", "hide" }, value = true },
+            -- hide_on_context[3] = "not in a group"; `value` is the alpha in percent while the rule is active
+            { id = "solo", label = "Hide when solo", show = "%s  alpha %s%%",
+              desc = "Window 1 is hidden when you play alone and shows again in a party or raid. Same idea as the damage meter under Minimalism.",
+              set = { { path = { "hide_on_context", 3, "enabled" }, value = true },
+                      { path = { "hide_on_context", 3, "value" }, value = 0 } } },
+            { id = "class_colors", label = "Class colors on bars", desc = "Bars are colored by class, so you can tell players apart at a glance.",
+              path = { "row_info", "texture_class_colors" }, value = true },
+        },
+    },
+    -- Clique 5.x: per-character options in Clique.settings (db.char). Bindings are left alone on purpose:
+    -- they depend on your spells, so you set them up in Clique itself.
+    {
+        addon = "Clique", title = "Clique (click-casting)",
+        root = function() return Clique and Clique.settings end,
+        rows = {
+            { id = "tooltip", label = "Show bindings in tooltips",
+              desc = "Hovering a unit frame lists what each click does, so you don't have to remember your bindings.",
+              path = { "showBindingTooltip" }, value = true },
+        },
+    },
+    -- TomTom (AceDB). The arrow position is only read when you enter the world: needs /reload.
+    {
+        addon = "TomTom", title = "TomTom (waypoints)",
+        root = function() return TomTom and TomTom.db and TomTom.db.profile end,
+        rows = {
+            { id = "arrow_lock", label = "Lock the arrow", desc = "The waypoint arrow can't be dragged away by accident.",
+              path = { "arrow", "lock" }, value = true },
+            { id = "block", label = "Hide the coordinate box",
+              desc = "Removes the small box with your coordinates. The world map still shows them. Off by default: tick it if you never read it.",
+              path = { "block", "enable" }, value = false, enabled = false },
+        },
+    },
+    -- Postal (AceDB). Options are read each time they are used: no reload needed.
+    {
+        addon = "Postal", title = "Postal (mail)",
+        live = true,
+        root = function() return Postal and Postal.db and Postal.db.profile end,
+        rows = {
+            { id = "openall_chat", label = "Quiet open all", desc = "Opening all mail doesn't print a chat line for every letter.",
+              path = { "OpenAll", "SpamChat" }, value = false },
+            { id = "select_chat", label = "Quiet select", desc = "Opening selected mail doesn't print a chat line for every letter.",
+              path = { "Select", "SpamChat" }, value = false },
+        },
+    },
+}
+
+-- Addons worth a look that the player doesn't have yet. Shown on the "Other addons" page and in
+-- /mlz health, never as a popup. MLZ UI never installs anything.
+--   addon = folder name, title = shown name, why = one line on what it does for the player
+--   roles = (optional) only highlighted for these roles; without it, it is for everyone
+ns.data.recommended = {
+    { addon = "Questie", title = "Questie",
+      why = "Shows quest givers and objectives on the map, so you spend less time searching." },
+    { addon = "Clique", title = "Clique", roles = { HEALER = true },
+      why = "Heal by clicking party and raid frames, no target switching." },
+    { addon = "Details", title = "Details!",
+      why = "Shows damage, healing and threat per player after each fight." },
+    { addon = "TomTom", title = "TomTom",
+      why = "An arrow that points to your next waypoint. RestedXP Guides and Questie can use it." },
+    { addon = "Postal", title = "Postal",
+      why = "Opens all your mail with one click and remembers who you send to." },
+    { addon = "BugSack", title = "BugSack",
+      why = "Collects Lua errors quietly, so you can report them instead of seeing popups." },
 }

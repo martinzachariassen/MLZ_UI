@@ -26,7 +26,8 @@ local function FadeModeText(mode)
     return t:sub(1, 1):upper() .. t:sub(2)
 end
 local AB_SHORT = { range = "range", mana = "mana", unusable = "unusable", hotkeys = "short keys", macroNames = "no macro names" }
-local TW_SHORT = { trackerHeader = "no tracker header", trackerHide = "tracker hidden", fps = "FPS counter", cleanCombatFont = "combat font" }
+local TW_SHORT = { trackerHeader = "no tracker header", trackerHide = "tracker hidden", fps = "FPS counter", cleanCombatFont = "combat font",
+    tooltipClass = "class colored tooltips", tooltipTarget = "tooltip target" }
 
 local function OpenWizard(stepKey)
     if InCombatLockdown() then
@@ -207,8 +208,28 @@ SECTIONS[#SECTIONS + 1] = function(Add)
     if MT.IsOn() then names[#names + 1] = "mana tick bar" end
     if IA.Get() ~= "off" then names[#names + 1] = "interrupt announce" end
     if ns.RoleProfiles.Auto() then names[#names + 1] = "role profiles" end
+    local R = ns.Reminders
+    if R and (R.Get("buffs") or R.Get("reagents")) then names[#names + 1] = "reminders" end
     Add("qol", "Quality of life", #names > 0 and "on" or "off", #names > 0 and (#names .. " on") or "Off",
         #names > 0 and ("On: " .. table.concat(names, ", ")) or "Nothing turned on")
+end
+
+-- Worn gear: only listed when it needs a repair
+SECTIONS[#SECTIONS + 1] = function(Add)
+    local R = ns.Reminders
+    if not (R and R.Get("durability")) then return end
+    local low = R.Durability()
+    if low and low <= R.DurabilityLimit() then
+        Add("qol", "Gear", "warn", low .. "%", "Your most worn item is at " .. low .. "%. Repair at a merchant.")
+    end
+end
+
+-- Leveling: XP per hour, hidden at max level
+SECTIONS[#SECTIONS + 1] = function(Add)
+    local X = ns.XPRate
+    local text = X and X.Text()
+    if not text then return end
+    Add("qol", "Leveling", "info", X.Badge() or "Counting", text)
 end
 
 SECTIONS[#SECTIONS + 1] = function(Add)
@@ -871,7 +892,11 @@ PAGES[#PAGES + 1] = { key = "buttons", title = "Action bars & UI", icon = "Inter
             p:Card(group)
             last = group
         end
-        p:Toggle(o.label, o.desc, function() return tw:IsOn(o.id) end, function(on) tw:Set(o.id, on) end)
+        local opts
+        if group == "Tooltips" then
+            opts = { avail = function() if not tw.TooltipsAvailable() then return "Tooltip hooks not available" end end }
+        end
+        p:Toggle(o.label, o.desc, function() return tw:IsOn(o.id) end, function(on) tw:Set(o.id, on) end, opts)
     end
 end }
 
@@ -905,6 +930,27 @@ PAGES[#PAGES + 1] = { key = "qol", title = "Quality of life", icon = "Interface\
     p:Card("Interrupts")
     p:Choice("Announce my interrupts", "\"Interrupted <mob>'s <spell>\" when you or your pet interrupt a cast. Say and Group only post while you are in a group.",
         IA.CHANNELS, IA.Get, IA.Set, 62)
+
+    local R, X = ns.Reminders, ns.XPRate
+    p:Card("Reminders", "Small icons below the middle of the screen, out of combat only. They go away once it is fixed.")
+    p:Toggle("Missing self buffs", "Inner Fire, Arcane Intellect, aspects, poisons, weapon imbues and similar. "
+        .. "Not shown in cities and inns.",
+        function() return R.Get("buffs") end, function(on) R.Set("buffs", on) end)
+    p:Toggle("Low reagents and ammo", "Ammo, soul shards, ankhs, powders and candles for the spells you know.",
+        function() return R.Get("reagents") end, function(on) R.Set("reagents", on) end)
+    p:Toggle("Worn gear", ("An icon and one chat line when your most worn item drops to %d%% durability."):format(R.DurabilityLimit()),
+        function() return R.Get("durability") end, function(on) R.Set("durability", on) end)
+
+    p:Card("Leveling", "Counted since you logged in or reloaded. Also on the overview and with /mlz xp.")
+    p:Value("XP per hour", function() return X.Text() or "You are at max level." end,
+        function() return X.Badge() or (C.grey .. (X.Stats() and "counting" or "max level") .. C.r) end, { width = 120 })
+    p:Buttons({
+        { text = "Start counting again", width = 170, style = "subtle", fn = function()
+            X.Reset()
+            ns.FireState()
+            S:Notify("XP per hour counts from now.", "info")
+        end },
+    })
 end }
 
 PAGES[#PAGES + 1] = { key = "addons", title = "Other addons", icon = "Interface\\Icons\\INV_Misc_Bag_08", build = function(p)
@@ -936,6 +982,22 @@ PAGES[#PAGES + 1] = { key = "addons", title = "Other addons", icon = "Interface\
         { text = "Apply addon settings...", width = 190, style = "primary", fn = function() OpenWizard("addons") end,
           tip = "Opens the setup wizard at the addons step, so you can see and pick each change." },
     })
+
+    if ns.Recommendations then
+        p.rec = ns.Recommendations()
+        p:OnRefresh(function() p.rec = ns.Recommendations() end)
+        p:Card("Worth a look", "Addons that make the game easier to read. MLZ UI doesn't install them: get them from "
+            .. "CurseForge or Wago if you want them.")
+        for i, rec in ipairs(p.rec) do
+            p:Status(rec.title, rec.why, function()
+                local r = p.rec[i]
+                if not r then return "na", "-" end
+                if r.installed then return "on", "Installed" end
+                if r.forRole then return "info", "For your role" end
+                return "na", "Not installed"
+            end)
+        end
+    end
 
     p:Card("Switched-off addons")
     p:Toggle("Point out switched-off addons", "Shows a note on the overview and the minimap button when a supported addon "

@@ -61,9 +61,12 @@ MLZ UI sets up the **Blizzard UI you already have** (Edit Mode, CVars, keybinds 
 - Role detection (talents, spec, group or your choice; DPS until your talents decide) that drives the layouts and nameplates
 - Our own flat nameplates: health, cast bar, quest marker, your debuffs and threat colors per role
 - Auto-repair, sell greys, a mana tick bar and an interrupt announce
+- Reminders for missing self buffs, low reagents and ammo, and worn gear (out of combat only)
+- XP per hour and time to the next level while leveling
+- Class colored names and a "Target:" line in unit tooltips
 
 **Ecosystem**
-- Recommended settings for Prat, Bagnon, Auctionator, DBM, Leatrix and more
+- Recommended settings for Prat, Bagnon, Questie, Details!, DBM, BigWigs, Leatrix and more
 - Optional: Platynator as the nameplate engine, with modes per role and a clean style
 - Role profiles, export/import strings and a health check for missing addons
 
@@ -91,6 +94,7 @@ MLZ UI sets up the **Blizzard UI you already have** (Edit Mode, CVars, keybinds 
 | `/mlz np auto\|tank\|healer\|dps\|solo` | Nameplate mode (also `engine mlz\|platynator\|off`, `style`, `threat`, `pvp`, `friends`, `save`, `load`, `export`) |
 | `/mlz export` · `/mlz import` | Share your choices as a string |
 | `/mlz health` | Check which supported addons are installed and loaded |
+| `/mlz xp` | XP per hour and time to level (`/mlz xp reset` starts counting again) |
 | `/mlz help` | List every command |
 
 ## Supported addons
@@ -108,6 +112,13 @@ MLZ UI **configures** these addons when they are installed and loaded. It does n
 | [AtlasLoot Classic](https://www.curseforge.com/wow/addons/atlasloot-classic-edition) | Optionally hide the minimap button |
 | [What's Training?](https://www.curseforge.com/wow/addons/whats-training) | Hide known weapon skills, dock beside the trainer |
 | [RestedXP Guides](https://www.restedxp.com/) | Lock frames, guide scale, optional fixed column |
+| [Questie](https://www.curseforge.com/wow/addons/questie) | Hidden minimap button, tracker hidden in combat, finished objectives hidden |
+| [Baganator](https://www.curseforge.com/wow/addons/baganator) | Junk greyed out, unusable items marked, fewer auto-opens |
+| [BigWigs](https://www.curseforge.com/wow/addons/big-wigs) | Same places as DBM: warnings top center, timers on the right, slimmer bars |
+| [Details!](https://www.curseforge.com/wow/addons/details) | Hidden when solo, class colors, hidden minimap button |
+| [Clique](https://www.curseforge.com/wow/addons/clique) | Your click bindings shown in unit frame tooltips |
+| [TomTom](https://www.curseforge.com/wow/addons/tomtom) | Locked arrow, optional hidden coordinate box |
+| [Postal](https://www.curseforge.com/wow/addons/postal) | No chat line for every opened letter |
 
 Settings that don't exist in your installed version are shown as *not available* and skipped.
 
@@ -123,9 +134,9 @@ Settings that don't exist in your installed version are shown as *not available*
 | **Minimalism** | Bars 4-5, micro menu, bags, chat buttons and XP bar hidden until hover. Bars 2-3 dimmed out of combat. Damage meter only in a group. |
 | **Action buttons** | Red = out of range, blue = no resource, grey = unusable. Short hotkeys (`S1`, `C1`) and hidden macro names. Stance, pet and bonus bars included. |
 | **Nameplates** | MLZ nameplates (or Platynator). Tank / Healer / DPS / Solo picked from your role. Healer: unclickable friendly names, dimmed enemies. Tank: bigger target, your debuffs on every mob. Quest marker, cast bar, level only when it matters. Applies at once, no `/reload`. |
-| **Quality of life** | Auto-repair (guild money first), sell greys (hold Shift to skip), mana tick / 5-second rule bar (energy tick for rogues and cats), interrupt announce. |
+| **Quality of life** | Auto-repair (guild money first), sell greys (hold Shift to skip), mana tick / 5-second rule bar (energy tick for rogues and cats), interrupt announce. Reminder icons for missing self buffs (not in cities), low reagents and ammo, and gear at 25% durability or less. XP per hour and time to level. |
 | **Role profiles** | Nameplates, fading, tick bar and interrupt announce saved per role, loaded automatically when your role changes. |
-| **Tweaks** | Minimap size, FPS counter, calmer combat text (Roboto Bold), hide the quest tracker or its header. |
+| **Tweaks** | Minimap size, FPS counter, calmer combat text (Roboto Bold), hide the quest tracker or its header, class colors and a target line in unit tooltips. |
 | **Backup / undo** | A stack of up to 5 backups. Every wizard run is reversible. |
 | **Health check** | Warns after login if a configured addon is installed but not loaded. |
 
@@ -141,9 +152,9 @@ Settings that don't exist in your installed version are shown as *not available*
 | Nameplates | Engine (MLZ, Platynator or off), current mode and why, mode picker, friendly names, threat colors, PvP tweak, what the plates show, size, Platynator profile save/restore |
 | Role & healing | Your role and where it comes from, healer layouts now and for your role, rebuild healer layouts |
 | Minimalism | One switch per faded frame, pause fading, clean chat |
-| Action bars & UI | Button colors and hotkeys, quest tracker, FPS counter, combat text |
-| Quality of life | Repair / sell greys, mana tick bar, interrupt announce |
-| Other addons | Which supported addons are loaded and how many settings differ |
+| Action bars & UI | Button colors and hotkeys, quest tracker, FPS counter, combat text, tooltips |
+| Quality of life | Repair / sell greys, mana tick bar, interrupt announce, reminders, XP per hour |
+| Other addons | Which supported addons are loaded and how many settings differ, plus addons worth a look for your role |
 | Profiles & backup | Role profiles, export/import, backups, undo |
 | About & help | How it works, minimap button, commands, debug |
 
