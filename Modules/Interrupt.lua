@@ -3,7 +3,7 @@
 -- Where it goes: Off / Self (only you see it) / Say / Group (instance, raid or party chat).
 -- Say and Group only post while you are in a group, so nothing is said when you are alone
 -- (Say only inside instances: the game blocks addon /say in the open world).
--- Off until you choose a channel in /mlz > Quality of life.
+-- Off until you choose a channel in /mlz > Helpers.
 
 local _, ns = ...
 

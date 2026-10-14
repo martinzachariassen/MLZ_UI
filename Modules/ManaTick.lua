@@ -6,7 +6,7 @@
 --   Energy users (rogues, druids in Cat Form): the bar shows the 2-second energy tick (yellow).
 --   Druids in Bear Form: the bar keeps showing mana, so you can time a shift out to heal or cast.
 -- Hidden when your mana/energy is full out of combat, and for rage (warriors).
--- Off until you turn it on in /mlz > Quality of life. The bar can be moved there too.
+-- Off until you turn it on in /mlz > Helpers. The bar can be moved there too.
 
 local _, ns = ...
 
@@ -84,8 +84,9 @@ local function PowerKind()
     local t = UnitPowerType("player")
     if t == MANA then return "mana" end
     if t == ENERGY then return "energy" end
-    -- A druid in Bear Form still has mana to protect (shifting out to heal or cast), so the bar keeps showing it
-    if t == RAGE and ns.PlayerClass() == "DRUID" then return "mana" end
+    -- A druid in Bear Form still has mana to protect (shifting out to heal or cast), so the bar keeps showing it.
+    -- Mana does not tick while shapeshifted, so the second value tells OnUpdate to show the level, not a tick.
+    if t == RAGE and ns.PlayerClass() == "DRUID" then return "mana", true end
 end
 
 local function OnUpdate(self)
@@ -96,9 +97,12 @@ local function OnUpdate(self)
         self.spark:SetPoint("CENTER", self, "LEFT", self:GetValue() * self:GetWidth(), 0)
         return
     end
-    local kind = PowerKind()
+    local kind, shifted = PowerKind()
     local value, color
-    if kind == "mana" and now - lastSpend < FIVE then
+    if shifted then
+        local max = UnitPowerMax("player", MANA)
+        value, color = max > 0 and UnitPower("player", MANA) / max or 0, COLORS.mana
+    elseif kind == "mana" and now - lastSpend < FIVE then
         value, color = (now - lastSpend) / FIVE, COLORS.five
     elseif kind and lastTick[kind] then
         value, color = ((now - lastTick[kind]) % TICK) / TICK, COLORS[kind]

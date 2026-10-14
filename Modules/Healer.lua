@@ -65,7 +65,13 @@ local function Switch(silent)
     local want = WantedLayout()
     if want == active.layoutName then return end
     local index = L:IndexOf(want)
-    if not index then return end -- the layout hasn't been created yet: stay on the main layout
+    if not index and want ~= ns.data.layout.name then
+        -- A role layout that was never built (older install, or Edit Mode is full): use the main layout
+        want = ns.data.layout.name
+        if want == active.layoutName then return end
+        index = L:IndexOf(want)
+    end
+    if not index then return end
     local ok, err = pcall(C_EditMode.SetActiveLayout, index)
     if ok then
         -- quiet in chat: the overview and the minimap tooltip show the active layout

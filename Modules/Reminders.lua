@@ -2,7 +2,7 @@
 -- A small row of icons below the middle of the screen, out of combat only: self buffs you forgot
 -- (Inner Fire, aspects, poisons, ...), reagents and ammo that run low, and worn-out gear.
 -- Buffs are not nagged about while resting (cities, inns); reagents are, since that is where you buy them.
--- Worn gear also gets one chat line when it drops below the limit. Settings: /mlz > Quality of life.
+-- Worn gear also gets one chat line when it drops below the limit. Settings: /mlz > Helpers.
 -- What is checked lives in Data/Reminders.lua.
 
 local _, ns = ...
@@ -18,6 +18,7 @@ local function Cfg()
     ns.db.reminders = ns.db.reminders or {}
     local c = ns.db.reminders
     for k, v in pairs(DEFAULTS) do if c[k] == nil then c[k] = v end end
+    c.ignore = c.ignore or {} -- ["b:<first spell id>"] or ["r:<item id>"] = true: muted one by one
     return c
 end
 
@@ -128,11 +129,12 @@ local function Missing()
     local _, class = UnitClass("player")
     -- What you do right now: a Feral druid in Cat Form is not a tank
     local role = ns.LiveRole and ns.LiveRole() or "DAMAGER"
+    local ignore = cfg.ignore or {}
 
     if cfg.buffs and not IsResting() then
         local have = PlayerBuffs()
         for _, b in ipairs(data.buffs or {}) do
-            if b.class == class and (not b.roles or b.roles[role]) then
+            if b.class == class and (not b.roles or b.roles[role]) and not ignore["b:" .. b.spells[1]] then
                 local known
                 for _, id in ipairs(b.spells) do
                     if Knows(id) then known = id break end
@@ -144,6 +146,10 @@ local function Missing()
                         ok = hand == nil
                     elseif b.kind == "pet" then
                         ok = UnitExists("pet") or (IsMounted and IsMounted())
+                        for _, id in ipairs(b.also or {}) do
+                            local n = SpellName(id)
+                            if n and have[n] then ok = true break end
+                        end
                     else
                         for _, id in ipairs(b.spells) do
                             local n = SpellName(id)
@@ -169,7 +175,7 @@ local function Missing()
     if cfg.reagents then
         local seen = {}
         for _, r in ipairs(data.reagents or {}) do
-            if r.class == class and not seen[r.item] and Knows(r.spell) then
+            if r.class == class and not seen[r.item] and not ignore["r:" .. tostring(r.item)] and Knows(r.spell) then
                 local count = ItemCount(r.item)
                 if count and count < r.min then
                     seen[r.item] = true
@@ -225,6 +231,14 @@ local function Hidden()
         or (C_PetBattles and C_PetBattles.IsInBattle and C_PetBattles.IsInBattle())
 end
 
+-- The overview and the minimap tooltip list what is missing too: tell them when that list changes
+local lastSig = ""
+local function Signature(list)
+    local parts = {}
+    for i, item in ipairs(list) do parts[i] = item.text end
+    return table.concat(parts, "|")
+end
+
 local function Update()
     if not ns.db then return end
     local cfg = Cfg()
@@ -233,6 +247,11 @@ local function Update()
         return
     end
     local list = Missing()
+    local sig = Signature(list)
+    if sig ~= lastSig then
+        lastSig = sig
+        ns.FireState()
+    end
     if #list == 0 then
         if row then row:Hide() end
         return
@@ -332,4 +351,39 @@ function R.Set(key, on)
     ns.FireState()
 end
 function R.Durability() return LowestDurability() end
+
+-- Everything this class can be reminded about, for the settings window:
+-- { key, name, kind = "buff" | "reagent", known = bool, min = number (reagents), roles = {...} (buffs) }
+-- known = false while you have not learned the spell yet.
+function R.Entries()
+    local data = ns.data.reminders or {}
+    local _, class = UnitClass("player")
+    local out, seen = {}, {}
+    for _, b in ipairs(data.buffs or {}) do
+        if b.class == class then
+            local known, name
+            for _, id in ipairs(b.spells) do
+                if Knows(id) then known = id break end
+            end
+            name = SpellName(known or b.spells[1])
+            if name then
+                out[#out + 1] = { key = "b:" .. b.spells[1], name = name, kind = "buff", known = known ~= nil, roles = b.roles }
+            end
+        end
+    end
+    for _, r in ipairs(data.reagents or {}) do
+        if r.class == class and not seen[r.item] then
+            seen[r.item] = true
+            out[#out + 1] = { key = "r:" .. tostring(r.item), name = r.label, kind = "reagent", known = Knows(r.spell), min = r.min }
+        end
+    end
+    return out
+end
+
+function R.IsMuted(key) return Cfg().ignore[key] and true or false end
+function R.SetMuted(key, muted)
+    Cfg().ignore[key] = muted and true or nil
+    Update()
+    ns.FireState()
+end
 function R.DurabilityLimit() return (ns.data.reminders or {}).durability or 25 end

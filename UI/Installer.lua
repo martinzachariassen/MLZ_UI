@@ -11,6 +11,12 @@
 --   fixed        always passed to Apply but never a change by itself (e.g. the movement choice)
 --   choices/choiceIndex  clickable value; the module may implement OnChoice(item)
 --   conflict     the key/value currently does something else (Current shown in red)
+--   keepVisible  stays in the list even when it is already right (a question the player should see)
+--   attention    an unavailable row that still matters (a key that will be lost): shown in the list in amber
+--   behaviour    changes how the game plays, not how it looks: label in amber
+--   groupNote    (on the first row of a group) one muted line under the group heading
+-- A module's Apply may return a short text when part of it failed; the last page then says "PARTLY".
+-- A module may set `dependents = { "settings" }`: those steps are previewed again after a choice changes.
 
 local _, ns = ...
 local W = ns.W
@@ -25,6 +31,7 @@ local APPLY_ORDER = ns.Backup.APPLY_ORDER
 -- Module pages are numbered automatically ("3. Game settings", "Step 3 of 9"). Titles match the control center.
 local PAGES = {
     { kind = "intro", title = "Welcome to MLZ UI" },
+    { kind = "module", key = "role", title = "Your character" },
     { kind = "module", key = "scale", title = "UI scale",
       text = "Sets the UI scale so edges are crisp and everything is the same size regardless of resolution. The scale is recalculated automatically if you change resolution." },
     { kind = "module", key = "layout", title = "Screen layout",
@@ -57,7 +64,48 @@ for _, page in ipairs(PAGES) do
 end
 
 -- Shown once, under the list, on every step
-local LEGEND = "Ticked = included     " .. C.green .. "Green" .. C.r .. " = will change     " .. C.red .. "Red" .. C.r .. " = replaces what you use today"
+local LEGEND = "Ticked = included     " .. C.green .. "Green" .. C.r .. " = will change     " .. C.red .. "Red" .. C.r
+    .. " = replaces what you use today     " .. C.amber .. "Amber" .. C.r .. " = changes how the game plays"
+
+-- Text under the title of some steps depends on your class and role
+local PAGE_TEXT = {
+    role = function()
+        local class = UnitClass("player") or "your class"
+        local arch, source = ns.Archetype(true)
+        return ("MLZ UI adapts to how you play. For your %s it sees %s%s%s (%s). Tank, healer and DPS get different nameplates, role layouts and a few game settings. Change the role below if that is wrong."):format(
+            class, C.gold, ns.ArchetypeText(arch), C.r, ns.SOURCE_TEXT[source] or tostring(source))
+    end,
+    layout = function(base)
+        local want = ns.Healer and ns.Healer.Wanted and ns.Healer.Wanted()
+        if not want then return base end
+        return base .. "\n" .. C.grey .. "Role layouts switch by themselves. With your current role: " .. want .. "." .. C.r
+    end,
+    bindings = function(base)
+        local c = ns.data.classes and ns.data.classes[ns.PlayerClass() or ""] or {}
+        local parts = {}
+        if c.stance == true or (c.stance == "forms" and GetNumShapeshiftForms and GetNumShapeshiftForms() > 0) then
+            parts[#parts + 1] = "stances and forms"
+        end
+        if c.pet then parts[#parts + 1] = "the pet bar" end
+        if #parts == 0 then return base end
+        return base .. "\n" .. C.grey .. (UnitClass("player") or "Your class") .. ": "
+            .. table.concat(parts, " and ") .. " get their own keys too." .. C.r
+    end,
+}
+
+local function PageText(page)
+    local fn = PAGE_TEXT[page.key]
+    if fn then return fn(page.text) end
+    return page.text
+end
+
+-- Amber line on the first page when this is not the main supported game version. Never blocks anything.
+local function ClientNote()
+    local info = ns.ClientInfo and ns.ClientInfo()
+    if not info or info.main or not info.toc then return "" end
+    return "\n\n" .. C.amber .. ("This is game version %d. MLZ UI is built for %s, so some things may look or work differently here."):format(
+        info.toc, info.name) .. C.r
+end
 
 local function Intro()
     local names = {}
@@ -68,7 +116,9 @@ local function Intro()
         .. C.grey .. table.concat(names, "  ·  ") .. C.r .. "\n\n"
         .. "Nothing changes until you press " .. C.gold .. "Apply changes" .. C.r .. ", and a backup is taken first. "
         .. C.gold .. "/mlz undo" .. C.r .. " puts everything back.\n\n"
-        .. "In a hurry? " .. C.gold .. "Use recommended" .. C.r .. " takes every suggestion and jumps to the review."
+        .. "Not sure? " .. C.gold .. "Use recommended" .. C.r .. " takes every suggestion and jumps to the review. "
+        .. C.gold .. "Looks only" .. C.r .. " skips everything that changes how the game plays."
+        .. ClientNote()
 end
 
 local WIDTH, HEIGHT = 760, 620
@@ -82,7 +132,7 @@ local GROUP_H = 30
 ------------------------------------------------------------------------
 function Installer:Build()
     if self.frame then return end
-    local f = W.Window("MLZUI_Installer", WIDTH, HEIGHT, "MLZ UI - Setup wizard")
+    local f = W.Window("MLZUI_Installer", WIDTH, HEIGHT, "MLZ UI: Setup wizard")
     self.frame = f
 
     -- Progress strip: one segment per numbered step, so it matches "STEP n OF 9". Click to jump.
@@ -126,6 +176,7 @@ function Installer:Build()
         local page = PAGES[self.page]
         if page.key then
             self.stepOn[page.key] = on
+            self:RefreshDependents(page.key)
             self:UpdateSelButtons()
             self:RenderList()
         end
@@ -179,21 +230,20 @@ function Installer:Build()
     f.next:SetPoint("BOTTOMRIGHT", -16, 14)
     f.skip = W.Button(f, "Skip this step", 130, 28, function()
         local page = PAGES[self.page]
-        if page.key then self.stepOn[page.key] = false end
+        if page.key then
+            self.stepOn[page.key] = false
+            self:RefreshDependents(page.key)
+        end
         self:Go(self.page + 1)
     end, "subtle")
     f.skip:SetPoint("RIGHT", f.next, "LEFT", -8, 0)
-    -- Welcome page: keep every suggestion as it is and go straight to the review
-    f.quick = W.Button(f, "Use recommended", 150, 28, function()
-        for _, page in ipairs(PAGES) do
-            if page.key then self.stepOn[page.key] = true end
-        end
-        for i, page in ipairs(PAGES) do
-            if page.kind == "summary" then self:Go(i) end
-        end
-    end)
+    -- Welcome page: take the suggestions as they are and go straight to the review
+    f.quick = W.Button(f, "Use recommended", 150, 28, function() self:ApplyPreset("recommended") end)
     f.quick:SetPoint("RIGHT", f.next, "LEFT", -8, 0)
     f.quick.tipText = "Takes every suggestion as it is and shows the review. Nothing changes until you press Apply changes there."
+    f.looks = W.Button(f, "Looks only", 120, 28, function() self:ApplyPreset("looks") end)
+    f.looks:SetPoint("RIGHT", f.quick, "LEFT", -8, 0)
+    f.looks.tipText = "Layout, scale, minimalism and nameplates only. Game settings, keybinds and other addons are left alone. Nothing changes until you press Apply changes."
 
     f.reload = W.Button(f, "Reload now", 150, 28, function() ReloadUI() end, "primary")
     f.reload:SetPoint("BOTTOMRIGHT", -16, 14)
@@ -208,8 +258,35 @@ function Installer:Build()
         f:Hide()
         if ns.Tour then ns.Tour.Start() end
     end)
-    f.tour:SetPoint("LEFT", f.settings, "RIGHT", 8, 0)
+    f.tour:SetPoint("BOTTOMLEFT", 16, 50)
     f.tour.tipText = "A short tour of the bars and buttons that now stay hidden until you need them."
+    f.keys = W.Button(f, "Show my keybinds", 150, 28, function()
+        f:Hide()
+        if ns.Keys then ns.Keys.Open() end
+    end)
+    f.keys:SetPoint("LEFT", f.tour, "RIGHT", 8, 0)
+    f.keys.tipText = "A picture of your keyboard with what each key does now."
+    -- Undo sits on the last page, so nobody has to remember /mlz undo. Two clicks, like in the control center.
+    local UNDO_LABEL = "Undo these changes"
+    f.undo = W.Button(f, UNDO_LABEL, 170, 28, function(b)
+        if not b.armed then
+            local token = {}
+            b.armed = token
+            b:SetText("Click again to undo")
+            C_Timer.After(4, function()
+                if b.armed == token then
+                    b.armed = nil
+                    b:SetText(UNDO_LABEL)
+                end
+            end)
+            return
+        end
+        b.armed = nil
+        b:SetText(UNDO_LABEL)
+        self:UndoLast()
+    end, "danger")
+    f.undo:SetPoint("LEFT", f.keys, "RIGHT", 8, 0)
+    f.undo.tipText = "Puts everything back the way it was before this run. Click twice to confirm."
 
     self.rows = {}
 end
@@ -257,13 +334,18 @@ local function RowTooltip(r)
         return
     end
     GameTooltip:SetOwner(r, "ANCHOR_CURSOR")
-    GameTooltip:SetText(Plain(item.label), 1, 1, 1)
+    local text, muted, bad = W.T.text, W.T.muted, W.T.red
+    GameTooltip:SetText(Plain(item.label), text[1], text[2], text[3])
     if r.blocker then
-        GameTooltip:AddLine("Requires: " .. Plain(r.blocker.label), 1, 0.4, 0.4, true)
+        GameTooltip:AddLine("Requires: " .. Plain(r.blocker.label), bad[1], bad[2], bad[3], true)
     end
     if item.note then GameTooltip:AddLine(item.note, nil, nil, nil, true) end
-    if truncOld then GameTooltip:AddDoubleLine("Current", Plain(r.old:GetText()), 0.6, 0.6, 0.6, 1, 1, 1) end
-    if truncNew then GameTooltip:AddDoubleLine("New", Plain(r.newText:GetText()), 0.6, 0.6, 0.6, 1, 1, 1) end
+    if truncOld then
+        GameTooltip:AddDoubleLine("Current", Plain(r.old:GetText()), muted[1], muted[2], muted[3], text[1], text[2], text[3])
+    end
+    if truncNew then
+        GameTooltip:AddDoubleLine("New", Plain(r.newText:GetText()), muted[1], muted[2], muted[3], text[1], text[2], text[3])
+    end
     GameTooltip:Show()
 end
 
@@ -273,7 +355,7 @@ local function CreateRow(parent)
     -- Zebra stripe on every other item row, hover highlight on top of it
     r.zebra = r:CreateTexture(nil, "BACKGROUND", nil, 0)
     r.zebra:SetAllPoints()
-    r.zebra:SetColorTexture(1, 1, 1, 0.025)
+    r.zebra:SetColorTexture(unpack(W.T.shade))
     r.zebra:Hide()
     r.hl = r:CreateTexture(nil, "BACKGROUND", nil, 1)
     r.hl:SetAllPoints()
@@ -381,7 +463,10 @@ function Installer:SetItemRow(r, item, modKey, stepOn, readOnly)
     local turningOff = item.toggle and item.isOn and not item.enabled and not item.unavailable
     local already = not item.unavailable and ((item.toggle and item.isOn and item.enabled) or (not item.toggle and item.alreadySet))
 
-    r.label:SetText(((change or (item.fixed and live)) and C.white or C.grey) .. item.label .. C.r)
+    local labelColor = (change or (item.fixed and live)) and C.white or C.grey
+    if item.behaviour and change then labelColor = C.amber end
+    if item.attention and not blocker then labelColor = C.amber end
+    r.label:SetText(labelColor .. item.label .. C.r)
 
     local old = item.old ~= nil and tostring(item.old) or ""
     r.old:SetText(((item.conflict and change) and C.red or C.grey) .. old .. C.r)
@@ -394,7 +479,7 @@ function Installer:SetItemRow(r, item, modKey, stepOn, readOnly)
 
     local new = item.new ~= nil and tostring(item.new) or ""
     if item.unavailable then
-        new = C.grey .. new .. C.r
+        new = (item.attention and C.amber or C.grey) .. new .. C.r
     elseif turningOff and stepOn and not blocker then
         new = C.amber .. (item.offText or "off") .. C.r
     elseif item.choices and not readOnly and live then
@@ -426,6 +511,7 @@ function Installer:SetItemRow(r, item, modKey, stepOn, readOnly)
     r.check:SetScript("OnClick", function(btn)
         item.enabled = btn:GetChecked() and true or false
         ns.SetEnabled(modKey, item.id, item.enabled)
+        self:RefreshDependents(modKey)
         self:RenderList()
         if r:IsMouseOver() then RowTooltip(r) end
     end)
@@ -460,6 +546,7 @@ function Installer:CycleChoice(modKey, item)
     item.choiceIndex = (item.choiceIndex or 1) % n + 1
     local choice = item.choices[item.choiceIndex]
     item.value, item.new = choice.value, choice.text
+    item.touched = true -- stays in the list even when the new value is what you have today
     if not item.enabled then
         item.enabled = true
         ns.SetEnabled(modKey, item.id, true)
@@ -468,7 +555,32 @@ function Installer:CycleChoice(modKey, item)
     if mod.OnChoice and mod:OnChoice(item) then
         self.items[modKey] = mod:Preview()
     end
+    self:RefreshDependents(modKey)
     self:RenderList()
+end
+
+-- Previews one step again, keeping the values the player already picked in it
+function Installer:Repreview(key)
+    local mod = ns.modules[key]
+    if not (mod and mod.Preview) then return end
+    local ok, items = pcall(mod.Preview, mod)
+    if not ok then return end
+    local old = {}
+    for _, it in ipairs(self.items[key] or {}) do old[it.id] = it end
+    for _, it in ipairs(items) do
+        local o = old[it.id]
+        if o and o.touched and it.choices then
+            it.touched, it.value, it.new, it.choiceIndex = true, o.value, o.new, o.choiceIndex
+            if mod.OnChoice then mod:OnChoice(it) end
+        end
+    end
+    self.items[key] = items
+end
+
+-- Steps that plan around this one (the role step feeds the game settings) are previewed again
+function Installer:RefreshDependents(modKey)
+    local mod = ns.modules[modKey]
+    for _, key in ipairs(mod and mod.dependents or {}) do self:Repreview(key) end
 end
 
 ------------------------------------------------------------------------
@@ -498,9 +610,9 @@ function Installer:RenderList()
         local stepOn = self.stepOn[page.key]
         local shown, unavailable, already = {}, {}, {}
         for _, item in ipairs(self.items[page.key] or {}) do
-            if item.unavailable then
+            if item.unavailable and not item.attention then
                 unavailable[#unavailable + 1] = item
-            elseif item.alreadySet and not item.toggle and not item.fixed then
+            elseif item.alreadySet and not item.toggle and not item.fixed and not item.touched and not item.keepVisible then
                 already[#already + 1] = item
             else
                 shown[#shown + 1] = item
@@ -515,6 +627,13 @@ function Installer:RenderList()
             if item.group and item.group ~= lastGroup then
                 Group(item.group)
                 lastGroup = item.group
+                if item.groupNote then
+                    -- why these settings are here, in one muted line
+                    n = n + 1
+                    SetFooterRow(self:AcquireRow(n, y, ROW_H), item.groupNote)
+                    y = y + ROW_H
+                    stripe = 0
+                end
             end
             Item(item, page.key, stepOn, false)
         end
@@ -542,7 +661,9 @@ function Installer:RenderList()
                     tip:SetText("Not available", 1, 1, 1)
                     for i, item in ipairs(unavailable) do
                         if i > 14 then tip:AddLine("...and " .. (#unavailable - 14) .. " more", 0.6, 0.6, 0.6) break end
-                        tip:AddDoubleLine(Plain(item.label), Plain(item.new or ""), 1, 1, 1, 0.6, 0.6, 0.6)
+                        local tx, mu = W.T.text, W.T.muted
+                        tip:AddDoubleLine(Plain(item.label), Plain(item.new or ""), tx[1], tx[2], tx[3], mu[1], mu[2], mu[3])
+                        if item.note then tip:AddLine(item.note, mu[1], mu[2], mu[3], true) end
                     end
                 end)
             y = y + ROW_H
@@ -551,7 +672,8 @@ function Installer:RenderList()
         local sels = self:Selections()
         if #sels == 0 then Group(C.grey .. "Nothing to change." .. C.r, false) end
         for _, sel in ipairs(sels) do
-            Group(("%s  %s(%d %s)%s"):format(sel.mod.title, C.grey, sel.count, sel.count == 1 and "change" or "changes", C.r))
+            Group(("%s  %s(%d %s)%s"):format(self:StepTitle(sel.mod.key) or sel.mod.title, C.grey, sel.count,
+                sel.count == 1 and "change" or "changes", C.r))
             for _, item in ipairs(sel.items) do
                 -- Fixed rows (the movement choice) only when they differ from today
                 if not item.fixed or tostring(item.old) ~= tostring(item.new) then
@@ -572,13 +694,15 @@ function Installer:Go(index)
     f.title:SetText(page.number and (page.number .. ". " .. page.title) or page.title)
     f.step:SetText(page.number and ("STEP %d OF %d"):format(page.number, NUM_STEPS)
         or (page.kind == "summary" and "REVIEW") or "")
-    f.desc:SetText(page.text or "")
+    f.desc:SetText(PageText(page) or "")
 
-    -- Progress strip: green = behind you, blue = here, grey = ahead (all green on Review and Done)
+    -- Progress strip: green = behind you, blue = here, amber = skipped, grey = ahead (all green on Review and Done)
     for _, seg in ipairs(f.progress) do
         local i, c = seg.pageIndex
-        if i < index then c = W.T.green
-        elseif i == index then c = W.T.accent
+        local key = PAGES[i].key
+        if i == index then c = W.T.accent
+        elseif not self.singleStep and key and self.stepOn[key] == false and i < index then c = W.T.amber
+        elseif i < index then c = W.T.green
         else c = W.T.off end
         seg.bar:SetColorTexture(unpack(c))
         seg:SetHeight(i == index and 18 or 14)
@@ -599,10 +723,18 @@ function Installer:Go(index)
         f.stepCheck:SetChecked(self.stepOn[page.key])
         self:UpdateSelButtons()
     elseif page.kind == "summary" then
-        nothing = #self:Selections() == 0
-        f.desc:SetText(nothing
+        local t = self:Totals()
+        nothing = t.changes == 0
+        local text = nothing
             and ("Nothing will be changed. Go back to pick something, or press " .. C.gold .. "Finish" .. C.r .. ".")
-            or ("This will be changed when you press " .. C.gold .. "Apply changes" .. C.r .. ". A backup is taken first."))
+            or ("%d change%s in %d step%s%s. They are made when you press %sApply changes%s. A backup is taken first."):format(
+                t.changes, t.changes == 1 and "" or "s", t.steps, t.steps == 1 and "" or "s",
+                t.already > 0 and (", " .. t.already .. " already right") or "", C.gold, C.r)
+        if t.attention > 0 then
+            text = text .. "\n" .. C.amber .. t.attention .. " key" .. (t.attention == 1 and "" or "s")
+                .. " will lose their action. See the amber rows." .. C.r
+        end
+        f.desc:SetText(text)
     elseif page.kind == "intro" then
         f.big:SetText(Intro())
     elseif page.kind == "done" then
@@ -613,9 +745,20 @@ function Installer:Go(index)
     f.back:SetShown(not done)
     f.settings:SetShown(done)
     f.tour:SetShown(done and self.appliedAny and ns.Tour and ns.Tour.HasSteps() or false)
+    f.keys:SetShown(done and self.appliedAny and ns.Keys ~= nil)
+    f.undo:SetShown(done and self.appliedAny and ns.db.backups ~= nil and #ns.db.backups > 0)
+    f.undo.armed = nil
+    f.undo:SetText("Undo these changes")
+    f.keys:ClearAllPoints()
+    if f.tour:IsShown() then
+        f.keys:SetPoint("LEFT", f.tour, "RIGHT", 8, 0)
+    else
+        f.keys:SetPoint("BOTTOMLEFT", 16, 50)
+    end
     f.next:SetShown(not done)
     f.skip:SetShown(page.kind == "module")
     f.quick:SetShown(page.kind == "intro")
+    f.looks:SetShown(page.kind == "intro")
     local wantReload = done and self.appliedAny and ns.needsReload and true or false
     f.reload:SetShown(wantReload)
     f.close:SetShown(done)
@@ -628,6 +771,8 @@ function Installer:Go(index)
     f.back:SetEnabled(index > 1)
     if page.kind == "summary" then
         f.next:SetText(nothing and "Finish" or "Apply changes")
+    elseif page.kind == "intro" then
+        f.next:SetText("Step by step")
     else
         f.next:SetText("Next")
     end
@@ -670,6 +815,37 @@ function Installer:Selections()
     return sels
 end
 
+-- The name of a step as the player sees it in the wizard ("Game settings"), not the module's own title
+function Installer:StepTitle(key)
+    for _, page in ipairs(PAGES) do
+        if page.key == key then return page.title end
+    end
+end
+
+-- Numbers for the review: changes, steps with changes, settings already right, skipped steps, keys that get lost
+function Installer:Totals()
+    local t = { changes = 0, steps = 0, already = 0, skipped = 0, attention = 0 }
+    for _, sel in ipairs(self:Selections()) do
+        t.changes = t.changes + sel.count
+        t.steps = t.steps + 1
+    end
+    for _, key in ipairs(APPLY_ORDER) do
+        if self.items[key] then
+            if self.stepOn[key] then
+                for _, item in ipairs(self.items[key]) do
+                    if item.attention and not self:Blocker(key, item) then t.attention = t.attention + 1 end
+                    if item.alreadySet and not item.toggle and not item.fixed and not item.keepVisible then
+                        t.already = t.already + 1
+                    end
+                end
+            elseif not self.singleStep then
+                t.skipped = t.skipped + 1
+            end
+        end
+    end
+    return t
+end
+
 function Installer:ApplyAll()
     if InCombatLockdown() then
         ns.Print(C.red .. "You are in combat. Try again after combat." .. C.r)
@@ -677,8 +853,7 @@ function Installer:ApplyAll()
     end
     local sels = self:Selections()
     if #sels == 0 then
-        ns.db.installed = true
-        ns.FireState()
+        -- Nothing was applied, so the wizard is not "done": it can still offer itself on the next login
         self.frame:Hide()
         ns.Print("Nothing was changed. " .. C.gold .. "/mlz install" .. C.r .. " opens the wizard again.")
         return
@@ -690,33 +865,90 @@ function Installer:ApplyAll()
         return
     end
 
-    local lines, failed = {}, 0
+    local lines, failed, partly = {}, 0, 0
     for _, sel in ipairs(sels) do
-        local ok, err = pcall(sel.mod.Apply, sel.mod, sel.items)
-        if ok then
-            lines[#lines + 1] = C.green .. "OK" .. C.r .. "  " .. sel.mod.title
-        else
+        local title = self:StepTitle(sel.mod.key) or sel.mod.title
+        local ok, result = pcall(sel.mod.Apply, sel.mod, sel.items)
+        if not ok then
             failed = failed + 1
-            lines[#lines + 1] = C.red .. "FAILED" .. C.r .. "  " .. sel.mod.title .. ": " .. tostring(err)
-            ns.Print(C.red .. "Error in " .. sel.mod.title .. ":" .. C.r, err)
+            lines[#lines + 1] = C.red .. "FAILED" .. C.r .. "  " .. title .. ": " .. tostring(result)
+            ns.Debug("Error in " .. sel.mod.title .. ":", result)
+        elseif type(result) == "string" then
+            -- the module did its best but something did not work: say what, in plain words
+            partly = partly + 1
+            lines[#lines + 1] = C.amber .. "PARTLY" .. C.r .. "  " .. title .. ": " .. result
+        else
+            lines[#lines + 1] = C.green .. "OK" .. C.r .. "  " .. title
         end
     end
     ns.db.installed = true
     self.appliedAny = true
     ns.FireState()
 
-    self.doneText = table.concat(lines, "\n") .. "\n\n" ..
-        (failed > 0 and (C.red .. "Something failed. Type /mlz undo to undo, and pass on the error message." .. C.r .. "\n\n") or "") ..
-        (ns.needsReload
-            and ("Some addons pick up their new settings after a reload. Press " .. C.gold .. "Reload now" .. C.r .. " when it suits you.\n\n")
-            or ("Everything is already in effect. No reload needed.\n\n")) ..
-        "Settings: " .. C.gold .. "/mlz" .. C.r .. "     Undo: " .. C.gold .. "/mlz undo" .. C.r .. "     Run again: " .. C.gold .. "/mlz install" .. C.r
+    local text = table.concat(lines, "\n") .. "\n\n"
+    if failed > 0 then
+        text = text .. C.red .. "Something failed. Type /mlz undo to go back, and pass on the error from /mlz debug." .. C.r .. "\n\n"
+    elseif partly > 0 then
+        text = text .. C.amber .. "Some parts could not be done. The rest is in place." .. C.r .. "\n\n"
+    end
+    if ns.needsReload then
+        local why = ns.reloadReasons and #ns.reloadReasons > 0 and (" (" .. table.concat(ns.reloadReasons, ", ") .. ")") or ""
+        text = text .. "Some addon settings need a reload" .. why .. ". Press " .. C.gold .. "Reload now" .. C.r .. " when it suits you.\n\n"
+    else
+        text = text .. "Everything is already in effect. No reload needed.\n\n"
+    end
+    if ns.editModeStale then
+        text = text .. C.amber .. "Reload before you open Edit Mode, or it may show the old layout." .. C.r .. "\n\n"
+    end
+    self.doneText = text .. "Settings: " .. C.gold .. "/mlz" .. C.r .. "     Undo: " .. C.gold .. "/mlz undo" .. C.r
+        .. "     Run again: " .. C.gold .. "/mlz install" .. C.r
+    self:Go(#PAGES)
+end
+
+-- The undo button on the last page
+function Installer:UndoLast()
+    local ran = ns.Backup:Undo()
+    if ran == "partial" then
+        -- keep the button: pressing it again retries what failed
+        self.doneText = (self.doneText or "") .. "\n\n" .. C.amber .. "Some parts could not be undone. Press the undo button again to retry." .. C.r
+        self:Go(#PAGES)
+        return
+    end
+    self.appliedAny = false
+    if ran == false then
+        self.doneText = "You are in combat. The undo runs when combat ends."
+    else
+        self.doneText = "Undone. Everything is back the way it was before this run."
+            .. (ns.needsReload and (" Some addon settings need a reload to finish: " .. C.gold .. "/reload" .. C.r .. ".") or "")
+            .. "\n\nRun the wizard again any time with " .. C.gold .. "/mlz install" .. C.r .. "."
+    end
     self:Go(#PAGES)
 end
 
 ------------------------------------------------------------------------
 -- Opening
 ------------------------------------------------------------------------
+-- Builds the preview of every step. stepKey = opened for one step only: the others are off.
+function Installer:Preview(stepKey)
+    self.items, self.stepOn = {}, {}
+    for _, page in ipairs(PAGES) do
+        if page.key then
+            local mod = ns.modules[page.key]
+            local ok, items = false, nil
+            if mod and mod.Preview then ok, items = pcall(mod.Preview, mod) end
+            if ok then
+                self.items[page.key] = items
+            else
+                if mod then ns.Print(C.red .. "Could not create preview for " .. mod.title .. ":" .. C.r, items) end
+                self.items[page.key] = {}
+            end
+            -- Opened for one step (e.g. "Re-apply layout"): only that step is on
+            self.stepOn[page.key] = mod ~= nil and ((stepKey == nil) or (page.key == stepKey))
+        end
+    end
+    self.singleStep = stepKey ~= nil
+end
+
 function Installer:Open(stepKey)
     if InCombatLockdown() then
         ns.Print("Cannot open the wizard in combat.")
@@ -724,22 +956,12 @@ function Installer:Open(stepKey)
     end
     self:Build()
     self.hiddenByCombat = nil
-    self.items, self.stepOn, self.appliedAny, self.showAlready = {}, {}, false, {}
+    self.appliedAny, self.showAlready = false, {}
     for _, page in ipairs(PAGES) do
-        if page.key then
-            local mod = ns.modules[page.key]
-            if mod.BeginWizard then pcall(mod.BeginWizard, mod) end
-            local ok, items = pcall(mod.Preview, mod)
-            if ok then
-                self.items[page.key] = items
-            else
-                ns.Print(C.red .. "Could not create preview for " .. mod.title .. ":" .. C.r, items)
-                self.items[page.key] = {}
-            end
-            -- Opened for one step (e.g. "Re-apply layout"): only that step is on
-            self.stepOn[page.key] = (stepKey == nil) or (page.key == stepKey)
-        end
+        local mod = page.key and ns.modules[page.key]
+        if mod and mod.BeginWizard then pcall(mod.BeginWizard, mod) end
     end
+    self:Preview(stepKey)
     self.frame:Show()
     local start = 1
     if stepKey then
@@ -748,6 +970,22 @@ function Installer:Open(stepKey)
         end
     end
     self:Go(start)
+end
+
+-- Steps in "Looks only": how things look, not how the game plays
+local LOOKS_ONLY = { role = true, scale = true, layout = true, fade = true, actionbuttons = true, tweaks = true, nameplates = true }
+
+-- "recommended" = every step with the suggested rows. "looks" = only the steps in LOOKS_ONLY.
+-- Both start from the suggestions, not from rows you unticked in an earlier run.
+function Installer:ApplyPreset(name)
+    ns.db.toggles = {}
+    self:Preview()
+    for key in pairs(self.stepOn) do
+        self.stepOn[key] = (name == "recommended") or LOOKS_ONLY[key] or false
+    end
+    for i, page in ipairs(PAGES) do
+        if page.kind == "summary" then self:Go(i) return end
+    end
 end
 
 ns.AddCommand("install", "opens the installation wizard", function() Installer:Open() end)

@@ -8,10 +8,12 @@
 --   tabs     = archetype per talent tree, in the order of the talent window (optional)
 --   dpsTabs  = what a tree counts as when you are NOT tanking or healing right now
 --              (a Protection paladin who is not tanking, a Feral druid in Cat Form)
---   dps      = archetype when talents don't decide yet (leveling) or when you chose DPS yourself
+--   dps      = archetype when talents don't decide yet (leveling) or when you chose DPS yourself.
+--              Hybrids use MELEE here: they melee a lot while leveling, so they keep the swing timers
 --   pureDps  = no tank or healer tree at all: always DPS, talents are not checked
 --   resource = main resource, only used for text
---   stance   = has a stance, form or aura bar (keys SHAPESHIFTBUTTON1-3)
+--   stance   = has a stance, form or aura bar (keys SHAPESHIFTBUTTON1-3). "forms" = only when the client
+--              has forms for it (Priest: Shadowform does not exist on every client)
 --   pet      = has a pet bar (keys BONUSACTIONBUTTON1-3)
 
 local _, ns = ...
@@ -30,10 +32,10 @@ ns.data.classes = {
         dps = "MELEE", pureDps = true, resource = "Energy", stance = true,
     },
     PRIEST = {
-        tabs = { "HEALER", "HEALER", "CASTER" }, dps = "CASTER", resource = "Mana", stance = true,
+        tabs = { "HEALER", "HEALER", "CASTER" }, dps = "CASTER", resource = "Mana", stance = "forms",
     },
     SHAMAN = {
-        tabs = { "CASTER", "MELEE", "HEALER" }, dps = "CASTER", resource = "Mana",
+        tabs = { "CASTER", "MELEE", "HEALER" }, dps = "MELEE", resource = "Mana",
     },
     MAGE = {
         dps = "CASTER", pureDps = true, resource = "Mana",
@@ -42,7 +44,7 @@ ns.data.classes = {
         dps = "CASTER", pureDps = true, resource = "Mana", pet = true,
     },
     DRUID = {
-        tabs = { "CASTER", "TANK", "HEALER" }, dpsTabs = { [2] = "MELEE" }, dps = "CASTER", resource = "Mana", stance = true,
+        tabs = { "CASTER", "TANK", "HEALER" }, dpsTabs = { [2] = "MELEE" }, dps = "MELEE", resource = "Mana", stance = true,
     },
 }
 

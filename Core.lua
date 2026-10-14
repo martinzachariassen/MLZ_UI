@@ -236,6 +236,11 @@ end
 -- so talents only decide the role once one tree has real investment.
 local TALENT_MIN_POINTS = 11
 ns.ROLE_TEXT = { TANK = "Tank", HEALER = "Healer", DAMAGER = "DPS" }
+-- Where a role came from (second value of ns.Role), as short text for the windows
+ns.SOURCE_TEXT = {
+    forced = "set by you", class = "class", spec = "spec", talents = "talents", group = "group role",
+    default = "until your talents decide", unknown = "unknown",
+}
 
 local function PlayerClass()
     local _, class = UnitClass("player")
@@ -324,8 +329,9 @@ function ns.GetRoleForce()
 end
 
 -- Returns role, source ("forced" | "class" | "spec" | "talents" | "group" | "default"). Never nil.
-function ns.Role()
-    local force = ns.GetRoleForce()
+-- ignoreForce = what the game detects, as if you had not picked a role (the setup wizard shows it)
+function ns.Role(ignoreForce)
+    local force = not ignoreForce and ns.GetRoleForce()
     if force then return force, "forced" end
     local class = PlayerClass()
     local c = ClassData(class)
@@ -375,24 +381,26 @@ end
 -- Returns role, reason (short text for the settings window)
 function ns.LiveRole()
     local role, source = ns.Role()
+    if source == "forced" then return role, "set by you" end
     local class = PlayerClass()
     if UnitHasEffectivelyTankAura and UnitHasEffectivelyTankAura("player") then
         return "TANK", "tank aura active"
     end
     if GroupRole() == "TANK" then return "TANK", "assigned tank in the group" end
-    if source ~= "forced" then
-        if class == "DRUID" and role == "TANK" then
-            if InBearForm() then return "TANK", "Bear Form + Feral talents" end
-            return "DAMAGER", "Feral, not in Bear Form"
-        elseif class == "WARRIOR" then
-            if InDefensiveStance() then return "TANK", "Defensive Stance" end
-            if role == "TANK" then return "DAMAGER", "Protection, not in Defensive Stance" end
-        elseif class == "PALADIN" and HasPlayerAura(RIGHTEOUS_FURY) then
-            return "TANK", "Righteous Fury active"
-        end
+    -- Stances and forms only turn a tank spec (or a character with no spec yet) into a tank. A Fury warrior
+    -- who touches Defensive Stance stays DPS, so nameplates don't flicker.
+    local mayTank = role == "TANK" or source == "default"
+    if class == "DRUID" then
+        if mayTank and InBearForm() then return "TANK", "Bear Form" end
+        if role == "TANK" then return "DAMAGER", "Feral, not in Bear Form" end
+    elseif class == "WARRIOR" then
+        if mayTank and InDefensiveStance() then return "TANK", "Defensive Stance" end
+        if role == "TANK" then return "DAMAGER", "Protection, not in Defensive Stance" end
+    elseif class == "PALADIN" and role ~= "HEALER" and HasPlayerAura(RIGHTEOUS_FURY) then
+        return "TANK", "Righteous Fury active"
     end
     if source == "default" then return "DAMAGER", "no role yet, counts as DPS" end
-    if role then return role, (source == "forced" and "set by you") or ("from " .. source) end
+    if role then return role, "from " .. source end
     return nil, "no role found" -- safety net, ns.Role() always returns a role
 end
 
@@ -408,8 +416,8 @@ local function ArchetypeFor(role, class)
 end
 
 -- Returns archetype, source (same sources as ns.Role)
-function ns.Archetype()
-    local role, source = ns.Role()
+function ns.Archetype(ignoreForce)
+    local role, source = ns.Role(ignoreForce)
     return ArchetypeFor(role, PlayerClass()), source
 end
 
@@ -469,10 +477,20 @@ for _, event in ipairs({
 }) do
     ns.TryOn(event, ScheduleRole)
 end
+-- Tank aura or Righteous Fury can change the live role. Aura events come in floods during combat,
+-- so only react when the state flips.
+local lastTankAura
 ns.TryOn("UNIT_AURA", function(_, unit)
     if unit ~= "player" then return end
-    -- Tank aura or Righteous Fury can change the live role
-    if UnitHasEffectivelyTankAura or PlayerClass() == "PALADIN" then ScheduleRole() end
+    local state
+    if UnitHasEffectivelyTankAura then
+        state = UnitHasEffectivelyTankAura("player") and true or false
+    elseif PlayerClass() == "PALADIN" then
+        state = HasPlayerAura(RIGHTEOUS_FURY)
+    end
+    if state == nil or state == lastTankAura then return end
+    lastTankAura = state
+    ScheduleRole()
 end)
 
 ------------------------------------------------------------------------
@@ -588,13 +606,13 @@ function ns.ShowCopy(title, text, onAccept)
         local W = ns.W
         local f = W.Window("MLZUICopyFrame", 540, 160, "MLZ UI")
         f:SetFrameStrata("FULLSCREEN_DIALOG")
-        local hint = W.Text(f, "GameFontDisableSmall", "Ctrl+A selects everything, Ctrl+C copies, Ctrl+V pastes.")
+        local hint = W.Text(f, "GameFontDisableSmall", "CTRL-A selects everything, CTRL-C copies, CTRL-V pastes.")
         hint:SetPoint("TOPLEFT", 16, -48)
         local holder = CreateFrame("Frame", nil, f)
         holder:SetPoint("TOPLEFT", 16, -68)
         holder:SetPoint("TOPRIGHT", -16, -68)
         holder:SetHeight(28)
-        W.Fill(holder, { 0.05, 0.055, 0.07, 1 })
+        W.Fill(holder, W.T.input)
         W.Border(holder, W.T.border)
         local box = CreateFrame("EditBox", nil, holder)
         box:SetPoint("TOPLEFT", 8, 0)

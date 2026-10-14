@@ -23,6 +23,7 @@ Data\Reminders.lua
 Data\Tips.lua
 
 Modules\Backup.lua
+Modules\Role.lua
 Modules\Scale.lua
 Modules\Settings.lua
 Modules\Bindings.lua

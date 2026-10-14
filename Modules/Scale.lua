@@ -108,6 +108,11 @@ function Scale:Preview()
     end
     local idx = 1
     for i, m in ipairs(MODES) do if m.value == mode then idx = i end end
+    if idx == 1 and mode ~= "auto" and self:ValidMode(mode) then
+        -- a number typed with /mlz scale: keep it in the list so the row shows what is saved
+        choices[#choices + 1] = { value = mode, text = ("Your own %s  =  %.3f"):format(tostring(mode), self:Compute(mode)) }
+        idx = #choices
+    end
     return {
         {
             id = "uiScale",
@@ -148,8 +153,15 @@ function Scale:Restore(snap)
     ns.db.scale.applied = snap.applied
     if snap.useUiScale then SetCVar("useUiScale", snap.useUiScale) end
     if snap.uiScale then SetCVar("uiScale", snap.uiScale) end
+    -- Go through ApplyScale when a scale was in use before, so the saved mode and the screen agree
+    -- (a mode below 0.64 is only reachable through UIParent:SetScale, the CVar says 0.64)
+    if snap.applied then
+        self:ApplyScale(ns.db.scale.mode)
+        return
+    end
     local s = tonumber(snap.uiScale) or 1
     if snap.useUiScale == "1" then UIParent:SetScale(s) end
+    self:UpdateSafeArea()
 end
 
 ------------------------------------------------------------------------

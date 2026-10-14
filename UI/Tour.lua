@@ -158,6 +158,11 @@ function Tour.Start()
         return
     end
     Build()
+    -- Already running: just restart at the first step. Starting again would remember our own pause as the player's.
+    if panel:IsShown() then
+        Tour.Go(1)
+        return
+    end
     -- show every faded frame while the tour runs (paused first, so the positions are read while visible)
     wasPaused = ns.fadePaused and true or false
     if not wasPaused then ns.modules.fade:SetPaused(true) end

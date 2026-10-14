@@ -21,18 +21,43 @@ local function Same(a, b)
     return tostring(a) == tostring(b)
 end
 
+-- Plain words for a raw value: "0" -> "off", "1" -> "on", or the row's own words ("locked")
+local function Plain(row, value)
+    if value == nil then return nil end
+    local v = tostring(value)
+    if row.text and row.text[v] then return row.text[v] end
+    return v
+end
+
+local function IsSwitch(row, a, b)
+    if row.numeric or row.choices or row.text then return false end
+    return (a == "0" or a == "1") and (b == "0" or b == "1")
+end
+
 function Settings:Preview()
     local items = {}
+    local grey = ns.W and ns.W.C.grey or "|cff8a909a"
+    local groupNotes = ns.data.cvarGroups or {}
+    -- The role picked in the wizard's first step counts at once (the saved role only changes on Apply)
+    local role = ns.WizardRole and ns.WizardRole() or (ns.Role and ns.Role()) or "DAMAGER"
     for _, row in ipairs(ns.data.cvars) do
-        local item = { id = row.name, label = row.label, note = row.desc }
+        local item = {
+            id = row.name, label = row.label, note = row.desc,
+            group = row.group, groupNote = groupNotes[row.group], behaviour = row.behaviour,
+        }
+        if row.behaviour then
+            item.note = (item.note or "") .. "  Changes how the game plays, not how it looks."
+        end
         if not CVarExists(row.name) then
             item.old, item.new = "-", "not available"
             item.enabled, item.unavailable = false, true
+            item.note = (item.note or "") .. "  Your game version does not have this setting."
         else
-            item.old = GetCVar(row.name)
+            local raw = GetCVar(row.name)
             local target = tostring(row.value)
             if row.name == "SpellQueueWindow" and ns.db.spellQueueWindow then target = ns.db.spellQueueWindow end
-            item.value, item.new = target, target
+            item.rawOld = raw
+            item.value = target
             if row.choices then
                 item.choices = {}
                 for i, v in ipairs(row.choices) do
@@ -41,18 +66,23 @@ function Settings:Preview()
                 end
                 item.choiceIndex = item.choiceIndex or 1
             end
+            local switch = IsSwitch(row, tostring(raw), target)
+            local function Words(v)
+                if switch then return v == "1" and "on" or "off" end
+                return Plain(row, v)
+            end
+            item.old, item.new = Words(tostring(raw)), Words(target)
             local default = row.enabled
             if row.roles then
                 -- role rows are only preselected for that role
-                local role = ns.Role and ns.Role() or "DAMAGER"
                 local names = {}
                 for r in pairs(row.roles) do names[#names + 1] = (ns.ROLE_TEXT and ns.ROLE_TEXT[r]) or r end
                 table.sort(names)
-                item.note = (item.note or "") .. "  |cff888888(Ticked for: " .. table.concat(names, ", ") .. ")|r"
+                item.note = (item.note or "") .. "  " .. grey .. "(Ticked for: " .. table.concat(names, ", ") .. ")|r"
                 default = default and row.roles[role] and true or false
             end
             item.enabled = ns.Enabled("settings", row.name, default)
-            item.alreadySet = Same(item.old, target)
+            item.alreadySet = Same(raw, target)
         end
         items[#items + 1] = item
     end
@@ -61,7 +91,7 @@ end
 
 -- Picking another value in the wizard can turn an "already set" row into a change (or back)
 function Settings:OnChoice(item)
-    item.alreadySet = Same(item.old, item.value)
+    item.alreadySet = Same(item.rawOld, item.value)
 end
 
 function Settings:Backup(items)
@@ -71,7 +101,7 @@ function Settings:Backup(items)
 end
 
 function Settings:Apply(items)
-    local changed = 0
+    local changed, failed = 0, 0
     for _, item in ipairs(items) do
         if not item.unavailable and item.value ~= nil then
             local ok, err = pcall(SetCVar, item.id, item.value)
@@ -79,11 +109,13 @@ function Settings:Apply(items)
                 changed = changed + 1
                 if item.id == "SpellQueueWindow" then ns.db.spellQueueWindow = item.value end
             else
-                ns.Print("|cffff4444Could not set|r", item.id, err)
+                failed = failed + 1
+                ns.Debug("Could not set", item.id, err)
             end
         end
     end
     ns.Debug("CVars set:", changed)
+    if failed > 0 then return ("%d game setting%s could not be changed"):format(failed, failed == 1 and "" or "s") end
 end
 
 function Settings:Restore(snap)

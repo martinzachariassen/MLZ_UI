@@ -21,6 +21,7 @@ MLZ_UI/
 │   └── Tips.lua          Tips for the overview card
 ├── Modules/              HOW to set it (one feature per file)
 │   ├── Backup.lua        Backup stack, apply order, undo (loads first)
+│   ├── Role.lua          "Your character" wizard step: confirm or change your role
 │   ├── Scale.lua  Settings.lua  Bindings.lua  Layout.lua  Healer.lua
 │   ├── Fade.lua  ActionButtons.lua  Tweaks.lua  Plates.lua  Nameplates.lua  Addons.lua
 │   ├── Health.lua  Vendor.lua  ManaTick.lua  Interrupt.lua  Profile.lua
@@ -69,11 +70,13 @@ local Tweaks = ns.RegisterModule({ key = "tweaks", title = "Tweaks" })
 
 function Tweaks:Preview()        -- returns a list of items (one row each in the wizard)
 function Tweaks:Backup(items)    -- returns a snapshot of the current values for those items
-function Tweaks:Apply(items)     -- applies the ticked items
+function Tweaks:Apply(items)     -- applies the ticked items; returns nil, or a short text when part of it failed
 function Tweaks:Restore(snap)    -- puts a snapshot back
 ```
 
-A preview item is a table with at least `id`, `label`, `old` and `new`. Optional fields include `group`, `note`, `enabled`, `toggle`/`isOn`, and `unavailable = true` with the reason in `new` (e.g. "tracker not found"). The wizard draws one row per item, as *now → will become*.
+A preview item is a table with at least `id`, `label`, `old` and `new`. Optional fields include `group`, `groupNote`, `note`, `enabled`, `toggle`/`isOn`, `behaviour` (changes how the game plays, drawn in amber), `keepVisible`, and `unavailable = true` with the reason in `new` (e.g. "tracker not found"). `attention = true` on an unavailable row keeps it in the list, in amber (a key that will be lost). The wizard draws one row per item, as *now → will become*.
+
+If `Apply` returns a text, the last wizard page shows the step as "PARTLY" with that text. A module can set `dependents = { "settings" }`: those steps are previewed again when a choice in this one changes (the role step does this).
 
 Rules:
 - `Preview` must not change anything.
@@ -90,7 +93,7 @@ Wizard "Apply"
   └─ Backup:Create(selections)      every module snapshots what it will change
        └─ pushed onto MLZUIDB.backups (max 5, #1 is always kept: your pre-MLZ state)
   └─ modules apply in Backup.APPLY_ORDER
-       scale → settings → layout → bindings → fade → actionbuttons → tweaks → addons → nameplates
+       role → scale → settings → layout → bindings → fade → actionbuttons → tweaks → addons → nameplates
   └─ ns.MarkReload(reason) only if a /reload is really needed, ns.MarkEditModeStale() for layouts
 
 /mlz undo
@@ -116,7 +119,7 @@ Use these before writing your own.
 | `ns.Enabled(mod, id, default)` · `ns.SetEnabled` | Remember which wizard rows are ticked. |
 | `ns.Try(fn, ...)` | `pcall` wrapper for APIs that may not exist or may fail. |
 | `ns.IsAddOnLoaded(name)` · `ns.IsAddOnInstalled(name)` | Addon checks that work across client APIs. |
-| `ns.Role()` · `ns.LiveRole()` · `ns.SetRoleForce` · `ns.OnRoleChanged(fn)` | Role detection (tank, healer, DPS) and overrides. `LiveRole` is what you do right now (Bear Form, Defensive Stance, Righteous Fury). |
+| `ns.Role()` · `ns.LiveRole()` · `ns.SetRoleForce` · `ns.OnRoleChanged(fn)` | Role detection (tank, healer, DPS) and overrides. `ns.Role(true)` ignores your own choice (what the game detects). `LiveRole` is what you do right now (Bear Form, Defensive Stance, Righteous Fury) and never overrides a role you picked. `ns.WizardRole()` is the role the wizard plans for, including a choice not applied yet. |
 | `ns.Archetype()` · `ns.LiveArchetype()` · `ns.ArchetypeText(a)` | Tank, healer, melee, ranged or caster, from `Data/Classes.lua`. Layouts use the stable one, reminders and nameplates the live one. |
 | `ns.ClientInfo()` | Game client facts for the About page. WoW Forever (Interface 16001) is the main client. |
 | `ns.CharDB()` | Per-character table inside `MLZUIDB.chars`. |

@@ -31,6 +31,9 @@ function Bindings:Desired(movement)
     local class = ns.PlayerClass()
     local c = ns.data.classes and ns.data.classes[class]
     local hasStances = c and c.stance
+    if hasStances == "forms" then
+        hasStances = GetNumShapeshiftForms and GetNumShapeshiftForms() > 0
+    end
     local hints = D.classRoles and D.classRoles[class] or {}
     local stance = (hasStances and D.stance and D.stance[movement]) or {}
     local stanceKeys = {}
@@ -81,7 +84,11 @@ end
 
 function Bindings:Preview()
     local D = ns.data.bindings
-    local movement = self.pendingMovement or ns.db.movement or "ESDF"
+    local current = CurrentMovement()
+    -- Before the first setup, keep the movement keys the player already uses. ESDF is one click away.
+    local movement = self.pendingMovement
+        or (not ns.db.installed and current ~= "custom" and current)
+        or ns.db.movement or "ESDF"
     local desired = self:Desired(movement)
 
     local desiredKeys, desiredCommands = {}, {}
@@ -101,9 +108,9 @@ function Bindings:Preview()
     end
     items[#items + 1] = {
         id = MOVEMENT_ID, label = "Movement", group = "Setup",
-        old = CurrentMovement(), new = movement, value = movement, choices = mchoices, choiceIndex = midx,
+        old = current, new = movement, value = movement, choices = mchoices, choiceIndex = midx,
         enabled = true, fixed = true,
-        note = "ESDF gives more keys around your fingers. Click the value to switch (the list updates).",
+        note = "Your movement keys stay as they are. ESDF gives more keys around your fingers. Click the value to switch (the list updates).",
     }
 
     local displacedTargets = {}
@@ -142,8 +149,8 @@ function Bindings:Preview()
                 else
                     items[#items + 1] = {
                         id = "lost:" .. d.key, group = "Moved actions",
-                        label = d.key, old = Pretty(current), new = "loses key",
-                        enabled = false, unavailable = true, requires = d.key,
+                        label = d.key, old = Pretty(current), new = "loses its key (" .. newKey .. " is taken)",
+                        enabled = false, unavailable = true, attention = true, requires = d.key,
                         note = newKey .. " is taken. Set a new key for this in Blizzard's keybinding menu if you need it.",
                     }
                 end
@@ -215,7 +222,7 @@ local function Save(set)
 end
 
 function Bindings:Apply(items)
-    local n = 0
+    local n, failed = 0, 0
     local list = BindingItems(items)
     -- Remove extra keys first, so the new bindings are alone on the buttons
     for _, item in ipairs(list) do
@@ -227,7 +234,8 @@ function Bindings:Apply(items)
             if ok and result ~= false then
                 n = n + 1
             else
-                ns.Print("|cffff4444Could not bind|r", item.key, "->", item.command, ok and "" or result)
+                failed = failed + 1
+                ns.Debug("Could not bind", item.key, "->", item.command, ok and "" or result)
             end
         end
     end
@@ -237,6 +245,7 @@ function Bindings:Apply(items)
     end
     self.pendingMovement = nil
     ns.Debug("bindings set:", n)
+    if failed > 0 then return ("%d key%s could not be set"):format(failed, failed == 1 and "" or "s") end
 end
 
 function Bindings:Restore(snap)

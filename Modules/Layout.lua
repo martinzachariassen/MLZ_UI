@@ -145,7 +145,7 @@ function Layout:Preview()
     local data = ns.data.layout
     if not Available() then
         return { { id = "na", label = "Edit Mode", old = "-", new = "not available", enabled = false, unavailable = true,
-                   note = "C_EditMode not found in this client. Run /mlz probe and send the output." } }
+                   note = "This game version has no Edit Mode, so the layout step is skipped." } }
     end
     local raw, _, active = self:GetInfo()
     if not raw or not active then
@@ -154,22 +154,28 @@ function Layout:Preview()
 
     local items = {}
     local exists = FindByName(raw.layouts, data.name)
+    -- Already in use: running the wizard again must not overwrite the player's own Edit Mode tweaks by surprise
+    local _, ours = self:ActiveName() -- the main layout or one of its role layouts
+    local inUse = exists and ours
+    local fresh = not inUse
     items[#items + 1] = {
         id = "__layout", label = "Layout \"" .. data.name .. "\"", group = "Setup",
         old = "active: " .. tostring(active.layoutName or "?"),
         new = exists and "will be updated and activated" or "will be created and activated",
-        enabled = ns.Enabled("layout", "__layout", true),
-        note = "Other layouts (e.g. your own) are not changed. You can switch back in Edit Mode or with /mlz undo.",
+        enabled = ns.Enabled("layout", "__layout", fresh),
+        note = inUse
+            and "You already use this layout. Ticking this replaces your own changes to it with the MLZ UI placement. Other layouts are not changed."
+            or "Other layouts (e.g. your own) are not changed. You can switch back in Edit Mode or with /mlz undo.",
     }
     items[#items + 1] = {
         id = "__bars", label = "Show action bars", group = "Setup",
-        old = "", new = "Bar " .. table.concat(data.showBars, ", "), enabled = ns.Enabled("layout", "__bars", true),
+        old = "", new = "Bar " .. table.concat(data.showBars, ", "), enabled = ns.Enabled("layout", "__bars", fresh),
     }
     if data.healer then
         local names = table.concat(self:VariantNames(), ", ")
         items[#items + 1] = {
             id = "__heal", label = "Role layouts", group = "Setup", requires = "__layout",
-            old = "", new = names, enabled = ns.Enabled("layout", "__heal", true),
+            old = "", new = names, enabled = ns.Enabled("layout", "__heal", fresh),
             note = "Three extra layouts. Healing in a dungeon or raid: group frames in the middle of the screen and no swing timers. Casters, hunters and solo healers: only the ranged swing timer. They switch by themselves with your role (see /mlz role).",
         }
     end
@@ -180,7 +186,7 @@ function Layout:Preview()
             old = sys and AnchorText(sys.anchorInfo) or "-",
             new = spec.keepAnchor and "hidden"
                   or (AnchorText({ point = spec.point, relativeTo = spec.relTo, offsetX = spec.x, offsetY = spec.y }) .. SizeText(spec)),
-            enabled = sys ~= nil and ns.Enabled("layout", "frame" .. i, true),
+            enabled = sys ~= nil and ns.Enabled("layout", "frame" .. i, fresh),
         }
         local own = spec.anchorOverride and ns.db.overrides and ns.db.overrides[spec.anchorOverride]
         if own then item.new = AnchorText(own) .. SizeText(spec) .. "  (your saved position)" end
@@ -319,28 +325,33 @@ end
 -- baseLayout = the finished main layout table. Adds or refreshes one layout per variant in raw.layouts.
 function Layout:BuildVariants(raw, baseLayout)
     local h = ns.data.layout.healer
-    if not h then return 0 end
-    local built = 0
+    if not h then return 0, 0 end
+    local max = Constants and Constants.EditModeConsts and Constants.EditModeConsts.EditModeMaxLayoutsPerType
+    local built, skipped = 0, 0
     for _, v in ipairs(h.variants) do
         local copy = ns.CopyTable(baseLayout)
         copy.layoutName = v.name
         copy.isPreset, copy.isModified = nil, nil
         local idx = FindByName(raw.layouts, v.name)
+        local room = true
         if idx then
             copy.layoutType = raw.layouts[idx].layoutType
             raw.layouts[idx] = copy
+        elseif max and #raw.layouts >= max then
+            -- Edit Mode is full: the callers say so (wizard review, Rebuild button)
+            ns.Debug("Too many Edit Mode layouts (max " .. max .. "), skipped " .. v.name)
+            room = false
         else
-            local max = Constants and Constants.EditModeConsts and Constants.EditModeConsts.EditModeMaxLayoutsPerType
-            if max and #raw.layouts >= max then
-                ns.Print("|cffff4444Too many Edit Mode layouts (max " .. max .. "), skipped " .. v.name .. ".|r")
-                break
-            end
             table.insert(raw.layouts, copy)
         end
-        self:WriteSpecs(copy, VariantSpecs(v))
-        built = built + 1
+        if room then
+            self:WriteSpecs(copy, VariantSpecs(v))
+            built = built + 1
+        else
+            skipped = skipped + 1
+        end
     end
-    return built
+    return built, skipped
 end
 
 -- Rebuilds the role layouts from the saved main layout. Returns ok, message.
@@ -351,10 +362,14 @@ function Layout:RebuildVariants()
     if not raw then return false, "could not read layouts" end
     local _, base = FindByName(raw.layouts, ns.data.layout.name)
     if not base then return false, "The MLZ UI layout does not exist yet (run /mlz install)" end
-    local n = self:BuildVariants(raw, base)
+    local n, skipped = self:BuildVariants(raw, base)
     local ok, err = pcall(C_EditMode.SaveLayouts, raw)
     if not ok then return false, tostring(err) end
-    return true, n .. " role layout(s) written"
+    local text = n .. " role layout(s) written"
+    if skipped > 0 then
+        text = text .. ", " .. skipped .. " skipped because Edit Mode is full. Delete a layout in Edit Mode and try again"
+    end
+    return true, text
 end
 
 function Layout:VariantNames()
@@ -364,6 +379,7 @@ function Layout:VariantNames()
     return names
 end
 
+-- Returns nil when everything worked, else a short text for the wizard ("PARTLY")
 function Layout:Apply(items)
     local data = ns.data.layout
     local doLayout, doBars, doHeal = false, false, false
@@ -379,14 +395,13 @@ function Layout:Apply(items)
     if not doLayout or not Available() then return end
 
     local raw, _, active, numPresets = self:GetInfo()
-    if not raw or not active then ns.Print("|cffff4444Could not read Edit Mode layouts.|r") return end
+    if not raw or not active then return "Edit Mode layouts could not be read" end
 
     local idx, target = FindByName(raw.layouts, data.name)
     if not target then
         local max = Constants and Constants.EditModeConsts and Constants.EditModeConsts.EditModeMaxLayoutsPerType
         if max and #raw.layouts >= max then
-            ns.Print("|cffff4444Too many Edit Mode layouts (max " .. max .. "). Delete one in Edit Mode and try again.|r")
-            return
+            return "Edit Mode is full (max " .. max .. " layouts). Delete one in Edit Mode and run this step again"
         end
         target = ns.CopyTable(active)
         target.layoutName = data.name
@@ -396,19 +411,32 @@ function Layout:Apply(items)
         idx = #raw.layouts
     end
 
+    local problem
     local moved, log = self:WriteSpecs(target, specs)
-    if doHeal then self:BuildVariants(raw, target) end
+    if doHeal then
+        local built, skipped = self:BuildVariants(raw, target)
+        if skipped > 0 then
+            problem = ("%d of %d role layouts did not fit in Edit Mode"):format(skipped, built + skipped)
+        end
+    end
     ns.db.layoutLog = log -- ends up in SavedVariables, so we can check the conversion after /reload
 
     raw.activeLayout = numPresets + idx
     local ok, err = pcall(C_EditMode.SaveLayouts, raw)
-    if not ok then ns.Print("|cffff4444SaveLayouts failed:|r", err) return end
+    if not ok then
+        ns.Debug("SaveLayouts failed:", err)
+        return "Edit Mode did not save the layout"
+    end
     ok, err = pcall(C_EditMode.SetActiveLayout, numPresets + idx)
-    if not ok then ns.Print("|cffff4444SetActiveLayout failed:|r", err) end
+    if not ok then
+        ns.Debug("SetActiveLayout failed:", err)
+        problem = "The layout was saved but could not be activated. Pick it in Edit Mode"
+    end
     ns.Debug("layout saved, frames moved:", moved)
     ns.MarkEditModeStale()
     -- A healer should land on the healer layout straight away, not on the next group change
     if ns.Healer and ns.Healer.Switch then C_Timer.After(1, function() ns.Healer.Switch(true) end) end
+    return problem
 end
 
 -- Changes a single setting (in display units, e.g. 120 %) in the MLZ UI layout and saves.

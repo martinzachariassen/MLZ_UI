@@ -20,7 +20,6 @@ local function Export()
         scale = db.scale and { mode = db.scale.mode } or nil,
         nameplatesAuto = np.auto,
         nameplates = { mode = np.mode, style = np.style, threat = np.threat, pvp = np.pvp, healerFriends = np.healerFriends },
-        roleForce = ns.GetRoleForce(),
     }
 end
 
@@ -70,8 +69,7 @@ local function Validate(data)
         end
         if next(out) then clean.nameplates = out end
     end
-    local roles = { TANK = true, HEALER = true, DAMAGER = true }
-    if type(data.roleForce) == "string" and roles[data.roleForce] then clean.roleForce = data.roleForce end
+    -- roleForce is never imported: your role belongs to this character, not to a shared setup
     return clean
 end
 
@@ -136,10 +134,13 @@ local function Import(text)
     if clean.nameplates then
         for k, v in pairs(clean.nameplates) do ns.db.nameplates[k] = v end
     end
-    if clean.roleForce then ns.GetRoleForce(); ns.CharDB().roleForce = clean.roleForce end
     if ns.FireRole then ns.FireRole() end
     if ns.NP and ns.NP.Apply then ns.NP.Apply() end -- nameplate options may have changed
     ns.Print("Imported. Run |cffffff00/mlz install|r to apply the settings, or |cffffff00/mlz undo|r to go back.")
+    local S = ns.Settings
+    if S and S.frame and S.frame:IsShown() then
+        S:Notify("Imported. Run the setup wizard to apply movement and scale, or undo it on Profiles & backup.", "warn")
+    end
 end
 
 ns.AddCommand("export", "shows a string with your MLZ UI choices", function()
@@ -219,11 +220,11 @@ function RP.Delete(role)
     ns.FireState()
 end
 
--- Returns true if a profile was loaded
+-- Returns true if a profile was found, and a second value: false when it waits for combat to end
 function RP.Load(role, quiet)
     local snap = Store()[role]
     if not snap then return false end
-    ns.RunOutOfCombat(function()
+    local ran = ns.RunOutOfCombat(function()
         Load(snap)
         if quiet then return end
         local text = "Loaded your " .. ns.ROLE_TEXT[role] .. " profile."
@@ -231,11 +232,14 @@ function RP.Load(role, quiet)
         local S = ns.Settings
         if S and S.frame and S.frame:IsShown() then S:Notify(text, "info") end
     end, "role profile", true)
-    return true
+    return true, ran
 end
 
-ns.OnRoleChanged(function(role, _, roleChanged)
-    if not (roleChanged and role and ns.db and ns.db.installed and RP.Auto()) then return end
+ns.OnRoleChanged(function(role)
+    -- compare roles ourselves: the listener flag is also true when only the archetype changed
+    local previous = RP.lastRole
+    RP.lastRole = role
+    if not (previous and role and role ~= previous and ns.db and ns.db.installed and RP.Auto()) then return end
     -- the first event after login only tells us the role we already had
     if not RP.started then return end
     if RP.Has(role) then RP.Load(role) end

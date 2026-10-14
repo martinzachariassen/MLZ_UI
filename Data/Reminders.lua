@@ -5,7 +5,7 @@
 --   class  = class file name ("PRIEST", ...)
 --   spells = spell IDs (rank 1 is enough: Classic keeps every rank in the spellbook). The first known one
 --            gives the icon and name.
---   also   = extra spell IDs that count as "has it" (group versions cast by someone else)
+--   also   = extra spell IDs that count as "has it" (group versions cast by someone else, Demonic Sacrifice)
 --   roles  = (optional) only for these roles
 --   kind   = "aura" (default), "weapon" (weapon enchant on each hand that holds a weapon: poisons, imbues)
 --            or "pet" (no pet out)
@@ -20,15 +20,15 @@ ns.data.reminders = {
     buffs = {
         { class = "PRIEST", spells = { 588 } },                          -- Inner Fire
         { class = "PRIEST", spells = { 1243 }, also = { 21562 } },       -- Power Word: Fortitude / Prayer of Fortitude
-        { class = "PRIEST", spells = { 976 }, also = { 27683 } },        -- Shadow Protection / Prayer of Shadow Protection
         { class = "PRIEST", spells = { 15473 } },                        -- Shadowform (talent)
         { class = "MAGE", spells = { 1459 }, also = { 23028 } },         -- Arcane Intellect / Arcane Brilliance
         { class = "MAGE", spells = { 6117, 7302, 168 } },                -- Mage Armor, Ice Armor, Frost Armor
         { class = "DRUID", spells = { 1126 }, also = { 21849 } },        -- Mark of the Wild / Gift of the Wild
         { class = "DRUID", spells = { 16864 } },                         -- Omen of Clarity (talent)
-        { class = "DRUID", spells = { 467 } },                           -- Thorns
+        { class = "DRUID", spells = { 467 }, roles = { TANK = true } },  -- Thorns
         { class = "WARLOCK", spells = { 706, 687 } },                    -- Demon Armor, Demon Skin
-        { class = "WARLOCK", kind = "pet", spells = { 688, 697, 712, 691 } }, -- Summon Imp, Voidwalker, Succubus, Felhunter
+        { class = "WARLOCK", kind = "pet", spells = { 688, 697, 712, 691 },
+          also = { 18789, 18790, 18791, 18792 } },                       -- Summon Imp, Voidwalker, Succubus, Felhunter (no pet after Demonic Sacrifice)
         { class = "WARRIOR", spells = { 6673 } },                        -- Battle Shout
         { class = "SHAMAN", spells = { 324 } },                          -- Lightning Shield
         { class = "SHAMAN", kind = "weapon", spells = { 8232, 8024, 8033, 8017 } }, -- Windfury, Flametongue, Frostbrand, Rockbiter

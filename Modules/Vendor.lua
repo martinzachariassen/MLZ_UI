@@ -1,7 +1,7 @@
 -- MLZ UI: Auto-repair and sell grey items at merchants
 -- When a merchant window opens: repair everything (guild bank money first when allowed, then your
 -- own) and sell every grey (poor quality) item, then print one summary line.
--- Hold Shift while opening the merchant to skip it once. Settings: /mlz > Quality of life.
+-- Hold Shift while opening the merchant to skip it once. Settings: /mlz > Helpers.
 -- Selling is skipped when Leatrix Plus already sells junk, so the two never fight.
 
 local _, ns = ...

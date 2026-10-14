@@ -22,7 +22,7 @@
 
 MLZ UI sets up the **Blizzard UI you already have** (Edit Mode, CVars, keybinds and your existing addons) instead of replacing it the way full UI suites do.
 
-- **Preview first.** A setup wizard shows every change as *now → will become*. You pick what you want.
+- **Preview first.** A setup wizard shows every change as *now → will become*. You pick what you want. It starts with your class and role, and offers "Use recommended" or "Looks only" if you do not want to go step by step.
 - **Always reversible.** A backup is taken before anything changes. `/mlz undo` puts it back.
 - **No taint, no libraries.** Protected frames are only faded with `SetAlpha`, and anything blocked in combat waits until combat ends. Plain Lua, no external dependencies.
 - **Data, not code.** All choices live in plain tables under [`Data/`](Data), so you can change them without touching the logic.
@@ -41,7 +41,7 @@ All 9 classes are supported. MLZ UI reads your class, your talents and your form
 | **Paladin** | Holy: healer. Protection: tank. Retribution: melee DPS. Righteous Fury counts as tank | Aura keys, aura and Righteous Fury reminders, Symbol of Kings and Divinity |
 | **Hunter** | Ranged DPS | Pet keys, aspect and pet reminders, ammo, only the ranged swing timer |
 | **Rogue** | Melee DPS | Stealth key, poison reminder for both hands, energy tick, powders |
-| **Priest** | Discipline and Holy: healer. Shadow: caster DPS | Shadowform key, Fortitude, Inner Fire and Shadow Protection reminders, mana tick |
+| **Priest** | Discipline and Holy: healer. Shadow: caster DPS | Shadowform key, Fortitude and Inner Fire reminders, mana tick |
 | **Shaman** | Elemental: caster DPS. Enhancement: melee DPS. Restoration: healer | Imbue reminder for both hands, Lightning Shield, Ankh |
 | **Mage** | Caster DPS | Armor and Arcane Intellect reminders, teleport and portal runes, mana tick |
 | **Warlock** | Caster DPS | Pet keys and pet reminder, Demon Armor, Soul Shards |
@@ -52,7 +52,7 @@ What follows your role:
 - **Nameplates.** Tank, Healer, DPS and Solo modes, picked from what you do right now.
 - **Keys and reminders.** Key hints, stance keys, pet keys, buffs, reagents and ammo follow your class.
 
-If the guess is wrong, set your role by hand with `/mlz role` or on the Role & healing page.
+If the guess is wrong, set your role by hand with `/mlz role`, on the Your role page in `/mlz`, or in the first step of the setup wizard.
 
 ## Screenshots
 
@@ -171,7 +171,7 @@ Settings that don't exist in your installed version are shown as *not available*
 | **Minimalism** | Bars 4-5, micro menu, bags, chat buttons and XP bar hidden until hover. Bars 2-3 dimmed out of combat. Damage meter only in a group. |
 | **Action buttons** | Red = out of range, blue = no resource, grey = unusable. Short hotkeys (`S1`, `C1`) and hidden macro names. Stance, pet and bonus bars included. |
 | **Nameplates** | MLZ nameplates (or Platynator). Tank / Healer / DPS / Solo picked from your role. Healer: unclickable friendly names, dimmed enemies. Tank: bigger target, your debuffs on every mob. Quest marker, cast bar, level only when it matters. Applies at once, no `/reload`. |
-| **Quality of life** | Auto-repair (guild money first), sell greys (hold Shift to skip), mana tick / 5-second rule bar (energy tick for rogues and cats), interrupt announce. Reminder icons for missing self buffs (not in cities), low reagents and ammo, and gear at 25% durability or less. XP per hour and time to level. |
+| **Helpers** | Auto-repair (guild money first), sell greys (hold Shift to skip), mana tick / 5-second rule bar (energy tick for rogues and cats), interrupt announce. Reminder icons for missing self buffs (not in cities), low reagents and ammo, and gear at 25% durability or less. XP per hour and time to level. |
 | **Classes and roles** | All 9 classes. Role is tank, healer or DPS, and DPS is melee, ranged or caster. Defensive Stance, Bear Form and Righteous Fury count as tanking. Data in `Data/Classes.lua`. |
 | **Role profiles** | Nameplates, fading, tick bar and interrupt announce saved per role, loaded automatically when your role changes. |
 | **Tweaks** | Minimap size, FPS counter, calmer combat text (Roboto Bold), hide the quest tracker or its header, class colors and a target line in unit tooltips, class colored names in chat (your old choice per chat type comes back when you turn it off). Style: square minimap with a 1px border (rotation off while square, skipped when Leatrix Plus styles the minimap), flat chat input box, Roboto chat font. |
@@ -185,13 +185,13 @@ Settings that don't exist in your installed version are shown as *not available*
 
 | Page | What you see and change |
 |---|---|
-| Overview | One status line per area, a tip card, and a banner only when setup or a reload is pending |
+| Overview | One status line per area, up to 3 next steps (missing buffs, missing role layouts, reminders off), a tip card, and a banner only when setup or a reload is pending |
 | Layout & scale | Scale mode, screen layout (Edit Mode), minimap size, pet bar position |
 | Nameplates | Engine (MLZ, Platynator or off), current mode and why, mode picker, friendly names, threat colors, PvP tweak, what the plates show, size, Platynator profile save/restore |
-| Role & healing | Your role and where it comes from, your class and archetype, role layouts now and for your role, rebuild role layouts |
+| Your role | Your role and where it comes from, your class and archetype, role layouts now and for your role, rebuild role layouts |
 | Minimalism | One switch per faded frame, pause fading, clean chat |
-| Action bars & UI | Button colors and hotkeys, quest tracker, FPS counter, combat text, tooltips, style |
-| Quality of life | Repair / sell greys, mana tick bar, interrupt announce, reminders, XP per hour |
+| Action bars & interface | Button colors and hotkeys, quest tracker, FPS counter, combat text, tooltips, style |
+| Helpers | Repair / sell greys, mana tick bar, interrupt announce, reminders (with one switch per reminder for your class), XP per hour |
 | Other addons | Which supported addons are loaded and how many settings differ, plus addons worth a look for your role |
 | Profiles & backup | Role profiles, export/import, backups, undo |
 | About & help | How it works, minimap button, commands, debug |

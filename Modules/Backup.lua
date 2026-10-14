@@ -10,7 +10,7 @@ ns.Backup = Backup
 local MAX_BACKUPS = 5
 
 -- Order the wizard applies modules in (UI/Installer.lua); undo goes the other way
-Backup.APPLY_ORDER = { "scale", "settings", "layout", "bindings", "fade", "actionbuttons", "tweaks", "addons", "nameplates" }
+Backup.APPLY_ORDER = { "role", "scale", "settings", "layout", "bindings", "fade", "actionbuttons", "tweaks", "addons", "nameplates" }
 
 -- selections = { { mod = <module>, items = {...} }, ... }; kind = "import" for profile imports
 function Backup:Create(selections, kind)
@@ -53,15 +53,29 @@ function Backup:Undo()
         ns.Print("No backup to restore.")
         return
     end
-    -- Returns true when it ran now, false when it waits for combat to end
-    return ns.RunOutOfCombat(function()
+    -- Returns true when it ran now, false when it waits for combat to end, "partial" when a part could not be restored
+    local partial = false
+    local ran = ns.RunOutOfCombat(function()
         local entry = table.remove(list)
+        local failed
         for _, mod in ipairs(RestoreOrder()) do
             local snap = entry.data[mod.key]
             if snap and mod.Restore then
                 local ok, err = pcall(mod.Restore, mod, snap)
-                if not ok then ns.Print("|cffff4444Restore failed for|r", mod.title, err) end
+                if not ok then
+                    ns.Print("|cffff4444Restore failed for|r", mod.title, err)
+                    failed = failed or {}
+                    failed[mod.key] = snap
+                end
             end
+        end
+        if failed then
+            -- Keep what could not be restored, so another /mlz undo can try again
+            table.insert(list, { time = entry.time, data = failed, kind = entry.kind })
+            ns.Print("Some parts could not be undone. Run |cffffff00/mlz undo|r again to retry.")
+            partial = true
+            ns.FireState()
+            return
         end
         -- Undoing an import only gives back your old choices; the setup itself is still in place
         if #list == 0 and entry.kind ~= "import" then ns.db.installed = false end
@@ -70,6 +84,8 @@ function Backup:Undo()
             .. (ns.needsReload and " Reload to finish." or ""))
         ns.FireState()
     end, "undo")
+    if ran and partial then return "partial" end
+    return ran
 end
 
 ns.AddCommand("undo", "undoes the last run of the setup wizard", function() Backup:Undo() end)

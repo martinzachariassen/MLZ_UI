@@ -15,7 +15,7 @@ The target player wants a calm, good-looking UI without learning a big suite lik
 - **Load order** (`MLZ_UI.toc`): `Core.lua` → `Probe.lua` → `Data/*` → `Modules/*` (`Backup.lua` first) → `UI/*` (`Widgets.lua` first).
 - **Namespace:** every file starts with `local _, ns = ...`. `ns` is global as `MLZUI` for `/dump` only. Never read `MLZUI` from code.
 - **`Data/` = what, `Modules/` = how.** Defaults and presets go in `Data/` as plain tables. Logic goes in `Modules/`.
-- **Module contract:** `ns.RegisterModule({ key, title })`, then `:Preview()`, `:Backup(items)`, `:Apply(items)`, `:Restore(snap)`. New wizard modules must be added to `Backup.APPLY_ORDER` in `Modules/Backup.lua`.
+- **Module contract:** `ns.RegisterModule({ key, title })`, then `:Preview()`, `:Backup(items)`, `:Apply(items)`, `:Restore(snap)`. `:Apply` returns nil, or a short text when part of it failed (the wizard then shows PARTLY). New wizard modules must be added to `Backup.APPLY_ORDER` in `Modules/Backup.lua`.
 - **Reuse Core helpers** instead of writing your own: `ns.On`/`ns.TryOn`, `ns.RunOutOfCombat`, `ns.FireState`/`ns.OnState`, `ns.MarkReload` (last resort, apply live when you can), `ns.MarkEditModeStale`, `ns.Error`, `ns.Enabled`/`ns.SetEnabled`, `ns.Try`, `ns.IsAddOnLoaded`/`ns.IsAddOnInstalled`, `ns.Role`/`ns.LiveRole`, `ns.Archetype`/`ns.LiveArchetype`, `ns.CharDB`, `ns.AddCommand`, `ns.ShowCopy`, `ns.Debug`.
 
 ## Hard rules
@@ -103,7 +103,7 @@ The README images in `docs/screenshots/` are currently **mockups**: HTML in `doc
 |---|---|---|
 | `control-center.png` | `/mlz`, Overview page with all status lines | Setup done, no reload pending (so no banner), healer role, hover one line |
 | `nameplates.png` | `/mlz` → Nameplates, "Right now", Mode and Options cards | Platynator loaded, Auto mode, clean style on |
-| `wizard.png` | `/mlz install`, step 4 Keybinds | Moving ESDF → WASD so red conflicts and Alt moves show |
+| `wizard.png` | `/mlz install`, step 5 Keybinds | Moving ESDF → WASD so red conflicts and Alt moves show |
 | `minimap-menu.png` | Minimap button tooltip and right-click menu | Two separate captures composed side by side (they can't be open at once) |
 
 Use a clean, well-lit spot (e.g. a capital city at day), 1440p or higher, UI scale set by MLZ UI, and no other addon windows open.
