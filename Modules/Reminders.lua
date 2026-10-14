@@ -57,12 +57,24 @@ local function PlayerBuffs()
     return names
 end
 
-local MAIN_HAND = INVSLOT_MAINHAND or 16
+local MAIN_HAND, OFF_HAND = INVSLOT_MAINHAND or 16, INVSLOT_OFFHAND or 17
+local WEAPON_CLASS = (Enum and Enum.ItemClass and Enum.ItemClass.Weapon) or LE_ITEM_CLASS_WEAPON or 2
 
-local function HasMainHandEnchant()
-    if not GetWeaponEnchantInfo then return true end -- can't tell: don't nag
-    if not GetInventoryItemID("player", MAIN_HAND) then return true end -- no weapon, nothing to coat
-    return GetWeaponEnchantInfo() and true or false
+local function IsWeapon(slot)
+    local id = GetInventoryItemID("player", slot)
+    if not id then return false end
+    local info = (C_Item and C_Item.GetItemInfoInstant) or GetItemInfoInstant
+    if not info then return slot == MAIN_HAND end -- can't tell: only check the main hand
+    local _, _, _, _, _, classID = info(id)
+    return classID == WEAPON_CLASS
+end
+
+-- Returns nil when every weapon you hold has an enchant (poison, imbue), else "main hand" or "off hand"
+local function WeaponMissing()
+    if not GetWeaponEnchantInfo then return nil end -- can't tell: don't nag
+    local hasMain, _, _, _, hasOff = GetWeaponEnchantInfo()
+    if IsWeapon(MAIN_HAND) and not hasMain then return "main hand" end
+    if IsWeapon(OFF_HAND) and not hasOff then return "off hand" end
 end
 
 -- GetInventorySlotInfo errors on clients without an ammo slot
@@ -114,7 +126,8 @@ local function Missing()
     local cfg, data = Cfg(), ns.data.reminders or {}
     local list = {}
     local _, class = UnitClass("player")
-    local role = ns.Role and ns.Role() or "DAMAGER"
+    -- What you do right now: a Feral druid in Cat Form is not a tank
+    local role = ns.LiveRole and ns.LiveRole() or "DAMAGER"
 
     if cfg.buffs and not IsResting() then
         local have = PlayerBuffs()
@@ -125,9 +138,10 @@ local function Missing()
                     if Knows(id) then known = id break end
                 end
                 if known then
-                    local ok
+                    local ok, hand
                     if b.kind == "weapon" then
-                        ok = HasMainHandEnchant()
+                        hand = WeaponMissing()
+                        ok = hand == nil
                     elseif b.kind == "pet" then
                         ok = UnitExists("pet") or (IsMounted and IsMounted())
                     else
@@ -142,7 +156,7 @@ local function Missing()
                     end
                     if not ok then
                         local name = SpellName(known) or "?"
-                        local why = b.kind == "weapon" and ("Your main hand weapon has no " .. name:lower() .. " on it.")
+                        local why = b.kind == "weapon" and ("Your " .. (hand or "main hand") .. " weapon has no " .. name:lower() .. " on it.")
                             or b.kind == "pet" and "Your pet is not out."
                             or ("You don't have " .. name .. " on you.")
                         list[#list + 1] = { icon = SpellIcon(known), text = name, why = why }

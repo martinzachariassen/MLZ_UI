@@ -1,8 +1,9 @@
--- MLZ UI: Healer layouts
+-- MLZ UI: Role layouts
 -- Switches between the Edit Mode layouts made in Modules/Layout.lua (data: ns.data.layout.healer):
 --   healer in a raid           -> "MLZ UI Heal Raid"
 --   healer in a party          -> "MLZ UI Heal Dungeon"
---   anything else              -> "MLZ UI" (main layout: tank / dps / solo)
+--   caster, hunter, or a healer on their own -> "MLZ UI Ranged" (no melee swing timers)
+--   anything else              -> "MLZ UI" (main layout: tank / melee dps)
 -- Healer = your active spec has the healer role (e.g. Restoration druid). If the client can't tell,
 -- the role you have in the group is used, and /mlz heal on|off overrides both.
 -- It only switches when one of the MLZ layouts is active, so a layout you chose yourself is never replaced.
@@ -23,12 +24,19 @@ end
 
 local function WantedLayout()
     local h = ns.data.layout.healer
-    if not h or not IsHealer() then return ns.data.layout.name end
-    local kind = IsInRaid() and "raid" or (IsInGroup() and "party" or nil)
-    if kind then
-        for _, v in ipairs(h.variants) do
-            if v.kind == kind then return v.name end
+    if not h then return ns.data.layout.name end
+    if IsHealer() then
+        local kind = IsInRaid() and "raid" or (IsInGroup() and "party" or nil)
+        if kind then
+            for _, v in ipairs(h.variants) do
+                if v.kind == kind then return v.name end
+            end
         end
+    end
+    -- Not the stable archetype of the moment (ns.LiveArchetype): switching layouts on every form change would flicker
+    local arch = ns.Archetype()
+    for _, v in ipairs(h.variants) do
+        if v.archetypes and v.archetypes[arch] then return v.name end
     end
     return ns.data.layout.name
 end
@@ -154,12 +162,12 @@ ns.AddCommand("heal","healer layouts: (status) | on | off | auto | build", funct
         ns.Print("Healer layouts follow your spec.")
     elseif arg == "build" then
         local ok, msg = Healer.Rebuild()
-        ns.Print(ok and "Healer layouts rebuilt:" or "|cffff4444Failed:|r", msg)
+        ns.Print(ok and "Role layouts rebuilt:" or "|cffff4444Failed:|r", msg)
     else
         local role, source = ns.Role()
         ns.Print("Role:", tostring(role), "(" .. tostring(source) .. ") | healer:", IsHealer() and "yes" or "no",
             "| wanted layout:", WantedLayout())
-        ns.Print("Use /mlz heal on, off, auto or build (rebuilds the healer layouts from the main layout).")
+        ns.Print("Use /mlz heal on, off, auto or build (rebuilds the role layouts from the main layout).")
     end
 end)
 

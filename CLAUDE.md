@@ -4,7 +4,7 @@ Guidance for working on MLZ UI. Read this before you change code, UI or copy. Fo
 
 ## Project
 
-MLZ UI is a World of Warcraft Classic addon (`## Interface: 16001`, Lua 5.1). It turns the default Blizzard UI into a clean, minimal setup through one guided wizard and a control center (`/mlz`).
+MLZ UI is a World of Warcraft Classic addon (`## Interface: 16001`, Lua 5.1). **WoW Forever is the main supported client**, and every class is supported: tank, healer, melee, ranged and caster DPS, and hybrids such as druid, paladin, shaman and priest get the UI that fits how they play. Class facts live in `Data/Classes.lua`. It turns the default Blizzard UI into a clean, minimal setup through one guided wizard and a control center (`/mlz`).
 
 **Philosophy: configure, never replace.** We set up Edit Mode, CVars, keybinds and other addons the player already has. We do not build replacement unit frames or action bars. The one exception is nameplates (`Modules/Plates.lua`): our own frames on top of Blizzard's plate, with Platynator as an optional engine. Every change is previewed as *now → will become*, backed up first and undoable with `/mlz undo`.
 
@@ -16,7 +16,7 @@ The target player wants a calm, good-looking UI without learning a big suite lik
 - **Namespace:** every file starts with `local _, ns = ...`. `ns` is global as `MLZUI` for `/dump` only. Never read `MLZUI` from code.
 - **`Data/` = what, `Modules/` = how.** Defaults and presets go in `Data/` as plain tables. Logic goes in `Modules/`.
 - **Module contract:** `ns.RegisterModule({ key, title })`, then `:Preview()`, `:Backup(items)`, `:Apply(items)`, `:Restore(snap)`. New wizard modules must be added to `Backup.APPLY_ORDER` in `Modules/Backup.lua`.
-- **Reuse Core helpers** instead of writing your own: `ns.On`/`ns.TryOn`, `ns.RunOutOfCombat`, `ns.FireState`/`ns.OnState`, `ns.MarkReload` (last resort, apply live when you can), `ns.MarkEditModeStale`, `ns.Error`, `ns.Enabled`/`ns.SetEnabled`, `ns.Try`, `ns.IsAddOnLoaded`/`ns.IsAddOnInstalled`, `ns.Role`/`ns.LiveRole`, `ns.CharDB`, `ns.AddCommand`, `ns.ShowCopy`, `ns.Debug`.
+- **Reuse Core helpers** instead of writing your own: `ns.On`/`ns.TryOn`, `ns.RunOutOfCombat`, `ns.FireState`/`ns.OnState`, `ns.MarkReload` (last resort, apply live when you can), `ns.MarkEditModeStale`, `ns.Error`, `ns.Enabled`/`ns.SetEnabled`, `ns.Try`, `ns.IsAddOnLoaded`/`ns.IsAddOnInstalled`, `ns.Role`/`ns.LiveRole`, `ns.Archetype`/`ns.LiveArchetype`, `ns.CharDB`, `ns.AddCommand`, `ns.ShowCopy`, `ns.Debug`.
 
 ## Hard rules
 

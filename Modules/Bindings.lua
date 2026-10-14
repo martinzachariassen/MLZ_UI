@@ -29,7 +29,9 @@ function Bindings:Desired(movement)
     end
     local keys = D.baseKeys[movement]
     local class = ns.PlayerClass()
-    local hasStances = not D.stanceClasses or D.stanceClasses[class]
+    local c = ns.data.classes and ns.data.classes[class]
+    local hasStances = c and c.stance
+    local hints = D.classRoles and D.classRoles[class] or {}
     local stance = (hasStances and D.stance and D.stance[movement]) or {}
     local stanceKeys = {}
     for _, b in ipairs(stance) do stanceKeys[b.key] = true end
@@ -43,7 +45,7 @@ function Bindings:Desired(movement)
                 key = full,
                 command = layer.prefix .. i,
                 group = layer.bar .. (layer.modifier ~= "" and (" (" .. layer.modifier:sub(1, -2) .. ")") or ""),
-                role = layer.modifier == "" and D.roles[i] or nil,
+                role = layer.modifier == "" and (hints[i] or D.roles[i]) or nil,
             }
           end
         end
@@ -51,7 +53,7 @@ function Bindings:Desired(movement)
     for i, b in ipairs(stance) do
         list[#list + 1] = { key = b.key, command = b.command, group = "Stances / forms", role = "Stance " .. i }
     end
-    if D.petClasses and D.petClasses[class] and D.pet and D.pet[movement] then
+    if c and c.pet and D.pet and D.pet[movement] then
         for _, b in ipairs(D.pet[movement]) do
             list[#list + 1] = { key = b.key, command = b.command, group = "Pet", role = b.role }
         end

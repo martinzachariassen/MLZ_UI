@@ -12,6 +12,7 @@ MLZ_UI/
 ├── Data/                 WHAT to set (plain tables, no logic)
 │   ├── CVars.lua
 │   ├── Bindings.lua
+│   ├── Classes.lua       The 9 WoW Forever classes: talent trees, archetypes, stance and pet bars
 │   ├── Layout.lua
 │   ├── Fade.lua
 │   ├── Nameplates.lua
@@ -115,7 +116,9 @@ Use these before writing your own.
 | `ns.Enabled(mod, id, default)` · `ns.SetEnabled` | Remember which wizard rows are ticked. |
 | `ns.Try(fn, ...)` | `pcall` wrapper for APIs that may not exist or may fail. |
 | `ns.IsAddOnLoaded(name)` · `ns.IsAddOnInstalled(name)` | Addon checks that work across client APIs. |
-| `ns.Role()` · `ns.LiveRole()` · `ns.SetRoleForce` · `ns.OnRoleChanged(fn)` | Role detection and overrides. |
+| `ns.Role()` · `ns.LiveRole()` · `ns.SetRoleForce` · `ns.OnRoleChanged(fn)` | Role detection (tank, healer, DPS) and overrides. `LiveRole` is what you do right now (Bear Form, Defensive Stance, Righteous Fury). |
+| `ns.Archetype()` · `ns.LiveArchetype()` · `ns.ArchetypeText(a)` | Tank, healer, melee, ranged or caster, from `Data/Classes.lua`. Layouts use the stable one, reminders and nameplates the live one. |
+| `ns.ClientInfo()` | Game client facts for the About page. WoW Forever (Interface 16001) is the main client. |
 | `ns.CharDB()` | Per-character table inside `MLZUIDB.chars`. |
 | `ns.AddCommand(name, help, fn)` | Add a `/mlz <name>` subcommand. It shows up in `/mlz help`. |
 | `ns.ShowCopy(title, text, onAccept)` | Copy/paste dialog (export, import, probe). |

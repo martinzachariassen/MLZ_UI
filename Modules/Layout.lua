@@ -168,9 +168,9 @@ function Layout:Preview()
     if data.healer then
         local names = table.concat(self:VariantNames(), ", ")
         items[#items + 1] = {
-            id = "__heal", label = "Healer layouts", group = "Setup", requires = "__layout",
+            id = "__heal", label = "Role layouts", group = "Setup", requires = "__layout",
             old = "", new = names, enabled = ns.Enabled("layout", "__heal", true),
-            note = "Two extra layouts (dungeon and raid) with the group frames in the middle of the screen and the swing timers hidden. They switch automatically when you heal (see /mlz heal).",
+            note = "Three extra layouts. Healing in a dungeon or raid: group frames in the middle of the screen and no swing timers. Casters, hunters and solo healers: only the ranged swing timer. They switch by themselves with your role (see /mlz role).",
         }
     end
     for i, spec in ipairs(data.frames) do
@@ -343,7 +343,7 @@ function Layout:BuildVariants(raw, baseLayout)
     return built
 end
 
--- Rebuilds the healer layouts from the saved main layout. Returns ok, message.
+-- Rebuilds the role layouts from the saved main layout. Returns ok, message.
 function Layout:RebuildVariants()
     if not Available() then return false, "Edit Mode API missing" end
     if InCombatLockdown() then return false, "not possible in combat" end
@@ -354,7 +354,7 @@ function Layout:RebuildVariants()
     local n = self:BuildVariants(raw, base)
     local ok, err = pcall(C_EditMode.SaveLayouts, raw)
     if not ok then return false, tostring(err) end
-    return true, n .. " healer layout(s) written"
+    return true, n .. " role layout(s) written"
 end
 
 function Layout:VariantNames()
@@ -413,7 +413,7 @@ end
 
 -- Changes a single setting (in display units, e.g. 120 %) in the MLZ UI layout and saves.
 -- Used by /mlz map. Returns ok, error message.
--- The healer layouts get the same change, so the minimap doesn't change size when you start healing.
+-- The role layouts get the same change, so the minimap does not change size when your layout switches.
 function Layout:UpdateOne(id, name, value)
     if not Available() then return false, "Edit Mode API missing" end
     if InCombatLockdown() then return false, "not possible in combat" end

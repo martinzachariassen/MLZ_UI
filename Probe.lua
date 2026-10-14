@@ -254,6 +254,18 @@ function ns.RunProbe(silent)
     if ns.Role then
         local role, source = ns.Role()
         p.role = { role = role, source = source }
+        if ns.LiveArchetype then
+            local live, why = ns.LiveRole()
+            local arch = ns.LiveArchetype()
+            p.role.live, p.role.liveWhy, p.role.archetype = live, why, arch
+        end
+        if ns.ClientInfo then p.client = ns.ClientInfo() end
+        -- stance and form facts, to check Defensive Stance / Bear Form detection on this client
+        p.form = {
+            id = GetShapeshiftFormID and GetShapeshiftFormID() or nil,
+            index = GetShapeshiftForm and GetShapeshiftForm() or nil,
+            count = GetNumShapeshiftForms and GetNumShapeshiftForms() or nil,
+        }
     end
 
     if silent then

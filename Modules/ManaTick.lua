@@ -4,7 +4,8 @@
 --   "five-second rule": spirit regen is off until it is full. After that the bar shows the
 --   2-second regen tick (blue), so you can time a cast just after a tick.
 --   Energy users (rogues, druids in Cat Form): the bar shows the 2-second energy tick (yellow).
--- Hidden when your mana/energy is full out of combat, and for rage (warriors, Bear Form).
+--   Druids in Bear Form: the bar keeps showing mana, so you can time a shift out to heal or cast.
+-- Hidden when your mana/energy is full out of combat, and for rage (warriors).
 -- Off until you turn it on in /mlz > Quality of life. The bar can be moved there too.
 
 local _, ns = ...
@@ -12,7 +13,7 @@ local _, ns = ...
 local MT = {}
 ns.ManaTick = MT
 
-local MANA, ENERGY = 0, 3
+local MANA, RAGE, ENERGY = 0, 1, 3
 local FIVE, TICK = 5, 2
 local COLORS = {
     five   = { 1.00, 0.55, 0.10 },
@@ -83,6 +84,8 @@ local function PowerKind()
     local t = UnitPowerType("player")
     if t == MANA then return "mana" end
     if t == ENERGY then return "energy" end
+    -- A druid in Bear Form still has mana to protect (shifting out to heal or cast), so the bar keeps showing it
+    if t == RAGE and ns.PlayerClass() == "DRUID" then return "mana" end
 end
 
 local function OnUpdate(self)

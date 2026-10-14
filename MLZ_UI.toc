@@ -1,6 +1,6 @@
 ## Interface: 16001
 ## Title: MLZ UI
-## Notes: Sets up scaling, layout, keybinds and settings via an installation wizard. /mlz
+## Notes: Sets up scaling, layout, keybinds and settings via an installation wizard. Built for WoW Forever, all classes. /mlz
 ## Author: Martin
 ## Version: 0.7.0
 ## SavedVariables: MLZUIDB
@@ -14,6 +14,7 @@ Probe.lua
 
 Data\CVars.lua
 Data\Bindings.lua
+Data\Classes.lua
 Data\Layout.lua
 Data\Fade.lua
 Data\Nameplates.lua

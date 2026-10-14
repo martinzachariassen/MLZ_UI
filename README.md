@@ -2,9 +2,10 @@
 
 # MLZ UI
 
-**A clean, minimal World of Warcraft UI in one guided setup. Every change previewed, every change undoable.**
+**A clean, minimal World of Warcraft UI in one guided setup, built for WoW Forever and every class. Every change previewed, every change undoable.**
 
 ![Version](https://img.shields.io/badge/version-0.7.0-33a0ff?style=flat-square)
+![Client](https://img.shields.io/badge/client-WoW%20Forever-33a0ff?style=flat-square)
 ![Interface](https://img.shields.io/badge/interface-16001-20242b?style=flat-square)
 ![Lua](https://img.shields.io/badge/lua-5.1-000080?style=flat-square&logo=lua)
 ![Dependencies](https://img.shields.io/badge/dependencies-none-4ad173?style=flat-square)
@@ -25,6 +26,33 @@ MLZ UI sets up the **Blizzard UI you already have** (Edit Mode, CVars, keybinds 
 - **Always reversible.** A backup is taken before anything changes. `/mlz undo` puts it back.
 - **No taint, no libraries.** Protected frames are only faded with `SetAlpha`, and anything blocked in combat waits until combat ends. Plain Lua, no external dependencies.
 - **Data, not code.** All choices live in plain tables under [`Data/`](Data), so you can change them without touching the logic.
+
+## Supported game version
+
+**WoW Forever is the main supported client.** MLZ UI is built, tested and tuned for it (`## Interface: 16001`). Other Classic clients may load the addon, but they are not tested. The About page in the control center tells you if your client is not WoW Forever.
+
+## Classes and roles
+
+All 9 classes are supported. MLZ UI reads your class, your talents and your form or stance, and sets up the UI for how you play. DPS is split in three, so a mage and a rogue do not get the same UI.
+
+| Class | How MLZ UI sees you | What adapts |
+|---|---|---|
+| **Warrior** | Arms and Fury: melee DPS. Protection: tank (Defensive Stance counts) | Stance keys, Battle Shout reminder, key hints |
+| **Paladin** | Holy: healer. Protection: tank. Retribution: melee DPS. Righteous Fury counts as tank | Aura keys, aura and Righteous Fury reminders, Symbol of Kings and Divinity |
+| **Hunter** | Ranged DPS | Pet keys, aspect and pet reminders, ammo, only the ranged swing timer |
+| **Rogue** | Melee DPS | Stealth key, poison reminder for both hands, energy tick, powders |
+| **Priest** | Discipline and Holy: healer. Shadow: caster DPS | Shadowform key, Fortitude, Inner Fire and Shadow Protection reminders, mana tick |
+| **Shaman** | Elemental: caster DPS. Enhancement: melee DPS. Restoration: healer | Imbue reminder for both hands, Lightning Shield, Ankh |
+| **Mage** | Caster DPS | Armor and Arcane Intellect reminders, teleport and portal runes, mana tick |
+| **Warlock** | Caster DPS | Pet keys and pet reminder, Demon Armor, Soul Shards |
+| **Druid** | Balance: caster DPS. Feral: tank in Bear Form, melee DPS in Cat Form. Restoration: healer | Form keys, mana bar stays in Bear Form, Mark of the Wild, Thorns, Wild Thornroot |
+
+What follows your role:
+- **Layouts.** Healers in a dungeon or raid get the group frames in the middle of the screen. Casters, hunters and healers on their own lose the melee swing timers. Everyone else keeps the main layout.
+- **Nameplates.** Tank, Healer, DPS and Solo modes, picked from what you do right now.
+- **Keys and reminders.** Key hints, stance keys, pet keys, buffs, reagents and ammo follow your class.
+
+If the guess is wrong, set your role by hand with `/mlz role` or on the Role & healing page.
 
 ## Screenshots
 
@@ -58,7 +86,8 @@ MLZ UI sets up the **Blizzard UI you already have** (Edit Mode, CVars, keybinds 
 **In play**
 - Minimalism: bars, bags and menus fade until you hover, and bars dim out of combat
 - Action buttons colored by range, mana and usability, with short hotkey labels
-- Role detection (talents, spec, group or your choice; DPS until your talents decide) that drives the layouts and nameplates
+- Role detection (talents, spec, form, group or your choice; DPS until your talents decide) that drives the layouts and nameplates, with melee, ranged and caster DPS told apart
+- Class-aware key hints, stance and pet keys, and reminders for all 9 classes
 - Our own flat nameplates: health, cast bar, quest marker, your debuffs and threat colors per role
 - Auto-repair, sell greys, a mana tick bar and an interrupt announce
 - Reminders for missing self buffs, low reagents and ammo, and worn gear (out of combat only)
@@ -87,7 +116,7 @@ MLZ UI sets up the **Blizzard UI you already have** (Edit Mode, CVars, keybinds 
 3. Open the control center at any time with `/mlz` or the minimap button.
 
 > [!NOTE]
-> MLZ UI targets `## Interface: 16001`. If your client marks it as out of date, enable *Load out of date AddOns* or update the number in [`MLZ_UI.toc`](MLZ_UI.toc).
+> MLZ UI targets WoW Forever (`## Interface: 16001`). If your client marks it as out of date, enable *Load out of date AddOns* or update the number in [`MLZ_UI.toc`](MLZ_UI.toc).
 
 ## Commands
 
@@ -136,13 +165,14 @@ Settings that don't exist in your installed version are shown as *not available*
 | Area | What it does |
 |---|---|
 | **Pixel-perfect scale** | Calculates the scale from screen height (`k * 768 / height`). Stores the *mode*, not the number, and handles scales below Blizzard's 0.64 CVar limit. |
-| **Edit Mode layout** | Bars stacked bottom center, player/target flanking, swing timers and cast bar aligned, corners kept for glance-only info. Separate healer layouts for dungeons and raids. |
+| **Edit Mode layout** | Bars stacked bottom center, player/target flanking, swing timers and cast bar aligned, corners kept for glance-only info. Separate healer layouts for dungeons and raids, and one without melee swing timers for casters and hunters. |
 | **Keybinds** | 12 reach-sorted base keys per movement setup. With WASD, Shift+1/2/3 switch stance or form, and bar 2 buttons 1-3 move to Shift+G/V/T. Displaced actions (e.g. Character panel) move to Alt. |
 | **Settings (CVars)** | Each CVar is optional. CVars your client doesn't have are skipped. |
 | **Minimalism** | Bars 4-5, micro menu, bags, chat buttons and XP bar hidden until hover. Bars 2-3 dimmed out of combat. Damage meter only in a group. |
 | **Action buttons** | Red = out of range, blue = no resource, grey = unusable. Short hotkeys (`S1`, `C1`) and hidden macro names. Stance, pet and bonus bars included. |
 | **Nameplates** | MLZ nameplates (or Platynator). Tank / Healer / DPS / Solo picked from your role. Healer: unclickable friendly names, dimmed enemies. Tank: bigger target, your debuffs on every mob. Quest marker, cast bar, level only when it matters. Applies at once, no `/reload`. |
 | **Quality of life** | Auto-repair (guild money first), sell greys (hold Shift to skip), mana tick / 5-second rule bar (energy tick for rogues and cats), interrupt announce. Reminder icons for missing self buffs (not in cities), low reagents and ammo, and gear at 25% durability or less. XP per hour and time to level. |
+| **Classes and roles** | All 9 classes. Role is tank, healer or DPS, and DPS is melee, ranged or caster. Defensive Stance, Bear Form and Righteous Fury count as tanking. Data in `Data/Classes.lua`. |
 | **Role profiles** | Nameplates, fading, tick bar and interrupt announce saved per role, loaded automatically when your role changes. |
 | **Tweaks** | Minimap size, FPS counter, calmer combat text (Roboto Bold), hide the quest tracker or its header, class colors and a target line in unit tooltips, class colored names in chat (your old choice per chat type comes back when you turn it off). Style: square minimap with a 1px border (rotation off while square, skipped when Leatrix Plus styles the minimap), flat chat input box, Roboto chat font. |
 | **Backup / undo** | A stack of up to 5 backups. Every wizard run is reversible. |
@@ -158,7 +188,7 @@ Settings that don't exist in your installed version are shown as *not available*
 | Overview | One status line per area, a tip card, and a banner only when setup or a reload is pending |
 | Layout & scale | Scale mode, screen layout (Edit Mode), minimap size, pet bar position |
 | Nameplates | Engine (MLZ, Platynator or off), current mode and why, mode picker, friendly names, threat colors, PvP tweak, what the plates show, size, Platynator profile save/restore |
-| Role & healing | Your role and where it comes from, healer layouts now and for your role, rebuild healer layouts |
+| Role & healing | Your role and where it comes from, your class and archetype, role layouts now and for your role, rebuild role layouts |
 | Minimalism | One switch per faded frame, pause fading, clean chat |
 | Action bars & UI | Button colors and hotkeys, quest tracker, FPS counter, combat text, tooltips, style |
 | Quality of life | Repair / sell greys, mana tick bar, interrupt announce, reminders, XP per hour |

@@ -204,15 +204,34 @@ function ns.IsAddOnInstalled(name)
 end
 
 ------------------------------------------------------------------------
+-- Client: WoW Forever is the main supported game version (## Interface: 16001). Other clients still load,
+-- they are just not tested. Used by the About page only, never blocks anything.
+------------------------------------------------------------------------
+ns.MAIN_CLIENT = "WoW Forever"
+
+-- Returns { main = bool, toc = number|nil, version = string|nil, name = "WoW Forever" }
+function ns.ClientInfo()
+    local ok, version, build, _, toc = pcall(GetBuildInfo or function() end)
+    toc = ok and tonumber(toc) or nil
+    return {
+        main = toc ~= nil and toc >= 16000 and toc < 16100,
+        toc = toc,
+        version = ok and version or nil,
+        build = ok and build or nil,
+        name = ns.MAIN_CLIENT,
+    }
+end
+
+------------------------------------------------------------------------
 -- Role: one answer for every module (healer layouts, nameplates, overview, role profiles).
 -- ns.Role()     -> "TANK" | "HEALER" | "DAMAGER"  (what you are: forced choice, spec, talents, group role).
 --                  A leveling character with no clear role yet counts as DAMAGER.
 -- ns.LiveRole() -> same, but a tank spec that isn't tanking right now (cat form, battle stance on a
---                  non-protection warrior) counts as DAMAGER. Used by nameplates.
+--                  protection warrior) counts as DAMAGER, and a Defensive Stance or Righteous Fury counts as TANK.
+--                  Used by nameplates, reminders and role-based defaults.
+-- ns.Archetype() / ns.LiveArchetype() -> "TANK" | "HEALER" | "MELEE" | "RANGED" | "CASTER" (Data/Classes.lua)
+--                  The DPS role split by how you play: swing timers, layouts and keys follow it.
 ------------------------------------------------------------------------
-local PURE_DPS = { MAGE = true, WARLOCK = true, ROGUE = true, HUNTER = true }
-local HEAL_TABS = { DRUID = { [3] = true }, PRIEST = { [1] = true, [2] = true }, PALADIN = { [1] = true }, SHAMAN = { [3] = true } }
-local TANK_TABS = { WARRIOR = { [3] = true }, PALADIN = { [2] = true }, DRUID = { [2] = true } }
 -- Early points often go into a healer tree while leveling (Divine Strength, Furor, Wand Specialization),
 -- so talents only decide the role once one tree has real investment.
 local TALENT_MIN_POINTS = 11
@@ -243,7 +262,12 @@ local function TabPoints(tab)
     return tonumber(points) or 0
 end
 
-local function TalentRole(class)
+local function ClassData(class)
+    return ns.data.classes and ns.data.classes[class]
+end
+
+-- The talent tree with the most points, or nil while no tree has real investment yet
+local function BestTab()
     if not (GetNumTalentTabs and GetTalentTabInfo) then return end
     local okN, n = pcall(GetNumTalentTabs)
     if not okN or not n or n == 0 then return end
@@ -253,9 +277,19 @@ local function TalentRole(class)
         if p > bestPoints then best, bestPoints = tab, p end
     end
     if not best or bestPoints < TALENT_MIN_POINTS then return end -- low level: not decided yet
-    if HEAL_TABS[class] and HEAL_TABS[class][best] then return "HEALER" end
-    if TANK_TABS[class] and TANK_TABS[class][best] then return "TANK" end
+    return best
+end
+
+local function ArchetypeRole(a)
+    if a == "TANK" or a == "HEALER" then return a end
     return "DAMAGER"
+end
+
+local function TalentRole(class)
+    local best = BestTab()
+    if not best then return end
+    local c = ClassData(class)
+    return ArchetypeRole(c and c.tabs and c.tabs[best])
 end
 
 local function GroupRole()
@@ -294,7 +328,8 @@ function ns.Role()
     local force = ns.GetRoleForce()
     if force then return force, "forced" end
     local class = PlayerClass()
-    if PURE_DPS[class] then return "DAMAGER", "class" end
+    local c = ClassData(class)
+    if c and c.pureDps then return "DAMAGER", "class" end
     local r = SpecRole()
     if r then return r, "spec" end
     r = TalentRole(class)
@@ -304,10 +339,37 @@ function ns.Role()
     return "DAMAGER", "default" -- no spec, too few talents, no group role: leveling, so DPS
 end
 
+local function FormID()
+    return GetShapeshiftFormID and GetShapeshiftFormID() or nil
+end
+
 local function InBearForm()
-    if not GetShapeshiftFormID then return false end
-    local id = GetShapeshiftFormID()
+    local id = FormID()
     return id == 5 or id == 8
+end
+
+-- Defensive Stance is form ID 18 in Classic, and always the second stance on the bar.
+-- Both checks, since not every client returns form IDs for warriors (see /mlz probe, "form").
+local function InDefensiveStance()
+    if FormID() == 18 then return true end
+    return GetShapeshiftForm and GetShapeshiftForm() == 2 or false
+end
+
+local RIGHTEOUS_FURY = 25780
+
+local function HasPlayerAura(spellId)
+    if C_UnitAuras and C_UnitAuras.GetPlayerAuraBySpellID then
+        return C_UnitAuras.GetPlayerAuraBySpellID(spellId) ~= nil
+    end
+    local name = (C_Spell and C_Spell.GetSpellName and C_Spell.GetSpellName(spellId))
+        or (GetSpellInfo and (GetSpellInfo(spellId)))
+    if not (name and UnitBuff) then return false end
+    for i = 1, 40 do
+        local buff = UnitBuff("player", i)
+        if not buff then return false end
+        if buff == name then return true end
+    end
+    return false
 end
 
 -- Returns role, reason (short text for the settings window)
@@ -318,13 +380,47 @@ function ns.LiveRole()
         return "TANK", "tank aura active"
     end
     if GroupRole() == "TANK" then return "TANK", "assigned tank in the group" end
-    if role == "TANK" and class == "DRUID" and source ~= "forced" then
-        if InBearForm() then return "TANK", "Bear Form + Feral talents" end
-        return "DAMAGER", "Feral, not in Bear Form"
+    if source ~= "forced" then
+        if class == "DRUID" and role == "TANK" then
+            if InBearForm() then return "TANK", "Bear Form + Feral talents" end
+            return "DAMAGER", "Feral, not in Bear Form"
+        elseif class == "WARRIOR" then
+            if InDefensiveStance() then return "TANK", "Defensive Stance" end
+            if role == "TANK" then return "DAMAGER", "Protection, not in Defensive Stance" end
+        elseif class == "PALADIN" and HasPlayerAura(RIGHTEOUS_FURY) then
+            return "TANK", "Righteous Fury active"
+        end
     end
     if source == "default" then return "DAMAGER", "no role yet, counts as DPS" end
     if role then return role, (source == "forced" and "set by you") or ("from " .. source) end
     return nil, "no role found" -- safety net, ns.Role() always returns a role
+end
+
+-- Archetype for a role. Talents refine DPS (a Feral druid out of Bear Form is melee, a Shadow priest a caster).
+local function ArchetypeFor(role, class)
+    if role == "TANK" or role == "HEALER" then return role end
+    local c = ClassData(class)
+    if not c then return "MELEE" end
+    local tab = BestTab()
+    local a = tab and c.tabs and c.tabs[tab]
+    if a and a ~= "TANK" and a ~= "HEALER" then return a end
+    return (tab and c.dpsTabs and c.dpsTabs[tab]) or c.dps
+end
+
+-- Returns archetype, source (same sources as ns.Role)
+function ns.Archetype()
+    local role, source = ns.Role()
+    return ArchetypeFor(role, PlayerClass()), source
+end
+
+-- Returns archetype, reason (same as ns.LiveRole)
+function ns.LiveArchetype()
+    local role, reason = ns.LiveRole()
+    return ArchetypeFor(role, PlayerClass()), reason
+end
+
+function ns.ArchetypeText(a)
+    return ns.data.archetypeText and ns.data.archetypeText[a] or ns.ROLE_TEXT[ArchetypeRole(a)]
 end
 
 -- v: "TANK" | "HEALER" | "DAMAGER" | nil (auto)
@@ -335,14 +431,17 @@ function ns.SetRoleForce(v)
 end
 
 -- Role change notifications (spec/talent/form/group changes come in bursts; this coalesces them)
-local roleListeners, lastRole, lastLive = {}, nil, nil
+local roleListeners, lastRole, lastLive, lastArch = {}, nil, nil, nil
 function ns.OnRoleChanged(fn) roleListeners[#roleListeners + 1] = fn end
 
+-- Listeners get (role, live, changed). `changed` is also true when only the archetype changed
+-- (a Shaman who goes from Elemental to Enhancement is still DPS but a different kind).
 function ns.FireRole()
     local role, live = ns.Role(), ns.LiveRole()
-    local changed = role ~= lastRole
+    local arch = ns.Archetype()
+    local changed = role ~= lastRole or arch ~= lastArch
     local liveChanged = live ~= lastLive
-    lastRole, lastLive = role, live
+    lastRole, lastLive, lastArch = role, live, arch
     if changed or liveChanged then
         for _, fn in ipairs(roleListeners) do
             local ok, err = pcall(fn, role, live, changed)
@@ -371,7 +470,9 @@ for _, event in ipairs({
     ns.TryOn(event, ScheduleRole)
 end
 ns.TryOn("UNIT_AURA", function(_, unit)
-    if unit == "player" and UnitHasEffectivelyTankAura then ScheduleRole() end
+    if unit ~= "player" then return end
+    -- Tank aura or Righteous Fury can change the live role
+    if UnitHasEffectivelyTankAura or PlayerClass() == "PALADIN" then ScheduleRole() end
 end)
 
 ------------------------------------------------------------------------

@@ -66,8 +66,15 @@ function S.RoleText()
     local role, source = ns.Role()
     return (ROLE_TEXT[role or ""] or "Unknown") .. " (" .. (SOURCE_TEXT[source] or tostring(source)) .. ")"
 end
+-- "Druid: Melee DPS (talents)": your class and the kind of player the UI adapts to right now
+function S.ClassText()
+    local class = UnitClass("player") or "Unknown"
+    local arch = ns.LiveArchetype()
+    local _, source = ns.Role()
+    return class .. ": " .. ns.ArchetypeText(arch) .. " (" .. (SOURCE_TEXT[source] or tostring(source)) .. ")"
+end
 local function RoleDesc()
-    return "Decides the healer layouts and the nameplate mode. Detected now: " .. S.RoleText() .. "."
+    return "Decides the role layouts and the nameplate mode. Detected now: " .. S.RoleText() .. "."
 end
 
 -- "Reload needed: addon settings", or nil when nothing waits for a reload
@@ -143,7 +150,7 @@ SECTIONS[#SECTIONS + 1] = function(Add)
     local H = ns.Healer
     local role = ns.Role()
     Add("healer", "Role & healing", H.IsHealer() and "on" or "off", ROLE_TEXT[role or ""] or "Unknown",
-        "Role: " .. S.RoleText() .. ". Layout: " .. tostring(H.Wanted()))
+        S.ClassText() .. ". Layout: " .. tostring(H.Wanted()))
 end
 
 SECTIONS[#SECTIONS + 1] = function(Add)
@@ -925,12 +932,22 @@ end }
 
 PAGES[#PAGES + 1] = { key = "healer", title = "Role & healing", icon = "Interface\\Icons\\Spell_Nature_HealingTouch", build = function(p)
     local H, lay = ns.Healer, M("layout")
-    p:Title("Role & healing", "Your role drives the nameplate mode and the healer layouts. When you heal, group frames move to the middle of the screen.")
+    p:Title("Role & healing", "Your role drives the nameplate mode and the layouts. When you heal, group frames move to the middle of the screen. Casters and hunters lose the melee swing timers.")
 
     p:Card("My role")
     p:Choice("My role", RoleDesc, ROLE_OPTIONS, GetRoleChoice, SetRoleChoice, 62)
 
-    p:Card("Healer layouts", "One layout for dungeons, one for raids. They switch only while an MLZ UI layout is active, and never in combat.")
+    p:Card("Your class", "MLZ UI adapts to all 9 classes in WoW Forever. Role is tank, healer or DPS. DPS is split into melee, ranged and caster.")
+    p:Value("Playing as now", "Follows your talents and your form or stance.", function() return S.ClassText() end, { width = 260 })
+    p:Value("Adapted for you", "Key hints and reminders are for your class. Stance keys and pet keys are added when your class has them.", function()
+        local c = ns.data.classes and ns.data.classes[ns.PlayerClass() or ""]
+        local parts = { "key hints", "reminders" }
+        if c and c.stance then parts[#parts + 1] = "stance keys" end
+        if c and c.pet then parts[#parts + 1] = "pet keys" end
+        return table.concat(parts, ", ")
+    end, { width = 260 })
+
+    p:Card("Role layouts", "One layout for healing in dungeons, one for raids, and one without melee swing timers for casters and hunters. They switch only while an MLZ UI layout is active, and never in combat.")
     p:Status("Counts as healer", nil, function()
         if H.IsHealer() then return "on", "Yes" end
         return "off", "No"
@@ -938,16 +955,16 @@ PAGES[#PAGES + 1] = { key = "healer", title = "Role & healing", icon = "Interfac
     p:Value("Layout now", nil, function() return lay:ActiveName() or (C.grey .. "unknown" .. C.r) end, { width = 260 })
     p:Value("Layout for your role", nil, function() return H.Wanted() or (C.grey .. "unknown" .. C.r) end, { width = 260 })
     p:Buttons({
-        { text = "Rebuild healer layouts", width = 190, fn = function()
+        { text = "Rebuild role layouts", width = 190, fn = function()
             if InCombatLockdown() then
-                ns.RunOutOfCombat(function() H.Rebuild() end, "rebuild healer layouts")
-                S:Notify("In combat: the healer layouts are rebuilt when combat ends.", "warn")
+                ns.RunOutOfCombat(function() H.Rebuild() end, "rebuild role layouts")
+                S:Notify("In combat: the role layouts are rebuilt when combat ends.", "warn")
                 return
             end
             local ok, msg = H.Rebuild()
-            S:Notify(ok and ("Healer layouts rebuilt: " .. tostring(msg) .. ".") or ("Rebuild failed: " .. tostring(msg)), ok and "good" or "bad")
+            S:Notify(ok and ("Role layouts rebuilt: " .. tostring(msg) .. ".") or ("Rebuild failed: " .. tostring(msg)), ok and "good" or "bad")
         end, refresh = function(b) b:SetEnabled(EditModeAvailable()) end,
-          tip = "Copies the main layout (MLZ UI) again with the healer changes. Do this after you have changed the main layout. Reload before you open Edit Mode again." },
+          tip = "Copies the main layout (MLZ UI) again with the role changes. Do this after you have changed the main layout. Reload before you open Edit Mode again." },
     })
 end }
 
@@ -1218,6 +1235,17 @@ end }
 
 PAGES[#PAGES + 1] = { key = "about", title = "About & help", icon = "Interface\\Icons\\INV_Misc_QuestionMark", build = function(p)
     p:Title("About & help", "MLZ UI version " .. ns.version .. ".")
+
+    p:Card("Game version")
+    p:Status("Client", "WoW Forever is the main supported game version. All 9 classes are supported.", function()
+        local info = ns.ClientInfo()
+        if info.main then return "on", info.name end
+        return "warn", "Not " .. info.name
+    end)
+    p:Value("Interface", "MLZ UI is built for Interface 16001. Other clients load, but are not tested.", function()
+        local info = ns.ClientInfo()
+        return info.toc and tostring(info.toc) or (C.grey .. "unknown" .. C.r)
+    end, { width = 260 })
 
     p:Card("How it works")
     p:Text("The " .. C.gold .. "setup wizard" .. C.r .. " is for the first install and for re-applying the whole setup with a backup. "

@@ -228,6 +228,7 @@ ns.data.layout = {
 
     -- Variants for Modules/Healer.lua. `frames` lists the frames that differ from the main layout, by label
     -- (same labels as in `frames` above); settings are merged over the main layout's settings.
+    -- A variant has either `kind` (a healer in a "party" or "raid") or `archetypes` (see Data/Classes.lua).
     healer = {
         variants = {
             -- Dungeon (party of 5): one wide row, big frames, easy to read dispels and debuffs
@@ -250,6 +251,16 @@ ns.data.layout = {
                     ["Swing timer off hand"]   = { rawSettings = SWING_HIDDEN },
                     ["Swing timer main hand"]  = { rawSettings = SWING_HIDDEN },
                     ["Swing timer ranged"]     = { rawSettings = SWING_HIDDEN },
+                },
+            },
+            -- Casters, hunters and healers on their own: no melee swing timers. The ranged timer (wand, bow, gun)
+            -- stays and moves down to the cast bar. Only one extra layout, so Edit Mode keeps room for your own.
+            {
+                name = "MLZ UI Ranged", archetypes = { CASTER = true, RANGED = true, HEALER = true },
+                frames = {
+                    ["Swing timer off hand"]   = { rawSettings = SWING_HIDDEN },
+                    ["Swing timer main hand"]  = { rawSettings = SWING_HIDDEN },
+                    ["Swing timer ranged"]     = { relTo = "PlayerCastingBarFrame", y = CAST_GAP },
                 },
             },
         },

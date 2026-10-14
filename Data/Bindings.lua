@@ -45,6 +45,28 @@ B.roles = {
     "Mobility", "CC/utility", "Dispel/utility",
 }
 
+-- Class hints for the same buttons, by index into B.roles. Text only, they don't change any binding.
+-- Missing entries fall back to B.roles.
+B.classRoles = {
+    WARRIOR = { [7] = "Interrupt (Pummel)", [10] = "Mobility (Charge)", [12] = "Taunt / utility" },
+    PALADIN = { [7] = "Interrupt (Hammer of Justice)", [8] = "Defensive (Divine Shield)",
+        [10] = "Utility (Freedom)", [12] = "Dispel (Cleanse)" },
+    HUNTER  = { [7] = "Interrupt (Concussive Shot)", [9] = "Main cooldown (Rapid Fire)", [10] = "Mobility (Disengage)",
+        [11] = "CC (Freezing Trap)", [12] = "Utility (Feign Death)" },
+    ROGUE   = { [7] = "Interrupt (Kick)", [8] = "Defensive (Evasion)", [10] = "Mobility (Sprint)",
+        [11] = "CC (Gouge, Sap)", [12] = "Utility (Vanish)" },
+    PRIEST  = { [7] = "Interrupt (Silence)", [8] = "Defensive (Shield)", [11] = "CC (Psychic Scream)",
+        [12] = "Dispel (Dispel Magic)" },
+    SHAMAN  = { [7] = "Interrupt (Earth Shock)", [8] = "Defensive (Totem)", [10] = "Mobility (Ghost Wolf)",
+        [12] = "Dispel (Purge, Cure)" },
+    MAGE    = { [7] = "Interrupt (Counterspell)", [8] = "Defensive (Ice Block)", [10] = "Mobility (Blink)",
+        [11] = "CC (Polymorph)", [12] = "Utility (Remove Curse)" },
+    WARLOCK = { [7] = "Interrupt (Spell Lock)", [8] = "Defensive (Death Coil)", [11] = "CC (Fear)",
+        [12] = "Utility (Healthstone)" },
+    DRUID   = { [7] = "Interrupt (Bash)", [8] = "Defensive (Barkskin)", [9] = "Main cooldown (Innervate)",
+        [10] = "Mobility (Dash)", [11] = "CC (Roots)", [12] = "Dispel (Remove Curse)" },
+}
+
 -- Layers: modifier + binding command prefix. Button number 1-12 is appended at the end.
 -- ACTIONBUTTON = main bar (bar 1), MULTIACTIONBAR1 = bottom left (bar 2), MULTIACTIONBAR2 = bottom right (bar 3)
 B.layers = {
@@ -54,7 +76,7 @@ B.layers = {
 }
 
 -- Stance / form keys (SHAPESHIFTBUTTON1-10 = Blizzard's stance bar). Per movement setup.
--- Only classes with a stance bar get them (see B.stanceClasses).
+-- Only classes with a stance bar get them (see `stance` in Data/Classes.lua).
 -- WASD: SHIFT-1/2/3 become stances, so bar 2 buttons 1-3 move to the keys in B.stanceRelocate.
 -- ESDF: the 1 key is free in every layer (it's not a base key), so 1 / SHIFT-1 / CTRL-1 are the stances.
 B.stance = {
@@ -70,11 +92,9 @@ B.stance = {
     },
 }
 
--- Classes that have a stance/form/aura bar
-B.stanceClasses = { WARRIOR = true, DRUID = true, ROGUE = true, PALADIN = true, PRIEST = true }
+-- Which classes have a stance/form/aura bar or a pet bar: see `stance` and `pet` in Data/Classes.lua.
 
 -- Pet keys for pet classes (BONUSACTIONBUTTON1-10 = the pet bar: 1 Attack, 2 Follow, 3 Stay)
-B.petClasses = { HUNTER = true, WARLOCK = true }
 B.pet = {
     ESDF = {
         { key = "5",       command = "BONUSACTIONBUTTON1", role = "Pet attack" },
