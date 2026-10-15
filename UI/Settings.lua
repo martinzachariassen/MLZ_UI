@@ -1108,11 +1108,11 @@ PAGES[#PAGES + 1] = { key = "healer", title = "Your role", icon = "Interface\\Ic
 
     p:Card("Your class", "MLZ UI adapts to all 9 classes in WoW Forever. Role is tank, healer or DPS. DPS is split into melee, ranged and caster.")
     p:Value("Playing as now", "Follows your talents and your form or stance.", function() return S.ClassText() end, { width = 260 })
-    p:Value("Adapted for you", "Key hints and reminders are for your class. Stance keys and pet keys are added when your class has them.", function()
+    p:Value("Adapted for you", "Key hints and reminders are for your class. Extra keys on bar 5 (for your forms or stances) and pet keys are added when your class has them.", function()
         local c = ns.data.classes and ns.data.classes[ns.PlayerClass() or ""]
         local parts = { "key hints", "reminders" }
-        local stances = ns.modules.bindings.StanceCount()
-        if stances > 0 then parts[#parts + 1] = stances .. " stance key" .. (stances == 1 and "" or "s") end
+        local extra = ns.modules.bindings.ExtraKeyCount()
+        if extra > 0 then parts[#parts + 1] = extra .. " extra key" .. (extra == 1 and "" or "s") .. " for forms" end
         if c and c.pet then parts[#parts + 1] = "pet keys" end
         return table.concat(parts, ", ")
     end, { width = 260 })

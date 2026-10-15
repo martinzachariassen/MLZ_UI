@@ -75,30 +75,32 @@ B.layers = {
     { modifier = "CTRL-",  prefix = "MULTIACTIONBAR2BUTTON",  bar = "Bar 3" },
 }
 
--- Stance / form keys (SHAPESHIFTBUTTON1-10 = Blizzard's stance bar). Per movement setup.
+-- Extra keys for classes with stances or forms. They go to bar 5 buttons 1-N (MULTIACTIONBAR4 = right bar 2).
+-- The player drags forms (or anything) onto those buttons and so picks which key does what. Bar 5 does not
+-- change page when you shift, bar 1 does, so a form stays on the same key.
 -- A class only gets the first N of them (`stance` in Data/Classes.lua): warrior 3, druid 5, rogue 1.
--- WASD: SHIFT-1/2/3 become stances, so bar 2 buttons 1-3 move to the keys in B.stanceRelocate.
---       Keys 4-5 (druid: Moonkin, Travel...) are G and V, which are free.
--- ESDF: the 1 key is free in every layer (it's not a base key), so 1 / SHIFT-1 / CTRL-1 are the stances.
+-- WASD: SHIFT-1/2/3 are taken, so bar 2 buttons 1-3 move to the keys in B.extraRelocate.
+--       Keys 4-5 are G and V, which are free.
+-- ESDF: the 1 key is free in every layer (it's not a base key), so 1 / SHIFT-1 / CTRL-1 are free.
 --       Keys 4-5 are V and SHIFT-V.
-B.stance = {
+B.extra = {
     WASD = {
-        { key = "SHIFT-1", command = "SHAPESHIFTBUTTON1" },
-        { key = "SHIFT-2", command = "SHAPESHIFTBUTTON2" },
-        { key = "SHIFT-3", command = "SHAPESHIFTBUTTON3" },
-        { key = "G",       command = "SHAPESHIFTBUTTON4" },
-        { key = "V",       command = "SHAPESHIFTBUTTON5" },
+        { key = "SHIFT-1", command = "MULTIACTIONBAR4BUTTON1" },
+        { key = "SHIFT-2", command = "MULTIACTIONBAR4BUTTON2" },
+        { key = "SHIFT-3", command = "MULTIACTIONBAR4BUTTON3" },
+        { key = "G",       command = "MULTIACTIONBAR4BUTTON4" },
+        { key = "V",       command = "MULTIACTIONBAR4BUTTON5" },
     },
     ESDF = {
-        { key = "1",       command = "SHAPESHIFTBUTTON1" },
-        { key = "SHIFT-1", command = "SHAPESHIFTBUTTON2" },
-        { key = "CTRL-1",  command = "SHAPESHIFTBUTTON3" },
-        { key = "V",       command = "SHAPESHIFTBUTTON4" },
-        { key = "SHIFT-V", command = "SHAPESHIFTBUTTON5" },
+        { key = "1",       command = "MULTIACTIONBAR4BUTTON1" },
+        { key = "SHIFT-1", command = "MULTIACTIONBAR4BUTTON2" },
+        { key = "CTRL-1",  command = "MULTIACTIONBAR4BUTTON3" },
+        { key = "V",       command = "MULTIACTIONBAR4BUTTON4" },
+        { key = "SHIFT-V", command = "MULTIACTIONBAR4BUTTON5" },
     },
 }
 
--- Which classes have a stance/form/aura bar or a pet bar: see `stance` and `pet` in Data/Classes.lua.
+-- Which classes have a stance/form/aura bar or a pet bar: see `stance` (extra keys) and `pet` in Data/Classes.lua.
 
 -- Pet keys for pet classes (BONUSACTIONBUTTON1-10 = the pet bar: 1 Attack, 2 Follow, 3 Stay)
 B.pet = {
@@ -114,9 +116,9 @@ B.pet = {
     },
 }
 
--- Bar buttons that lost their key to a stance key get a new key here (free keys: WASD = G, V, T).
+-- Bar buttons that lost their key to an extra key get a new key here (free keys: WASD = G, V, T).
 -- Key = the key that was taken, value = replacement key for the same bar button.
-B.stanceRelocate = {
+B.extraRelocate = {
     WASD = {
         ["SHIFT-1"] = "SHIFT-G",
         ["SHIFT-2"] = "SHIFT-V",

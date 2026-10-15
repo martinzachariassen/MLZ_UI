@@ -19,8 +19,8 @@ local function CurrentAction(key)
     return action
 end
 
--- How many stance/form keys this class gets (0 = none). Capped by the keys in Data/Bindings.lua.
-function Bindings.StanceCount(class)
+-- How many extra keys (bar 5, for forms and stances) this class gets (0 = none). Capped by the keys in Data/Bindings.lua.
+function Bindings.ExtraKeyCount(class)
     local c = ns.data.classes and ns.data.classes[class or ns.PlayerClass()]
     local n = c and c.stance
     if n == true then n = 3 end -- older data format
@@ -41,17 +41,17 @@ function Bindings:Desired(movement)
     local class = ns.PlayerClass()
     local c = ns.data.classes and ns.data.classes[class]
     local hints = D.classRoles and D.classRoles[class] or {}
-    local stance = {}
-    for i, b in ipairs(D.stance and D.stance[movement] or {}) do
-        if i <= self.StanceCount(class) then stance[i] = b end
+    local extra = {}
+    for i, b in ipairs(D.extra and D.extra[movement] or {}) do
+        if i <= self.ExtraKeyCount(class) then extra[i] = b end
     end
-    local stanceKeys = {}
-    for _, b in ipairs(stance) do stanceKeys[b.key] = true end
-    local relocate = D.stanceRelocate and D.stanceRelocate[movement] or {}
+    local extraKeys = {}
+    for _, b in ipairs(extra) do extraKeys[b.key] = true end
+    local relocate = D.extraRelocate and D.extraRelocate[movement] or {}
     for _, layer in ipairs(D.layers) do
         for i, k in ipairs(keys) do
           local full = layer.modifier .. k
-          if stanceKeys[full] then full = relocate[full] end -- stance keys win; the bar button gets a replacement key
+          if extraKeys[full] then full = relocate[full] end -- extra keys win; the bar button gets a replacement key
           if full then
             list[#list + 1] = {
                 key = full,
@@ -62,8 +62,8 @@ function Bindings:Desired(movement)
           end
         end
     end
-    for i, b in ipairs(stance) do
-        list[#list + 1] = { key = b.key, command = b.command, group = "Stances / forms", role = "Stance " .. i }
+    for i, b in ipairs(extra) do
+        list[#list + 1] = { key = b.key, command = b.command, group = "Extra keys (bar 5)", role = "Bar 5 button " .. i }
     end
     if c and c.pet and D.pet and D.pet[movement] then
         for _, b in ipairs(D.pet[movement]) do

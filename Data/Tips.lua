@@ -27,7 +27,7 @@ ns.data.tips = {
       action = "page:qol", needs = "remindersOff" },
     { text = "Your role picks the nameplate mode and the layouts. Set it by hand in Your role.",
       action = "page:healer" },
-    { text = "Key hints, reminders and stance or pet keys follow your class. Druids, warriors and paladins also follow their form, stance or aura.",
+    { text = "Key hints, reminders and extra keys for forms and pet keys follow your class. Druids, warriors and paladins also follow their form, stance or aura.",
       action = "page:healer" },
     { text = "Every setup wizard run makes a backup first. /mlz undo puts the last one back.", },
 }

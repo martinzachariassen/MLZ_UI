@@ -83,8 +83,9 @@ local PAGE_TEXT = {
     bindings = function(base)
         local c = ns.data.classes and ns.data.classes[ns.PlayerClass() or ""] or {}
         local parts = {}
-        if ns.modules.bindings.StanceCount() > 0 then
-            parts[#parts + 1] = "stances and forms"
+        local extra = ns.modules.bindings.ExtraKeyCount()
+        if extra > 0 then
+            parts[#parts + 1] = extra .. " extra key" .. (extra == 1 and "" or "s") .. " on bar 5 for your stances or forms"
         end
         if c.pet then parts[#parts + 1] = "the pet bar" end
         if #parts == 0 then return base end

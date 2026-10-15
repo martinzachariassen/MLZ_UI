@@ -12,7 +12,7 @@
 --              Hybrids use MELEE here: they melee a lot while leveling, so they keep the swing timers
 --   pureDps  = no tank or healer tree at all: always DPS, talents are not checked
 --   resource = main resource, only used for text
---   stance   = number of stance, form or aura keys (SHAPESHIFTBUTTON1-N, max 5, see B.stance)
+--   stance   = number of extra keys (bar 5 buttons 1-N, max 5, see B.extra) to drag stances, forms or auras onto
 --   stanceNeedsForms = only when the client has forms for it (Priest: Shadowform does not exist on every client)
 --   pet      = has a pet bar (keys BONUSACTIONBUTTON1-3)
 

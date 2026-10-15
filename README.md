@@ -59,7 +59,7 @@ All 9 classes are supported. MLZ UI reads your class, your talents and your form
 
 | Class | How MLZ UI sees you | What adapts |
 |---|---|---|
-| **Warrior** | Arms and Fury: melee DPS. Protection: tank (Defensive Stance counts) | Stance keys, Battle Shout reminder, key hints |
+| **Warrior** | Arms and Fury: melee DPS. Protection: tank (Defensive Stance counts) | Extra keys for stances, Battle Shout reminder, key hints |
 | **Paladin** | Holy: healer. Protection: tank. Retribution: melee DPS. Righteous Fury counts as tank | Aura keys, aura and Righteous Fury reminders, Symbol of Kings and Divinity |
 | **Hunter** | Ranged DPS | Pet keys, aspect and pet reminders, ammo, only the ranged swing timer |
 | **Rogue** | Melee DPS | Stealth key, poison reminder for both hands, energy tick, powders |
@@ -72,7 +72,7 @@ All 9 classes are supported. MLZ UI reads your class, your talents and your form
 What follows your role:
 - **Layouts.** Healers in a dungeon or raid get the group frames in the middle of the screen. Casters, hunters and healers on their own lose the melee swing timers. Everyone else keeps the main layout.
 - **Nameplates.** Tank, Healer, DPS and Solo modes, picked from what you do right now.
-- **Keys and reminders.** Key hints, stance keys, pet keys, buffs, reagents and ammo follow your class.
+- **Keys and reminders.** Key hints, extra keys for forms, pet keys, buffs, reagents and ammo follow your class.
 
 If the guess is wrong, set your role by hand with `/mlz role`, on the Your role page in `/mlz`, or in the first step of the setup wizard.
 
@@ -117,7 +117,7 @@ If the guess is wrong, set your role by hand with `/mlz role`, on the Your role 
 - Minimalism: bars, bags and menus fade until you hover, and bars dim out of combat
 - Action buttons colored by range, mana and usability, with short hotkey labels
 - Role detection (talents, spec, form, group or your choice; DPS until your talents decide) that drives the layouts and nameplates, with melee, ranged and caster DPS told apart
-- Class-aware key hints, stance and pet keys, and reminders for all 9 classes
+- Class-aware key hints, extra form keys, pet keys, and reminders for all 9 classes
 - Our own flat nameplates: health, cast bar, quest marker, your debuffs and threat colors per role. Platynator is optional
 - Auto-repair, sell greys, a mana tick bar and an interrupt announce
 - Reminders for missing self buffs, low reagents and ammo, and worn gear (out of combat only)
@@ -208,7 +208,7 @@ Rows that only fit one role or archetype show only for you. Settings that don't 
 |---|---|
 | **Pixel-perfect scale** | Calculates the scale from screen height (`k * 768 / height`). Stores the *mode*, not the number, and handles scales below Blizzard's 0.64 CVar limit. |
 | **Edit Mode layout** | Bars stacked bottom center, player/target flanking, swing timers and cast bar aligned, corners kept for glance-only info. Separate healer layouts for dungeons and raids, and one without melee swing timers for casters and hunters. |
-| **Keybinds** | 12 reach-sorted base keys per movement setup. Stance and form keys follow your class: druids get 5, warriors and paladins 3, rogues and shadow priests 1. With ESDF they are 1, Shift+1, Ctrl+1, V and Shift+V. With WASD they are Shift+1/2/3, G and V, and bar 2 buttons 1-3 move to Shift+G/V/T. Displaced actions (e.g. Character panel) move to Alt. |
+| **Keybinds** | 12 reach-sorted base keys per movement setup. Classes with stances or forms get extra keys on bar 5 buttons: druids 5, warriors and paladins 3, rogues and shadow priests 1. Drag your forms there and choose which key does what. Bar 5 does not change page when you shift. With ESDF the keys are 1, Shift+1, Ctrl+1, V and Shift+V. With WASD they are Shift+1/2/3, G and V, and bar 2 buttons 1-3 move to Shift+G/V/T. Displaced actions (e.g. Character panel) move to Alt. |
 | **Settings (CVars)** | Each CVar is optional. CVars your client doesn't have are skipped. |
 | **Minimalism** | Bars 4-5, micro menu, bags, chat buttons and XP bar hidden until hover. Bars 2-3 dimmed out of combat. Damage meter only in a group. |
 | **Action buttons** | Red = out of range, blue = no resource, grey = unusable. Short hotkeys (`S1`, `C1`) and hidden macro names. Stance, pet and bonus bars included. |
@@ -250,7 +250,7 @@ Everything the wizard offers is defined in `Data/`:
 | File | Controls |
 |---|---|
 | [`Data/CVars.lua`](Data/CVars.lua) | Game settings |
-| [`Data/Bindings.lua`](Data/Bindings.lua) | Movement setups, base keys, layers, stance and pet keys |
+| [`Data/Bindings.lua`](Data/Bindings.lua) | Movement setups, base keys, layers, extra and pet keys |
 | [`Data/Layout.lua`](Data/Layout.lua) | Edit Mode frame positions |
 | [`Data/Fade.lua`](Data/Fade.lua) | What fades, when and how much |
 | [`Data/Nameplates.lua`](Data/Nameplates.lua) | Nameplate modes, PvP tweak, threat colors, MLZ nameplate sizes and colors |
