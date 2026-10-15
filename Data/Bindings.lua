@@ -76,19 +76,25 @@ B.layers = {
 }
 
 -- Stance / form keys (SHAPESHIFTBUTTON1-10 = Blizzard's stance bar). Per movement setup.
--- Only classes with a stance bar get them (see `stance` in Data/Classes.lua).
+-- A class only gets the first N of them (`stance` in Data/Classes.lua): warrior 3, druid 5, rogue 1.
 -- WASD: SHIFT-1/2/3 become stances, so bar 2 buttons 1-3 move to the keys in B.stanceRelocate.
+--       Keys 4-5 (druid: Moonkin, Travel...) are G and V, which are free.
 -- ESDF: the 1 key is free in every layer (it's not a base key), so 1 / SHIFT-1 / CTRL-1 are the stances.
+--       Keys 4-5 are V and SHIFT-V.
 B.stance = {
     WASD = {
         { key = "SHIFT-1", command = "SHAPESHIFTBUTTON1" },
         { key = "SHIFT-2", command = "SHAPESHIFTBUTTON2" },
         { key = "SHIFT-3", command = "SHAPESHIFTBUTTON3" },
+        { key = "G",       command = "SHAPESHIFTBUTTON4" },
+        { key = "V",       command = "SHAPESHIFTBUTTON5" },
     },
     ESDF = {
         { key = "1",       command = "SHAPESHIFTBUTTON1" },
         { key = "SHIFT-1", command = "SHAPESHIFTBUTTON2" },
         { key = "CTRL-1",  command = "SHAPESHIFTBUTTON3" },
+        { key = "V",       command = "SHAPESHIFTBUTTON4" },
+        { key = "SHIFT-V", command = "SHAPESHIFTBUTTON5" },
     },
 }
 

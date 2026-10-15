@@ -104,7 +104,7 @@ The README images in `docs/screenshots/` are currently **mockups**: HTML in `doc
 | `control-center.png` | `/mlz`, Overview page with all status lines | Setup done, no reload pending (so no banner), healer role, hover one line |
 | `nameplates.png` | `/mlz` → Nameplates, Engine, Mode and Options cards | MLZ engine (the default), Auto mode, healer role in a group |
 | `wizard.png` | `/mlz install`, step 5 Keybinds | Moving ESDF → WASD so red conflicts and Alt moves show |
-| `addons.png` | `/mlz install`, step 9 Other addons | Healer role, DBM, Questie, Details! and Postal loaded, so role rows show |
+| `addons.png` | `/mlz install`, step 9 Other addons | Healer role, DBM, Questie, and Details! loaded, so role rows show |
 | `minimap-menu.png` | Minimap button tooltip and right-click menu | Two separate captures composed side by side (they can't be open at once) |
 
 Use a clean, well-lit spot (e.g. a capital city at day), 1440p or higher, UI scale set by MLZ UI, and no other addon windows open.

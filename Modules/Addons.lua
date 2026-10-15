@@ -58,22 +58,33 @@ local function Reason(entry, row)
     return "unknown"
 end
 
-local function Show(v)
-    if v == nil then return "default" end
-    if type(v) == "table" then
-        local parts = {}
-        for i, x in ipairs(v) do parts[i] = tostring(x) end
-        return "{" .. table.concat(parts, ", ") .. "}"
+-- Colors and similar tables can sit behind a metatable (Bagnon) or use named keys (Questie), so both
+-- helpers walk the keys of the *expected* value instead of using # or ipairs on the current one.
+local function Keys(shape)
+    local keys = {}
+    if #shape > 0 then
+        for i = 1, #shape do keys[i] = i end
+    else
+        for k in pairs(shape) do keys[#keys + 1] = k end
+        table.sort(keys, function(a, b) return tostring(a) < tostring(b) end)
     end
-    return tostring(v)
+    return keys
 end
 
--- Equal for plain values and flat arrays (e.g. colors)
+local function Show(v, shape)
+    if v == nil then return "default" end
+    if type(v) ~= "table" then return tostring(v) end
+    if type(shape) ~= "table" then shape = v end
+    local parts = {}
+    for i, k in ipairs(Keys(shape)) do parts[i] = tostring(v[k]) end
+    return "{" .. table.concat(parts, ", ") .. "}"
+end
+
+-- Equal for plain values and flat tables (e.g. colors)
 local function Same(a, b)
     if type(a) ~= "table" or type(b) ~= "table" then return a == b end
-    if #a ~= #b then return false end
-    for i = 1, #a do
-        if a[i] ~= b[i] then return false end
+    for _, k in ipairs(Keys(b)) do
+        if a[k] ~= b[k] then return false end
     end
     return true
 end
@@ -92,12 +103,12 @@ end
 -- Text for the wizard: one value as is, several through row.show
 local function Format(row, get)
     local parts = Parts(row)
-    if not row.set then return Show(get(1, parts[1])) end
+    if not row.set then return Show(get(1, parts[1]), parts[1].value) end
     local shown = {}
     for i, part in ipairs(parts) do
         local v = get(i, part)
         if v == nil then return "default" end
-        shown[i] = Show(v)
+        shown[i] = Show(v, part.value)
     end
     if row.show then return row.show:format(unpack(shown)) end
     return table.concat(shown, " ")
@@ -125,6 +136,31 @@ local function MissingDependency(entry)
     end
 end
 
+-- Leatrix keeps its settings in a private table and writes them over its saved file at logout.
+-- Its own "nosave" command stops that for this session, so what we write stays. Without the
+-- command (an older Leatrix) the rows are shown but never written.
+local unlocked = {}
+
+local function Writable(entry)
+    if entry.nosave then
+        return type(SlashCmdList) == "table" and type(SlashCmdList[entry.nosave]) == "function"
+    end
+    return not entry.manual
+end
+
+local function Unlock(entry)
+    if not entry.nosave or unlocked[entry.nosave] then return end
+    unlocked[entry.nosave] = true
+    ns.Try(SlashCmdList[entry.nosave], "nosave")
+end
+
+-- Asks an addon to redraw from its new settings. Returns true if it did, so no /reload is needed.
+local function Refresh(entry)
+    if not entry.refresh then return false end
+    local ok, done = ns.Try(entry.refresh)
+    return ok and done == true
+end
+
 local function PreviewRow(entry, row)
     local id = entry.addon .. ":" .. row.id
     local item = { id = id, group = entry.title, label = row.label, note = row.desc }
@@ -144,7 +180,7 @@ local function PreviewRow(entry, row)
     item.new = Format(row, function(_, part) return part.value end)
     item.enabled = ns.Enabled("addons", id, row.enabled ~= false)
     item.alreadySet = Matches(row, values)
-    if entry.manual and not item.alreadySet then
+    if not Writable(entry) and not item.alreadySet then
         -- shown so you know what to change, but never written
         item.enabled, item.unavailable = false, true
         item.note = entry.manual .. (row.desc and ("  " .. row.desc) or "")
@@ -194,16 +230,18 @@ function Addons:Backup(items)
 end
 
 function Addons:Apply(items)
-    local changed, failed, needReload = 0, 0, false
+    local changed, failed = 0, 0
+    local touched = {}
     for _, item in ipairs(items) do
         local entry, row = Find(item.id)
-        if entry and not item.unavailable and not entry.manual then
+        if entry and not item.unavailable and Writable(entry) then
+            Unlock(entry)
             for _, part in ipairs(Parts(row)) do
                 local parent, key = Resolve(entry, row, part.path, true)
                 if parent then
                     parent[key] = type(part.value) == "table" and ns.CopyTable(part.value) or part.value
                     changed = changed + 1
-                    if not entry.live then needReload = true end
+                    touched[entry] = true
                 else
                     failed = failed + 1
                 end
@@ -211,7 +249,12 @@ function Addons:Apply(items)
         end
     end
     ns.Debug("Addon settings set:", changed, "failed:", failed)
-    -- Most addons read their saved settings only when they load; entries marked live don't
+    -- Most addons read their saved settings only when they load. Entries marked live, or that redraw
+    -- through their own refresh, don't need a reload.
+    local needReload = false
+    for entry in pairs(touched) do
+        if not entry.live and not Refresh(entry) then needReload = true end
+    end
     if needReload then ns.MarkReload("addon settings") end
     if failed > 0 then
         return failed == 1 and "1 addon setting could not be written." or (failed .. " addon settings could not be written.")
@@ -219,9 +262,11 @@ function Addons:Apply(items)
 end
 
 function Addons:Restore(snap)
+    local touched = {}
     for id, old in pairs(snap) do
         local entry, row = Find(id)
-        if entry then
+        if entry and Writable(entry) then
+            Unlock(entry)
             -- Older backups stored one { has, value } per row
             local saved = old.parts or { old }
             for i, part in ipairs(Parts(row)) do
@@ -230,11 +275,14 @@ function Addons:Restore(snap)
                     local parent, key = Resolve(entry, row, part.path)
                     if parent then
                         if prev.has then parent[key] = prev.value else parent[key] = nil end
-                        if not entry.live then ns.MarkReload("addon settings") end
+                        touched[entry] = true
                     end
                 end
             end
         end
+    end
+    for entry in pairs(touched) do
+        if not entry.live and not Refresh(entry) then ns.MarkReload("addon settings") end
     end
 end
 
@@ -244,7 +292,7 @@ function Addons:Summary()
     local list = {}
     for _, entry in ipairs(ns.data.addons) do
         local s = { title = entry.title, addon = entry.addon, loaded = Loaded(entry) and true or false,
-            differ = 0, total = 0, rows = 0, missing = {}, manual = entry.manual }
+            differ = 0, total = 0, rows = 0, missing = {}, manual = not Writable(entry) and entry.manual or nil }
         for _, row in ipairs(entry.rows) do
             if ForMe(row) then s.rows = s.rows + 1 end
         end

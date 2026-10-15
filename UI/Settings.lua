@@ -1111,7 +1111,8 @@ PAGES[#PAGES + 1] = { key = "healer", title = "Your role", icon = "Interface\\Ic
     p:Value("Adapted for you", "Key hints and reminders are for your class. Stance keys and pet keys are added when your class has them.", function()
         local c = ns.data.classes and ns.data.classes[ns.PlayerClass() or ""]
         local parts = { "key hints", "reminders" }
-        if c and c.stance then parts[#parts + 1] = "stance keys" end
+        local stances = ns.modules.bindings.StanceCount()
+        if stances > 0 then parts[#parts + 1] = stances .. " stance key" .. (stances == 1 and "" or "s") end
         if c and c.pet then parts[#parts + 1] = "pet keys" end
         return table.concat(parts, ", ")
     end, { width = 260 })

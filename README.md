@@ -131,7 +131,7 @@ If the guess is wrong, set your role by hand with `/mlz role`, on the Your role 
 - One tip at a time on the overview, based on what you have turned on
 
 **Ecosystem**
-- Recommended settings for 16 addons, many of them per role: a healer and a tank do not get the same Questie, DBM or Details setup
+- Recommended settings for 15 addons, many of them per role: a healer and a tank do not get the same Questie, DBM or Details setup
 - Optional: Platynator as the nameplate engine, with modes per role and archetype and a clean style
 - Role profiles, export/import strings and a health check for missing addons
 
@@ -193,7 +193,6 @@ MLZ UI **configures** these addons when they are installed and loaded. It does n
 | [Questie](https://www.curseforge.com/wow/addons/questie) | Hidden minimap button, finished objectives hidden. The tracker is hidden in combat for healers and ranged classes, and shrunk for tanks and melee |
 | [Clique](https://www.curseforge.com/wow/addons/clique) | Your click bindings shown in unit frame tooltips. Your bindings are never touched |
 | [TomTom](https://www.curseforge.com/wow/addons/tomtom) | Locked arrow, no arrival time, same-zone waypoints only, optional hidden coordinate box |
-| [Postal](https://www.curseforge.com/wow/addons/postal) | No chat line for every opened letter, one name suggestion list |
 | [Auctionator](https://www.curseforge.com/wow/addons/auctionator) | No splash screen, auto-select next item, remember duration, quiet posting |
 | [AtlasLoot Classic](https://www.curseforge.com/wow/addons/atlasloot-classic-edition) | Optionally hide the minimap button |
 | [What's Training?](https://www.curseforge.com/wow/addons/whats-training) | Hide known weapon skills, dock beside the trainer |
@@ -209,7 +208,7 @@ Rows that only fit one role or archetype show only for you. Settings that don't 
 |---|---|
 | **Pixel-perfect scale** | Calculates the scale from screen height (`k * 768 / height`). Stores the *mode*, not the number, and handles scales below Blizzard's 0.64 CVar limit. |
 | **Edit Mode layout** | Bars stacked bottom center, player/target flanking, swing timers and cast bar aligned, corners kept for glance-only info. Separate healer layouts for dungeons and raids, and one without melee swing timers for casters and hunters. |
-| **Keybinds** | 12 reach-sorted base keys per movement setup. With WASD, Shift+1/2/3 switch stance or form, and bar 2 buttons 1-3 move to Shift+G/V/T. Displaced actions (e.g. Character panel) move to Alt. |
+| **Keybinds** | 12 reach-sorted base keys per movement setup. Stance and form keys follow your class: druids get 5, warriors and paladins 3, rogues and shadow priests 1. With ESDF they are 1, Shift+1, Ctrl+1, V and Shift+V. With WASD they are Shift+1/2/3, G and V, and bar 2 buttons 1-3 move to Shift+G/V/T. Displaced actions (e.g. Character panel) move to Alt. |
 | **Settings (CVars)** | Each CVar is optional. CVars your client doesn't have are skipped. |
 | **Minimalism** | Bars 4-5, micro menu, bags, chat buttons and XP bar hidden until hover. Bars 2-3 dimmed out of combat. Damage meter only in a group. |
 | **Action buttons** | Red = out of range, blue = no resource, grey = unusable. Short hotkeys (`S1`, `C1`) and hidden macro names. Stance, pet and bonus bars included. |

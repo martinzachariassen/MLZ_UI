@@ -19,6 +19,16 @@ local function CurrentAction(key)
     return action
 end
 
+-- How many stance/form keys this class gets (0 = none). Capped by the keys in Data/Bindings.lua.
+function Bindings.StanceCount(class)
+    local c = ns.data.classes and ns.data.classes[class or ns.PlayerClass()]
+    local n = c and c.stance
+    if n == true then n = 3 end -- older data format
+    if type(n) ~= "number" then return 0 end
+    if c.stanceNeedsForms and not (GetNumShapeshiftForms and GetNumShapeshiftForms() > 0) then return 0 end
+    return n
+end
+
 -- Returns a list of { key, command, group, role } for the chosen movement setup
 function Bindings:Desired(movement)
     local D = ns.data.bindings
@@ -30,12 +40,11 @@ function Bindings:Desired(movement)
     local keys = D.baseKeys[movement]
     local class = ns.PlayerClass()
     local c = ns.data.classes and ns.data.classes[class]
-    local hasStances = c and c.stance
-    if hasStances == "forms" then
-        hasStances = GetNumShapeshiftForms and GetNumShapeshiftForms() > 0
-    end
     local hints = D.classRoles and D.classRoles[class] or {}
-    local stance = (hasStances and D.stance and D.stance[movement]) or {}
+    local stance = {}
+    for i, b in ipairs(D.stance and D.stance[movement] or {}) do
+        if i <= self.StanceCount(class) then stance[i] = b end
+    end
     local stanceKeys = {}
     for _, b in ipairs(stance) do stanceKeys[b.key] = true end
     local relocate = D.stanceRelocate and D.stanceRelocate[movement] or {}

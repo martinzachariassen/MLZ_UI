@@ -83,7 +83,7 @@ local PAGE_TEXT = {
     bindings = function(base)
         local c = ns.data.classes and ns.data.classes[ns.PlayerClass() or ""] or {}
         local parts = {}
-        if c.stance == true or (c.stance == "forms" and GetNumShapeshiftForms and GetNumShapeshiftForms() > 0) then
+        if ns.modules.bindings.StanceCount() > 0 then
             parts[#parts + 1] = "stances and forms"
         end
         if c.pet then parts[#parts + 1] = "the pet bar" end

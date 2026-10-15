@@ -2,7 +2,7 @@
 -- When a merchant window opens: repair everything (guild bank money first when allowed, then your
 -- own) and sell every grey (poor quality) item, then print one summary line.
 -- Hold Shift while opening the merchant to skip it once. Settings: /mlz > Helpers.
--- Selling is skipped when Leatrix Plus already sells junk, so the two never fight.
+-- Selling and repairing are skipped when Leatrix Plus already does them, so the two never fight.
 
 local _, ns = ...
 
@@ -51,6 +51,12 @@ local function LeatrixSells()
     return type(db) == "table" and db.AutoSellJunk == "On"
 end
 
+local function LeatrixRepairs()
+    if not ns.IsAddOnLoaded("Leatrix_Plus") then return false end
+    local db = _G.LeaPlusDB
+    return type(db) == "table" and db.AutoRepairGear == "On"
+end
+
 local function Money(copper)
     if GetCoinTextureString then return GetCoinTextureString(copper) end
     return ("%dg %ds %dc"):format(copper / 10000, (copper / 100) % 100, copper % 100)
@@ -61,6 +67,7 @@ end
 ------------------------------------------------------------------------
 -- Returns the cost, and true if the guild paid
 local function Repair(cfg)
+    if LeatrixRepairs() then return 0 end
     if not (cfg.repair and CanMerchantRepair and CanMerchantRepair() and GetRepairAllCost and RepairAllItems) then return 0 end
     local cost, can = GetRepairAllCost()
     if not can or not cost or cost <= 0 then return 0 end
