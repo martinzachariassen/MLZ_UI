@@ -48,9 +48,9 @@ ns.data.cvars = {
     -- Unit frames: read the numbers instead of guessing from the bar
     { name = "statusText", value = "1", label = "Health and mana as text", enabled = true, group = "Unit frames",
       desc = "Shows health and mana as text on your unit frames (older clients)." },
-    { name = "statusTextDisplay", value = "NUMERIC", label = "Health and mana text", enabled = true, group = "Unit frames",
-      choices = { "NUMERIC", "PERCENT", "BOTH" },
-      desc = "Shows health and mana on your unit frames as numbers, percent or both. Click the value to change it." },
+    { name = "statusTextDisplay", value = "BOTH", label = "Health and mana text", enabled = true, group = "Unit frames",
+      choices = { "BOTH", "NUMERIC", "PERCENT" },
+      desc = "Shows health and mana on your unit frames as numbers (current / total) and percent. Click the value to change it." },
     { name = "breakUpLargeNumbers", value = "1", label = "Readable large numbers", enabled = true, group = "Unit frames",
       desc = "Writes 12,345 instead of 12345." },
     { name = "showTargetOfTarget", value = "1", label = "Target of target", enabled = true, group = "Unit frames",
