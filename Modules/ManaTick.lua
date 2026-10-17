@@ -178,6 +178,24 @@ end
 
 local TRACKED = { mana = { MANA, "MANA" }, energy = { ENERGY, "ENERGY" } }
 
+-- How far off the 2-second rhythm a gain may land and still count as a tick (latency and event jitter)
+local SLOP = 0.3
+-- When power last dropped below max: no ticks show up at max, so a quiet period there is not a missed tick
+local notFullSince = {}
+
+-- Regen ticks come on a fixed 2-second server timer. Other gains (Illumination, Relentless Strikes, potions,
+-- drinks, Mana Spring, Judgement of Wisdom) land off that rhythm and must not move it. Only when no tick has
+-- been seen for 2 periods where one was expected do we trust an off-rhythm gain and start over from it.
+local function IsTick(kind, now)
+    local last = lastTick[kind]
+    if not last then return true end
+    local phase = (now - last) % TICK
+    if phase <= SLOP or phase >= TICK - SLOP then return true end
+    local expectedSince = math.max(last, notFullSince[kind] or 0)
+    if kind == "mana" then expectedSince = math.max(expectedSince, lastSpend + FIVE) end
+    return now - expectedSince > 2 * TICK + SLOP
+end
+
 local function OnPower(_, unit, powerToken)
     if unit ~= "player" then return end
     if powerToken and powerToken ~= "MANA" and powerToken ~= "ENERGY" then return end -- rage, combo points
@@ -185,13 +203,14 @@ local function OnPower(_, unit, powerToken)
     for kind, t in pairs(TRACKED) do
         local id = t[1]
         if not powerToken or powerToken == t[2] then
-            local p = Num(UnitPower("player", id))
+            local p, max = Num(UnitPower("player", id)), Num(UnitPowerMax("player", id))
             local old = lastPower[kind]
             if p and old then
-                if p < old and kind == "mana" then
-                    lastSpend = now
-                elseif p > old then
-                    -- a regen tick (big jumps such as potions also land here; the next real tick corrects it)
+                if p < old then
+                    if max and old >= max then notFullSince[kind] = now end
+                    -- a drop that leaves you at max is a lower max (a buff ran out), not a spend
+                    if kind == "mana" and not (max and p >= max) then lastSpend = now end
+                elseif p > old and IsTick(kind, now) then
                     lastTick[kind] = now
                 end
             end

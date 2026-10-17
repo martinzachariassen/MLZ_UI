@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Search in the control center: type in the box at the top of the sidebar (or `/mlz search minimap`) to
+  find any setting. Typos, short forms (5sr, np) and other words (junk, kick) still find it. UP and DOWN
+  pick a match, ENTER opens the page and points out the setting.
+- Tick bar: mana or energy from Illumination, Relentless Strikes, potions, drinks or totems no longer moves
+  the 2-second tick. A lower max mana (a buff that ran out) no longer starts the five-second rule.
 - New "Fewer clicks" card on Helpers, all off by default: accept and turn in quests, accept summons and
   resurrections, confirm bind on pickup loot when solo, decline duels. Hold SHIFT to skip once.
   Options that Leatrix Plus already handles step aside.

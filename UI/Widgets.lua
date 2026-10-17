@@ -497,6 +497,57 @@ function W.Slider(parent, width, minV, maxV, step, fmt, onChange, onCommit)
 end
 
 ------------------------------------------------------------------------
+-- SearchBox: a flat one-line text field with a grey placeholder and a clear button.
+-- onChange(text) on every change. The caller adds OnEnterPressed / OnArrowPressed as needed.
+------------------------------------------------------------------------
+function W.SearchBox(parent, width, placeholder, onChange)
+    local e = CreateFrame("EditBox", nil, parent)
+    e:SetSize(width, 26)
+    e:SetAutoFocus(false)
+    e:SetFontObject("GameFontHighlight")
+    e:SetTextInsets(8, 24, 0, 0)
+    e:SetMaxLetters(60)
+    if e.SetAltArrowKeyMode then e:SetAltArrowKeyMode(false) end -- plain UP/DOWN reach OnArrowPressed
+    e.bg = W.Fill(e, T.input)
+    e.border = W.Border(e, T.border)
+
+    e.placeholder = W.Muted(e, "GameFontHighlight", placeholder or "Search")
+    e.placeholder:SetPoint("LEFT", 8, 0)
+    e.placeholder:SetPoint("RIGHT", -24, 0)
+    e.placeholder:SetWordWrap(false)
+
+    local clear = CreateFrame("Button", nil, e)
+    clear:SetSize(22, 22)
+    clear:SetPoint("RIGHT", -2, 0)
+    clear.hl = W.Fill(clear, T.press, "HIGHLIGHT")
+    clear.x = W.Text(clear, "MLZUI_FontButton", "X", "CENTER")
+    clear.x:SetPoint("CENTER")
+    clear.x:SetTextColor(unpack(T.muted))
+    clear:SetScript("OnClick", function() e:SetText(""); e:ClearFocus() end)
+    clear:Hide()
+    e.clear = clear
+
+    local function Update(self)
+        local text = self:GetText() or ""
+        self.placeholder:SetShown(text == "")
+        self.clear:SetShown(text ~= "")
+    end
+    e:SetScript("OnTextChanged", function(self)
+        Update(self)
+        if onChange then onChange(self:GetText() or "") end
+    end)
+    e:SetScript("OnEditFocusGained", function(self) self.border:SetColor(T.accent) end)
+    e:SetScript("OnEditFocusLost", function(self) self.border:SetColor(T.border) end)
+    -- ESC empties the field first, a second ESC lets go of the keyboard
+    e:SetScript("OnEscapePressed", function(self)
+        if (self:GetText() or "") ~= "" then self:SetText("") else self:ClearFocus() end
+    end)
+    e:SetScript("OnEnter", function(self) if not self:HasFocus() then self.border:SetColor(T.inputEdge) end end)
+    e:SetScript("OnLeave", function(self) if not self:HasFocus() then self.border:SetColor(T.border) end end)
+    return e
+end
+
+------------------------------------------------------------------------
 -- Badge: colored square + short text. :Set(state, text), state = "on" | "off" | "warn" | "bad" | "info"
 ------------------------------------------------------------------------
 local BADGE = {

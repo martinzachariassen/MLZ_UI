@@ -6,7 +6,18 @@
     width: 180px; flex: none;
     background: var(--panel);
     border-right: 1px solid var(--border);
-    padding-top: 10px;
+    padding-top: 12px;
+}
+/* W.SearchBox: 152x26 well at the top of the sidebar, grey placeholder */
+.side-search {
+    width: 152px; height: 26px; box-sizing: border-box;
+    margin: 0 14px 10px;
+    padding-left: 8px;
+    display: flex; align-items: center;
+    background: var(--well);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font: 400 13px/1 var(--body);
 }
 .side-btn {
     position: relative;

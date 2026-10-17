@@ -397,7 +397,14 @@ local function NewPage(parent)
     sf:SetPoint("TOPLEFT", parent, "TOPLEFT", 1 + SIDEBAR_W + PAGE_INSET, -(TITLE_H + 1 + PAD))
     sf:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", -(1 + PAGE_INSET), FOOTER_H + 1 + PAD)
     sf:Hide()
-    return setmetatable({ scroll = sf, content = sf.content, y = 0, refreshers = {} }, Page)
+    return setmetatable({ scroll = sf, content = sf.content, y = 0, refreshers = {}, index = {} }, Page)
+end
+
+-- Remember what a page shows, so the search box can find it. y = offset from the top of the page.
+function Page:AddToIndex(entry)
+    if entry.card == nil then entry.card = self.cardTitle end -- false: no card (the card itself, the page)
+    self.index[#self.index + 1] = entry
+    return entry
 end
 
 local function Eval(v)
@@ -418,6 +425,7 @@ end
 function Page:Title(title, subtitle)
     local t = W.Text(self.content, "MLZUI_FontTitle", title)
     t:SetPoint("TOPLEFT", 0, -self.y)
+    self:AddToIndex({ kind = "page", label = title, desc = subtitle, card = false, y = self.y })
     self.y = self.y + 28
     if subtitle then
         local s = W.Text(self.content, "GameFontHighlight", subtitle)
@@ -443,6 +451,10 @@ function Page:Card(title, subtitle)
     c:SetPoint("TOPLEFT", 0, -self.y)
     c:SetWidth(PAGE_W)
     c.cy = 4
+    self.cardTitle = title
+    if title then
+        self:AddToIndex({ kind = "card", label = title, desc = subtitle, card = false, y = self.y, frame = c })
+    end
     if title then
         local t = W.Text(c, "MLZUI_FontHead", title)
         t:SetPoint("TOPLEFT", PAD, -13)
@@ -477,6 +489,8 @@ function Page:Row(opts, build, refresh)
     if c.cy > 4 then Divider(row) end
     row.hl = W.Fill(row, T.shade, "BACKGROUND", 1)
     row.hl:Hide()
+    row.search = self:AddToIndex({ kind = "row", label = opts.label, desc = opts.desc, tip = opts.tip,
+        keywords = opts.keywords, avail = opts.avail, y = self.y + c.cy, frame = row })
 
     local control = build and build(row)
     local cw = control and control:GetWidth() or 0
@@ -573,12 +587,14 @@ local function Opts(opts, label, desc)
 end
 
 function Page:Toggle(label, desc, get, set, opts)
-    return self:Row(Opts(opts, label, desc), function(row)
-        return W.Toggle(row, function(_, on)
+    local row, control = self:Row(Opts(opts, label, desc), function(r)
+        return W.Toggle(r, function(_, on)
             set(on)
             S:Refresh()
         end)
     end, function(t) t:SetOn(get()) end)
+    row.search.get = get -- search results show On or Off
+    return row, control
 end
 
 -- Segmented choice: options = { { value, text, tip }, ... }
@@ -657,6 +673,8 @@ function Page:Buttons(list)
         end, d.style)
         b:SetPoint("LEFT", x, 0)
         b.tipText = d.tip
+        self:AddToIndex({ kind = "button", label = d.text, desc = d.tip, keywords = d.keywords, avail = d.avail,
+            y = self.y + c.cy, frame = holder })
         x = x + w + 8
         made[#made + 1] = b
         defs[#defs + 1] = d
@@ -1723,6 +1741,7 @@ PAGES[#PAGES + 1] = { key = "about", title = "About & help", icon = "Interface\\
 
     p:Card("Chat commands")
     p:Text(C.white .. "/mlz" .. C.r .. "   opens or closes this window\n"
+        .. C.white .. "/mlz search" .. C.r .. "   finds a setting, for example /mlz search minimap\n"
         .. C.white .. "/mlz install" .. C.r .. "   opens the setup wizard\n"
         .. C.white .. "/mlz undo" .. C.r .. "   undoes the last setup wizard run or import\n"
         .. C.white .. "/mlz role" .. C.r .. "   shows your role, or sets it: tank, healer, dps, auto\n"
@@ -1754,6 +1773,412 @@ do
         return ra < rb
     end)
 end
+
+------------------------------------------------------------------------
+-- Search: finds rows, buttons, cards and pages by what they say
+-- Every query word has to match somewhere. A word matches whole, as the start of a word, inside a word,
+-- with a typo (1 letter off, 2 for long words), or through the words in Data/Search.lua.
+------------------------------------------------------------------------
+local Search = {}
+local MAX_RESULTS = 40
+
+-- Lowercase, no color codes or icons, punctuation becomes space ("Five-second" -> "five second")
+local function Normalize(s)
+    if type(s) ~= "string" then return "" end
+    s = s:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):gsub("|T.-|t", ""):lower()
+    return " " .. s:gsub("[^%w]+", " "):gsub("^ +", ""):gsub(" +$", "") .. " "
+end
+
+local function Words(text)
+    local list = {}
+    for w in text:gmatch("%S+") do list[#list + 1] = w end
+    return list
+end
+
+-- Edit distance with swapped letters counted as one edit. Gives up (returns limit + 1) once it can't
+-- stay within limit, so long words cost little.
+local function Distance(a, b, limit)
+    local la, lb = #a, #b
+    if math.abs(la - lb) > limit then return limit + 1 end
+    local prev2, prev = {}, {}
+    for j = 0, lb do prev[j] = j end
+    for i = 1, la do
+        local cur = { [0] = i }
+        local best = i
+        local ai = a:byte(i)
+        for j = 1, lb do
+            local cost = (ai == b:byte(j)) and 0 or 1
+            local v = math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost)
+            if i > 1 and j > 1 and ai == b:byte(j - 1) and a:byte(i - 1) == b:byte(j) then
+                v = math.min(v, prev2[j - 2] + 1)
+            end
+            cur[j] = v
+            if v < best then best = v end
+        end
+        if best > limit then return limit + 1 end
+        prev2, prev = prev, cur
+    end
+    return prev[lb]
+end
+
+-- How well one typed word matches a field: 3 whole word, 2.2 start of a word, 1.2 inside a word,
+-- 1 or 0.8 with a typo, 0 not at all
+local function MatchWord(q, field)
+    local n = #q
+    if n == 0 then return 0 end
+    if field.text:find(" " .. q .. " ", 1, true) then return 3 end
+    if field.text:find(" " .. q, 1, true) then return 2.2 end
+    if n >= 3 and field.text:find(q, 1, true) then return 1.2 end
+    if n < 4 then return 0 end
+    local limit = n >= 7 and 2 or 1
+    local best = 0
+    for _, w in ipairs(field.words) do
+        if Distance(q, w, limit) <= limit then return 1 end
+        -- still typing: "nameplt" against the start of "nameplates"
+        if best == 0 and #w > n and Distance(q, w:sub(1, n), 1) <= 1 then best = 0.8 end
+    end
+    return best
+end
+
+local function MatchTerm(term, field)
+    local best = 0
+    for _, alt in ipairs(term) do
+        local m
+        if alt.phrase then
+            m = field.text:find(alt.text, 1, true) and 2.2 or 0
+        else
+            m = MatchWord(alt.text, field) * (alt.weight or 1)
+        end
+        if m > best then best = m end
+    end
+    return best
+end
+
+-- Field weights: what a row is called counts most, its tooltip least
+local FIELDS = { { "label", 3 }, { "keywords", 2.5 }, { "card", 1.4 }, { "pageTitle", 1.2 }, { "desc", 1 }, { "tip", 0.6 } }
+local KIND_BONUS = { row = 0.6, button = 0.4, card = 0.2, page = 0 }
+
+local function Fields(entry)
+    if entry.fields then return entry.fields end
+    local f = {}
+    for _, def in ipairs(FIELDS) do
+        local text = Normalize(Eval(entry[def[1]]))
+        if text ~= "  " then f[#f + 1] = { text = text, words = Words(text), weight = def[2] } end
+    end
+    entry.fields = f
+    entry.labelText = Normalize(Eval(entry.label))
+    return f
+end
+
+-- The query as a list of terms; each term lists the ways it may match
+local function Terms(query)
+    local aliases = ns.data.searchAliases or {}
+    local stop = ns.data.searchStopwords or {}
+    local words = Words(Normalize(query))
+    local terms = {}
+    for i, w in ipairs(words) do
+        -- the last word may still be half typed, so a stopword there still counts ("f" -> "fade")
+        if not stop[w] or (i == #words and #words == 1) then
+            local term = { { text = w } }
+            if #w > 3 and w:sub(-1) == "s" then term[#term + 1] = { text = w:sub(1, -2), weight = 0.95 } end
+            for _, a in ipairs(aliases[w] or {}) do
+                local norm = Normalize(a)
+                if norm:find("%S %S") then
+                    term[#term + 1] = { text = norm:sub(2, -2), phrase = true }
+                else
+                    term[#term + 1] = { text = norm:sub(2, -2), weight = 0.85 }
+                end
+            end
+            terms[#terms + 1] = term
+        end
+    end
+    return terms, words
+end
+
+local function Score(entry, terms, phrase)
+    local fields = Fields(entry)
+    local total, inLabel = 0, 0
+    for _, term in ipairs(terms) do
+        local best, bestField = 0, nil
+        for _, field in ipairs(fields) do
+            local m = MatchTerm(term, field) * field.weight
+            if m > best then best, bestField = m, field end
+        end
+        if best == 0 then return nil end
+        total = total + best
+        if bestField and bestField.weight == FIELDS[1][2] then inLabel = inLabel + 1 end
+    end
+    -- every word in the name beats words spread over name, card and description
+    if #terms > 1 and inLabel == #terms then total = total + 3 end
+    -- the whole query in the name counts extra, at the start even more
+    local label = entry.labelText
+    if #phrase > 2 then
+        if label:find(" " .. phrase, 1, true) == 1 then total = total + 6
+        elseif label:find(phrase, 1, true) then total = total + 4 end
+    end
+    return total + (KIND_BONUS[entry.kind] or 0)
+end
+
+-- Builds every page once (hidden), so the search can see all of them
+function Search.EnsureAll()
+    for _, page in ipairs(PAGES) do S:BuildPage(page.key) end
+end
+
+function Search.Run(query)
+    local terms, words = Terms(query)
+    if #terms == 0 then return {} end
+    local phrase = table.concat(words, " ")
+    Search.EnsureAll()
+    local results, seen = {}, {}
+    for order, page in ipairs(PAGES) do
+        local entry = S.pages[page.key]
+        for i, item in ipairs(entry.page and entry.page.index or {}) do
+            item.pageKey, item.pageTitle = page.key, page.title
+            local score = Score(item, terms, phrase)
+            -- one result per name and place: the same button in one card shows once
+            local key = page.key .. "|" .. (item.labelText or "") .. "|" .. tostring(item.card)
+            if score and not seen[key] then
+                seen[key] = true
+                results[#results + 1] = { item = item, score = score, order = order * 1000 + i }
+            end
+        end
+    end
+    table.sort(results, function(a, b)
+        if a.score ~= b.score then return a.score > b.score end
+        return a.order < b.order
+    end)
+    for i = #results, MAX_RESULTS + 1, -1 do results[i] = nil end
+    return results
+end
+
+------------------------------------------------------------------------
+-- Search results view: replaces the page while there is text in the search box
+------------------------------------------------------------------------
+local RESULT_H = 58
+
+local function ResultButton(parent)
+    local b = CreateFrame("Button", nil, parent)
+    b:SetHeight(RESULT_H)
+    b.hl = W.Fill(b, T.shade, "HIGHLIGHT")
+    b.sel = W.Fill(b, T.hover, "BACKGROUND", 1)
+    b.sel:Hide()
+    b.bar = b:CreateTexture(nil, "ARTWORK")
+    b.bar:SetColorTexture(unpack(T.accent))
+    b.bar:SetPoint("TOPLEFT")
+    b.bar:SetPoint("BOTTOMLEFT")
+    b.bar:SetWidth(3)
+    b.bar:Hide()
+    b.line = W.Line(b)
+    b.line:SetPoint("TOPLEFT", PAD - 1, 0)
+    b.line:SetPoint("TOPRIGHT", -(PAD - 1), 0)
+    local textW = PAGE_W - PAD * 3 - 170
+    b.label = W.Text(b, "GameFontHighlight", "")
+    b.label:SetPoint("TOPLEFT", PAD, -10)
+    b.label:SetWidth(textW)
+    b.label:SetWordWrap(false)
+    b.path = W.Text(b, "GameFontHighlightSmall", "")
+    b.path:SetTextColor(unpack(T.accent))
+    b.path:SetPoint("TOPLEFT", b.label, "BOTTOMLEFT", 0, -3)
+    b.path:SetWidth(textW)
+    b.path:SetWordWrap(false)
+    b.desc = W.Muted(b, "GameFontHighlightSmall", "")
+    b.desc:SetPoint("TOPLEFT", b.path, "BOTTOMLEFT", 0, -3)
+    b.desc:SetWidth(textW)
+    b.desc:SetWordWrap(false)
+    b.badge = W.Badge(b)
+    b.badge:SetWidth(170)
+    b.badge:SetPoint("RIGHT", -PAD, 0)
+    b.reason = W.Text(b, "GameFontHighlightSmall", "", "RIGHT")
+    b.reason:SetTextColor(unpack(T.amber))
+    b.reason:SetPoint("RIGHT", -PAD, 0)
+    b.reason:SetWidth(170)
+    b:SetScript("OnClick", function(self) if self.item then S:OpenResult(self.item) end end)
+    b:SetScript("OnEnter", function(self)
+        local tip = self.item and (Eval(self.item.tip) or "")
+        if tip == "" then tip = self.item and Eval(self.item.desc) or "" end
+        if tip == "" then return end
+        GameTooltip:SetOwner(self, "ANCHOR_NONE")
+        GameTooltip:SetPoint("BOTTOMLEFT", self, "TOPLEFT", PAD, 2)
+        GameTooltip:SetText(self.label:GetText() or "", T.text[1], T.text[2], T.text[3])
+        GameTooltip:AddLine(tip, T.muted[1], T.muted[2], T.muted[3], true)
+        GameTooltip:Show()
+    end)
+    b:SetScript("OnLeave", function(self) if GameTooltip:IsOwned(self) then GameTooltip:Hide() end end)
+    function b:SetSelected(on)
+        self.sel:SetShown(on)
+        self.bar:SetShown(on)
+    end
+    -- state on the right: why it can't be used, On/Off for a switch, nothing otherwise
+    function b:RefreshState()
+        local item = self.item
+        local why = item.avail and Eval(item.avail)
+        if why == "" then why = nil end
+        self.reason:SetText(why or "")
+        self.reason:SetShown(why and true or false)
+        local on
+        if not why and item.get then
+            local ok, v = pcall(item.get)
+            if ok then on = v and true or false end
+        end
+        self.badge:SetShown(on ~= nil)
+        if on ~= nil then self.badge:Set(on and "on" or "off") end
+    end
+    function b:Fill(item)
+        self.item = item
+        self.label:SetText(item.label or "")
+        local path = item.pageTitle
+        if item.kind ~= "page" and item.card then path = path .. "  >  " .. item.card end
+        if item.kind == "page" then path = "Page" end
+        self.path:SetText(path)
+        self.desc:SetText(Eval(item.desc) or "")
+        self:RefreshState()
+    end
+    return b
+end
+
+function S:BuildResultsView()
+    local sf = W.ScrollArea(self.frame)
+    sf:SetPoint("TOPLEFT", self.frame, "TOPLEFT", 1 + SIDEBAR_W + PAGE_INSET, -(TITLE_H + 1 + PAD))
+    sf:SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", -(1 + PAGE_INSET), FOOTER_H + 1 + PAD)
+    sf:Hide()
+    local c = sf.content
+    sf.title = W.Text(c, "MLZUI_FontTitle", "Search")
+    sf.title:SetPoint("TOPLEFT", 0, 0)
+    sf.sub = W.Muted(c, "GameFontHighlight", "")
+    sf.sub:SetPoint("TOPLEFT", 0, -28)
+    sf.sub:SetWidth(PAGE_W)
+    sf.card = W.Card(c)
+    sf.card:SetPoint("TOPLEFT", 0, -(28 + 18 + PAD))
+    sf.card:SetWidth(PAGE_W)
+    sf.empty = W.Muted(sf.card, "GameFontHighlight", "")
+    sf.empty:SetPoint("TOPLEFT", PAD, -PAD)
+    sf.empty:SetWidth(PAGE_W - PAD * 2)
+    sf.buttons = {}
+    self.results = sf
+end
+
+function S:ShowResults(query, results)
+    local sf = self.results
+    sf.list = results
+    local n = #results
+    sf.sub:SetText(n == 0 and ('Nothing matches "' .. query .. '".')
+        or (n == 1 and ('1 match for "' .. query .. '". Press ENTER to open it.')
+        or (n .. ' matches for "' .. query .. '". Use UP and DOWN to pick one, ENTER to open it.')))
+    for i, r in ipairs(results) do
+        local b = sf.buttons[i]
+        if not b then
+            b = ResultButton(sf.card)
+            b:SetPoint("TOPLEFT", 1, -((i - 1) * RESULT_H + 1))
+            b:SetPoint("TOPRIGHT", -1, -((i - 1) * RESULT_H + 1))
+            sf.buttons[i] = b
+        end
+        b.line:SetShown(i > 1)
+        b:Fill(r.item)
+        b:Show()
+    end
+    for i = n + 1, #sf.buttons do sf.buttons[i]:Hide() end
+    if n == 0 then
+        local ex = ns.data.searchExamples or {}
+        sf.empty:SetText("Try fewer or other words, for example " .. C.white .. table.concat(ex, C.r .. ", " .. C.white)
+            .. C.r .. ". The search looks at every setting in this window, not at the setup wizard.")
+        sf.empty:Show()
+        sf.card:SetHeight(sf.empty:GetStringHeight() + PAD * 2)
+    else
+        sf.empty:Hide()
+        sf.card:SetHeight(n * RESULT_H + 2)
+    end
+    sf.content:SetHeight(28 + 18 + PAD + sf.card:GetHeight() + 4)
+    sf:SetVerticalScroll(0)
+    if sf.UpdateScroll then sf.UpdateScroll() end
+    self:SelectResult(n > 0 and 1 or nil)
+end
+
+function S:SelectResult(i)
+    local sf = self.results
+    sf.selected = i
+    for k, b in ipairs(sf.buttons) do b:SetSelected(k == i) end
+    if not i then return end
+    -- keep the picked line inside the visible part of the list
+    local top = 28 + 18 + PAD + (i - 1) * RESULT_H
+    local view = sf:GetHeight() or 0
+    local cur = sf:GetVerticalScroll()
+    local max = sf.GetVerticalScrollRange and sf:GetVerticalScrollRange() or top
+    if top < cur then sf:SetVerticalScroll(math.max(0, top - PAD))
+    elseif top + RESULT_H > cur + view then sf:SetVerticalScroll(math.min(max, top + RESULT_H - view + PAD)) end
+end
+
+function S:MoveResult(delta)
+    local sf = self.results
+    local n = sf and sf.list and #sf.list or 0
+    if n == 0 then return end
+    self:SelectResult(((sf.selected or 0) - 1 + delta) % n + 1)
+end
+
+function S:SetSearch(text)
+    self:Build()
+    self.searchBox:SetText(text or "")
+end
+
+-- Called on every change in the search box
+function S:Search(text)
+    local query = (text or ""):gsub("^%s+", ""):gsub("%s+$", "")
+    if query == "" then
+        if self.searching then self:Select(self.selected or "overview") end
+        return
+    end
+    self.searching = true
+    for _, entry in pairs(self.pages) do
+        entry.button:SetSelected(false)
+        if entry.page then entry.page.scroll:Hide() end
+    end
+    local ok, results = pcall(Search.Run, query)
+    if not ok then
+        ns.Debug("search:", results)
+        results = {}
+    end
+    self.results:Show()
+    self:ShowResults(query, results)
+end
+
+-- Opens the page of a result, scrolls to it and marks it for a moment with the accent strip
+function S:OpenResult(item)
+    if not item then return end
+    self.searchBox:ClearFocus()
+    self:Select(item.pageKey) -- also ends the search
+    local page = self.pages[item.pageKey].page
+    if not page then return end
+    local function ScrollTo()
+        local sf = page.scroll
+        local max = sf.GetVerticalScrollRange and sf:GetVerticalScrollRange() or 0
+        sf:SetVerticalScroll(math.max(0, math.min(max, (item.y or 0) - PAD * 2)))
+    end
+    ScrollTo()
+    C_Timer.After(0, ScrollTo) -- the scroll range is known for sure one frame later
+    local frame = item.frame
+    if not frame then return end
+    if not frame.found then
+        frame.found = CreateFrame("Frame", nil, frame)
+        frame.found:SetAllPoints()
+        frame.found:SetFrameLevel(frame:GetFrameLevel() + 5)
+        W.Fill(frame.found, T.shade)
+        local strip = frame.found:CreateTexture(nil, "ARTWORK")
+        strip:SetColorTexture(unpack(T.accent))
+        strip:SetPoint("TOPLEFT")
+        strip:SetPoint("BOTTOMLEFT")
+        strip:SetWidth(3)
+        frame.found:EnableMouse(false)
+    end
+    local token = {}
+    frame.found.token = token
+    frame.found:Show()
+    C_Timer.After(2, function() if frame.found.token == token then frame.found:Hide() end end)
+end
+
+ns.AddCommand("search", "finds a setting in the control center: /mlz search minimap", function(arg)
+    S:Open()
+    S:SetSearch(arg or "")
+    if (arg or "") == "" then S.searchBox:SetFocus() end
+end)
 
 ------------------------------------------------------------------------
 -- Window
@@ -1808,8 +2233,34 @@ function S:Build()
     edge:SetPoint("TOPRIGHT")
     edge:SetPoint("BOTTOMRIGHT")
 
+    -- Search box at the top of the sidebar
+    local box = W.SearchBox(side, SIDEBAR_W - PAD * 2, "Search settings", function(text) self:Search(text) end)
+    box:SetPoint("TOPLEFT", PAD, -12)
+    box:SetScript("OnEnterPressed", function(b)
+        local sf = self.results
+        local r = self.searching and sf.list and sf.list[sf.selected or 1]
+        if r then self:OpenResult(r.item) else b:ClearFocus() end
+    end)
+    box:SetScript("OnArrowPressed", function(_, key)
+        if not self.searching then return end
+        if key == "UP" then self:MoveResult(-1) elseif key == "DOWN" then self:MoveResult(1) end
+    end)
+    box:SetScript("OnTabPressed", function()
+        if self.searching then self:MoveResult(IsShiftKeyDown() and -1 or 1) end
+    end)
+    box.tipText = "Type a few letters: a setting's name, what it does, or a short form like 5sr or np."
+    box:HookScript("OnEnter", function(b)
+        GameTooltip:SetOwner(b, "ANCHOR_RIGHT")
+        GameTooltip:SetText("Search settings", T.text[1], T.text[2], T.text[3])
+        GameTooltip:AddLine(b.tipText, T.muted[1], T.muted[2], T.muted[3], true)
+        GameTooltip:Show()
+    end)
+    box:HookScript("OnLeave", function(b) if GameTooltip:IsOwned(b) then GameTooltip:Hide() end end)
+    self.searchBox = box
+    self:BuildResultsView()
+
     self.pages = {}
-    local y = 10
+    local y = 12 + 26 + 10
     for _, page in ipairs(PAGES) do
         if page.gap then
             local line = side:CreateTexture(nil, "ARTWORK")
@@ -1865,6 +2316,8 @@ function S:Build()
     -- and every 10 seconds as a fallback (some things change without an event)
     local elapsed = 0
     f:SetScript("OnShow", function() elapsed = 0; self:Refresh() end)
+    -- a focused search box would keep the keyboard after the window closes
+    f:SetScript("OnHide", function() box:ClearFocus() end)
     f:SetScript("OnUpdate", function(_, dt)
         elapsed = elapsed + dt
         if elapsed > 10 then
@@ -1920,24 +2373,34 @@ function S:RefreshFooter()
     foot.wizard:SetStyle(ns.db.installed and "normal" or "primary")
 end
 
+-- Builds a page without showing it (pages are built the first time they are opened or searched)
+function S:BuildPage(key)
+    local entry = self.pages[key]
+    if not entry or entry.page then return end
+    entry.page = NewPage(self.frame)
+    local ok, err = pcall(entry.def.build, entry.page)
+    if not ok then
+        entry.page:Card("Could not build this page")
+        entry.page:Text(C.red .. tostring(err) .. C.r)
+    end
+    entry.page:Finish()
+end
+
 function S:Select(key)
     self:Build()
     if not self.pages[key] then key = "overview" end
+    -- opening a page ends a search (set the flag first: emptying the box calls S:Search again)
+    if self.searching then
+        self.searching = false
+        self.results:Hide()
+        self.searchBox:SetText("")
+    end
+    self:BuildPage(key)
     for k, entry in pairs(self.pages) do
         entry.button:SetSelected(k == key)
         if entry.page then entry.page.scroll:SetShown(k == key) end
     end
     local entry = self.pages[key]
-    if not entry.page then
-        entry.page = NewPage(self.frame)
-        local ok, err = pcall(entry.def.build, entry.page)
-        if not ok then
-            entry.page:Card("Could not build this page")
-            entry.page:Text(C.red .. tostring(err) .. C.r)
-        end
-        entry.page:Finish()
-        entry.page.scroll:Show()
-    end
     self.selected = key
     entry.page.scroll:SetVerticalScroll(0)
     self:Refresh(true)
@@ -1953,7 +2416,8 @@ function S:RebuildPage(key)
         local offset = scroll:GetVerticalScroll()
         scroll:Hide()
         entry.page = nil
-        if self.selected == key and self.frame and self.frame:IsShown() then
+        -- during a search the page stays unbuilt until it is opened or searched again
+        if self.selected == key and self.frame and self.frame:IsShown() and not self.searching then
             self:Select(key)
             local page = self.pages[key].page
             if page then page.scroll:SetVerticalScroll(offset) end
@@ -1969,6 +2433,12 @@ function S:Refresh(force)
     if not force and self.lastRefresh == now then return end
     self.lastRefresh = now
     self:RefreshFooter()
+    if self.searching then
+        for _, b in ipairs(self.results.buttons) do
+            if b:IsShown() and b.item then b:RefreshState() end
+        end
+        return
+    end
     local entry = self.selected and self.pages[self.selected]
     if entry and entry.page then entry.page:Refresh() end
 end

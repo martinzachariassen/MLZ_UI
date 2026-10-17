@@ -156,6 +156,7 @@ If the guess is wrong, set your role by hand with `/mlz role`, on the Your role 
 | Command | What it does |
 |---|---|
 | `/mlz` | Open the control center |
+| `/mlz search [words]` | Find a setting in the control center, for example `/mlz search minimap` |
 | `/mlz install` | Open the setup wizard |
 | `/mlz undo` | Undo the last wizard run |
 | `/mlz backups` | List saved backups |

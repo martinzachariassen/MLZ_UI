@@ -672,7 +672,7 @@ end
 
 -- Everything else is controlled from the settings window (/mlz); the other commands still
 -- work but are not listed.
-local LISTED = { install = true, undo = true, debug = true, probe = true, minimap = true, role = true, np = true, keys = true, tour = true, pull = true }
+local LISTED = { install = true, search = true, undo = true, debug = true, probe = true, minimap = true, role = true, np = true, keys = true, tour = true, pull = true }
 
 -- Runs a command from code (used by the settings window)
 function ns.RunCommand(name, arg)

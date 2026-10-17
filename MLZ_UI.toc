@@ -26,6 +26,7 @@ Data\Addons.lua
 Data\Reminders.lua
 Data\Tips.lua
 Data\Cooking.lua
+Data\Search.lua
 
 Modules\Backup.lua
 Modules\Role.lua
