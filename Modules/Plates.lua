@@ -43,6 +43,7 @@ local casting = {}   -- [our frame] = true while a cast bar runs
 local hidden = setmetatable({}, { __mode = "k" }) -- Blizzard UnitFrames we made invisible
 local hooked = setmetatable({}, { __mode = "k" })
 local questCache = {} -- [guid] = true/false
+local Wake -- starts the OnUpdate (cast bars, debuff timers); set once the event frame exists
 
 ------------------------------------------------------------------------
 -- Feature detection
@@ -449,6 +450,7 @@ local function UpdateAuras(f)
     end
     for i = n + 1, #f.auras do f.auras[i]:Hide() end
     f.hasTimers = n > 0
+    if n > 0 and Wake then Wake() end
 end
 
 -- Cast info works across client versions: the "can't interrupt" flag is the first boolean after
@@ -480,6 +482,7 @@ local function UpdateCast(f)
     f.castText:SetText(name)
     f.cast:Show()
     casting[f] = true
+    if Wake then Wake() end
 end
 
 local function UpdateAll(f)
@@ -546,13 +549,16 @@ local function OnUnit(fn)
     end
 end
 
+-- Quest progress changes which mobs you still need. The cache is cleared when the rescan runs (at most
+-- once a second), not on every event, so a burst of quest events costs one tooltip scan per plate.
 local questScheduled = false
+local unitQuestEvents = false -- the client sends UNIT_QUEST_LOG_CHANGED: ignore the noisier QUEST_LOG_UPDATE
 local function QuestChanged()
-    wipe(questCache)
     if questScheduled then return end
     questScheduled = true
-    C_Timer.After(0.5, function()
+    C_Timer.After(1, function()
         questScheduled = false
+        wipe(questCache)
         if active then ForEach(UpdateQuest) end
     end)
 end
@@ -582,8 +588,14 @@ handlers.PLAYER_REGEN_DISABLED = handlers.UNIT_THREAT_SITUATION_UPDATE
 handlers.UNIT_AURA = OnUnit(UpdateAuras)
 handlers.RAID_TARGET_UPDATE = function() ForEach(UpdateRaid) end
 handlers.PLAYER_LEVEL_UP = function() C_Timer.After(0.2, function() if active then ForEach(UpdateName) end end) end
-handlers.QUEST_LOG_UPDATE = QuestChanged
-handlers.UNIT_QUEST_LOG_CHANGED = function(unit) if unit == "player" then QuestChanged() end end
+handlers.QUEST_LOG_UPDATE = function() if not unitQuestEvents then QuestChanged() end end
+handlers.UNIT_QUEST_LOG_CHANGED = function(unit)
+    unitQuestEvents = true
+    if unit == "player" then QuestChanged() end
+end
+handlers.QUEST_ACCEPTED = QuestChanged
+handlers.QUEST_REMOVED = QuestChanged
+handlers.QUEST_TURNED_IN = QuestChanged
 for _, ev in ipairs({
     "UNIT_SPELLCAST_START", "UNIT_SPELLCAST_STOP", "UNIT_SPELLCAST_FAILED", "UNIT_SPELLCAST_INTERRUPTED",
     "UNIT_SPELLCAST_DELAYED", "UNIT_SPELLCAST_CHANNEL_START", "UNIT_SPELLCAST_CHANNEL_STOP",
@@ -599,9 +611,13 @@ events:SetScript("OnEvent", function(_, event, ...)
     if not ok then ns.Error("nameplates", err) end
 end)
 
--- One OnUpdate for cast bars (every frame) and debuff timers (4 times a second)
+-- One OnUpdate for cast bars (every frame) and debuff timers (4 times a second).
+-- It stops itself when nothing is casting and no plate has a timer; Wake starts it again.
 local auraClock = 0
-events:SetScript("OnUpdate", function(_, elapsed)
+Wake = function()
+    if active and not events:IsShown() then events:Show() end
+end
+events:SetScript("OnUpdate", function(self, elapsed)
     local now = GetTime()
     for f in pairs(casting) do
         local total = f.castEnd - f.castStart
@@ -617,8 +633,10 @@ events:SetScript("OnUpdate", function(_, elapsed)
     auraClock = auraClock + elapsed
     if auraClock < 0.25 then return end
     auraClock = 0
+    local timers = false
     for _, f in pairs(byUnit) do
         if f.hasTimers then
+            timers = true
             for _, a in ipairs(f.auras) do
                 if a:IsShown() and a.expires then
                     local left = a.expires - now
@@ -635,6 +653,7 @@ events:SetScript("OnUpdate", function(_, elapsed)
             end
         end
     end
+    if not timers and not next(casting) then self:Hide() end
 end)
 events:Hide() -- OnUpdate only runs while shown, i.e. while active
 

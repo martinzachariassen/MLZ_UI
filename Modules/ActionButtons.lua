@@ -79,7 +79,7 @@ end
 -- Colors
 ------------------------------------------------------------------------
 local function State(cfg, action)
-    if not HasActionFn or not HasActionFn(action) then return nil end
+    if not (HasActionFn and IsUsableFn) or not HasActionFn(action) then return nil end
     local usable, noMana = IsUsableFn(action)
     if cfg.range and InRangeFn then
         local r = InRangeFn(action)
@@ -98,8 +98,9 @@ local function Color(btn, force)
     local icon = btn.icon or btn.Icon
     local action = btn.action
     if not icon or not action then return end
-    local ok, state = pcall(State, cfg, action)
-    if not ok or not state then return end
+    -- the APIs are feature-detected above, so no pcall: this runs for every button several times a second
+    local state = State(cfg, action)
+    if not state then return end
     if force or btn.mlzState ~= state then
         local c = COLORS[state]
         icon:SetVertexColor(c[1], c[2], c[3])
@@ -234,9 +235,13 @@ local function HookGlobals()
 end
 
 local buttons
-local function Tick()
+local UnitExists = UnitExists
+-- Usable and mana come from Blizzard's UpdateUsable hook. Only range changes without an event, and
+-- range only exists with a target, so the poll does nothing without one (all = run once anyway).
+local function Tick(all)
     local cfg = Cfg()
-    if not cfg or not (cfg.range or cfg.mana or cfg.unusable) then return end
+    if not cfg or not buttons or not (cfg.range or cfg.mana or cfg.unusable) then return end
+    if all ~= true and not (cfg.range and UnitExists("target")) then return end
     for i = 1, #buttons do
         local b = buttons[i]
         if not b.mlzNoColor and b:IsVisible() then Color(b) end
@@ -265,8 +270,11 @@ function AB:Refresh()
         wipe(colored)
     end
     if not ticker then ticker = C_Timer.NewTicker(0.2, Tick) end
-    Tick()
+    Tick(true)
 end
+
+-- A new or no target changes every button's range at once (red must go away when the target does)
+ns.TryOn("PLAYER_TARGET_CHANGED", function() Tick(true) end)
 
 ------------------------------------------------------------------------
 -- Module interface

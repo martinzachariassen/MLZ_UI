@@ -53,6 +53,15 @@ local function TargetAlpha(row, hovered, inCombat, hasTarget)
     return 1
 end
 
+-- The hover check (IsMouseOver on every frame) only runs when hovering can change the result:
+-- hideInCombat out of combat and group rows in a group are fully visible anyway.
+local function HoverMatters(row, inCombat)
+    if row.mode == "hideInCombat" then return inCombat end
+    if row.mode == "group" then return not IsInGroup() end
+    return true
+end
+
+local abs, min, max = math.abs, math.min, math.max
 local ticker
 
 local function Update()
@@ -69,18 +78,22 @@ local function Update()
         if db[row.id] then
             local frames = Frames(row)
             local hovered = false
-            for _, f in ipairs(frames) do
-                if f:IsVisible() and f:IsMouseOver() then hovered = true break end
+            if not editMode and HoverMatters(row, inCombat) then
+                for i = 1, #frames do
+                    local f = frames[i]
+                    if f:IsVisible() and f:IsMouseOver() then hovered = true break end
+                end
             end
             local target = editMode and 1 or TargetAlpha(row, hovered, inCombat, hasTarget)
-            for _, f in ipairs(frames) do
+            for i = 1, #frames do
+                local f = frames[i]
                 local want = (hidden[f] and not editMode) and 0 or target
                 local cur = f:GetAlpha()
-                if math.abs(cur - want) > 0.01 then
+                if abs(cur - want) > 0.01 then
                     if touched[f] == nil then touched[f] = cur end
                     -- smooth transition: takes a few tenths of a second
                     local step = (want > cur) and 0.34 or 0.2
-                    f:SetAlpha(cur + math.max(-step, math.min(step, want - cur)))
+                    f:SetAlpha(cur + max(-step, min(step, want - cur)))
                 end
             end
         end

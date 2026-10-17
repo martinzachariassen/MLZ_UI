@@ -110,7 +110,17 @@ local function PowerKind()
     if t == RAGE and ns.PlayerClass() == "DRUID" then return "mana", true end
 end
 
-local function OnUpdate(self)
+-- The power type only changes with a form or display power event; UpdateShown reads it then
+local curKind, curShifted
+
+-- About 30 updates a second is smooth for a 2-second tick and much cheaper than every frame
+local UPDATE_EVERY = 1 / 30
+local sinceUpdate = 0
+
+local function OnUpdate(self, elapsed)
+    sinceUpdate = sinceUpdate + (elapsed or 0)
+    if sinceUpdate < UPDATE_EVERY then return end
+    sinceUpdate = 0
     local now = GetTime()
     if testing then
         self.text:Hide()
@@ -121,7 +131,7 @@ local function OnUpdate(self)
         self.spark:SetPoint("CENTER", self, "LEFT", self:GetValue() * self:GetWidth(), 0)
         return
     end
-    local kind, shifted = PowerKind()
+    local kind, shifted = curKind, curShifted
     local value, color
     if shifted then
         local cur, max = UnitPower("player", MANA), UnitPowerMax("player", MANA)
@@ -153,8 +163,9 @@ end
 local function UpdateShown()
     if not bar then return end
     local cfg = Cfg()
+    curKind, curShifted = PowerKind()
     if testing then bar:Show() return end
-    local kind = cfg.enabled and PowerKind()
+    local kind = cfg.enabled and curKind
     local show = false
     if kind == "mana" and not cfg.noMana then
         show = not Full(MANA) or InCombatLockdown()
@@ -165,11 +176,15 @@ local function UpdateShown()
     bar:SetShown(show)
 end
 
+local TRACKED = { mana = { MANA, "MANA" }, energy = { ENERGY, "ENERGY" } }
+
 local function OnPower(_, unit, powerToken)
     if unit ~= "player" then return end
+    if powerToken and powerToken ~= "MANA" and powerToken ~= "ENERGY" then return end -- rage, combo points
     local now = GetTime()
-    for kind, id in pairs({ mana = MANA, energy = ENERGY }) do
-        if not powerToken or powerToken == (kind == "mana" and "MANA" or "ENERGY") then
+    for kind, t in pairs(TRACKED) do
+        local id = t[1]
+        if not powerToken or powerToken == t[2] then
             local p = Num(UnitPower("player", id))
             local old = lastPower[kind]
             if p and old then
@@ -198,8 +213,8 @@ local registered = false
 local function Register()
     if registered then return end
     registered = true
-    ns.TryOn("UNIT_POWER_FREQUENT", OnPower)
-    ns.TryOn("UNIT_POWER_UPDATE", OnPower)
+    -- one of the two is enough: the frequent one when the client has it
+    if not ns.TryOn("UNIT_POWER_FREQUENT", OnPower) then ns.TryOn("UNIT_POWER_UPDATE", OnPower) end
     ns.TryOn("UNIT_DISPLAYPOWER", function(_, unit) if unit == "player" then UpdateShown() end end)
     ns.TryOn("UPDATE_SHAPESHIFT_FORM", UpdateShown)
     ns.TryOn("PLAYER_REGEN_DISABLED", UpdateShown)
