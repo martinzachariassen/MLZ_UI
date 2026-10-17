@@ -372,7 +372,7 @@ function S.NextSteps()
         Add("Nameplates: " .. tostring(NP.NotReady()) .. ".", "Open", function() S:Select("nameplates") end)
     end
     if R and ns.db.installed and not (R.Get("buffs") or R.Get("reagents")) then
-        Add("Reminders for missing buffs and low reagents are off. They are made for your class.", "Open", function() S:Select("qol") end)
+        Add("Reminders for missing buffs and low reagents are off. They are made for your class.", "Open", function() S:Select("reminders") end)
     end
     if ns.db.installed and not ns.db.tourSeen and ns.Tour and ns.Tour.HasSteps() then
         local button, fn = TipAction("tour")
@@ -969,8 +969,8 @@ PAGES[#PAGES + 1] = { key = "overview", title = "Overview", icon = "Interface\\I
 end }
 
 PAGES[#PAGES + 1] = { key = "layout", title = "Layout & scale", icon = "Interface\\Icons\\INV_Misc_Map_01", build = function(p)
-    local sc, lay, tw = M("scale"), M("layout"), M("tweaks")
-    p:Title("Layout & scale", "How big the UI is and where everything sits.")
+    local sc, lay = M("scale"), M("layout")
+    p:Title("Layout & scale", "How big the UI is and where everything sits. The minimap size is under Bars & interface.")
 
     p:Card("UI scale", "The mode is saved, not the number, so the scale is recalculated if you change resolution.")
     -- the numbers depend on the screen size, so the labels are rebuilt on every refresh
@@ -1005,27 +1005,6 @@ PAGES[#PAGES + 1] = { key = "layout", title = "Layout & scale", icon = "Interfac
           tip = "Move and resize frames yourself. Remember to save in Edit Mode." },
         { text = "Re-apply layout...", width = 160, fn = function() OpenWizard("layout") end, avail = NoEditMode,
           tip = "Opens the setup wizard at the layout step, so you can see what will change before applying." },
-    })
-
-    -- Edit Mode can't be saved in combat: SaveMap keeps the size and saves it when combat ends
-    local function SaveMap(v, what)
-        local ok, err = tw.SaveMap(v, true)
-        if InCombatLockdown() then
-            S:Notify("In combat: the minimap size is saved when combat ends.", "warn")
-            return
-        end
-        S:Notify(ok and (what .. ": " .. v .. "%") or ("Minimap not saved in the layout: " .. tostring(err)), ok and "good" or "warn")
-    end
-    p:Card("Minimap")
-    p:Slider("Minimap size", "Drag to preview. Saved in the Edit Mode layout when you let go.",
-        tw.MAP_MIN, tw.MAP_MAX, tw.MAP_STEP, "%d%%",
-        function() return tw.MapSize() end,
-        function(v) tw.PreviewMap(v) end,
-        function(v) SaveMap(v, "Minimap size saved") end,
-        { avail = function() if not EditModeAvailable() then return "Needs Edit Mode" end end })
-    p:Buttons({
-        { text = "Reset to " .. tw.MAP_DEFAULT .. "%", width = 140, fn = function() SaveMap(tw.MAP_DEFAULT, "Minimap size reset to") end,
-          avail = NoEditMode, tip = "Puts the minimap back to the size MLZ UI uses and saves it in the layout." },
     })
 
     -- Hunters and warlocks only: other classes have no pet bar to place
@@ -1067,7 +1046,11 @@ PAGES[#PAGES + 1] = { key = "nameplates", title = "Nameplates", icon = "Interfac
         if NP.LastError() then return "warn", "Check" end
         return "on", "Working"
     end, { tip = function() return NP.LastError() end, descLines = 2 })
-    p:Value("Mode on your nameplates", function()
+
+    p:Card("Mode", "Auto: Tank while you tank (Defensive Stance or Bear Form with tank talents, or the group's tank). "
+        .. "Healer or DPS in a group, depending on your role. Solo when you are not in a group.")
+    p:Choice("Mode", "Picking a mode turns Auto off.", NP_OPTIONS, GetNPChoice, SetNPChoice, 62, { avail = NPNotReady })
+    p:Value("Active mode", function()
         if NP.Auto() then return "Picked automatically: " .. (NP.Reason() or "-") .. "." end
         local m, why = NP.Suggested()
         return "Chosen by you. Auto would pick " .. (MODE_TEXT[m] or "?") .. " (" .. (why or "-") .. ")."
@@ -1076,10 +1059,6 @@ PAGES[#PAGES + 1] = { key = "nameplates", title = "Nameplates", icon = "Interfac
         if not m then return C.grey .. (InCombatLockdown() and "waiting for combat to end" or "not applied yet") .. C.r end
         return MODE_TEXT[m] .. ((NP.PvP() and NP.InPvP()) and "  + PvP" or "")
     end, { avail = NPNotReady, width = 180, descLines = 2 })
-
-    p:Card("Mode", "Auto: Tank while you tank (Defensive Stance or Bear Form with tank talents, or the group's tank). "
-        .. "Healer or DPS in a group, depending on your role. Solo when you are not in a group.")
-    p:Choice("Mode", "Picking a mode turns Auto off.", NP_OPTIONS, GetNPChoice, SetNPChoice, 62, { avail = NPNotReady })
     p:Text(C.white .. "Tank" .. C.r .. ": every mob fully visible, your target a bit bigger.\n"
         .. C.white .. "Healer" .. C.r .. ": enemies dimmed to 60% so your eyes stay on the raid frames.\n"
         .. C.white .. "DPS" .. C.r .. ": mobs you don't target are faded a little.\n"
@@ -1202,23 +1181,9 @@ PAGES[#PAGES + 1] = { key = "fade", title = "Minimalism", icon = "Interface\\Ico
     local fade = M("fade")
     p:Title("Minimalism", "Hide what you rarely need. Faded frames come back on mouseover, and everything shows while Edit Mode is open.")
 
-    p:Card("Pause")
+    p:Card("Hide until needed", "Keybinds keep working when a bar is invisible. Show me around (on About & help) points them out.")
     p:Toggle("Pause all fading", "Shows everything again until you turn this off or reload.",
         function() return ns.fadePaused end, function(on) fade:SetPaused(on) end)
-    p:Buttons({
-        { text = "Show me around", width = 150, fn = function()
-            if InCombatLockdown() then
-                S:Notify("The tour can't run in combat. Try again after combat.", "warn")
-                return
-            end
-            S.frame:Hide()
-            ns.Tour.Start()
-        end, avail = function()
-            if not (ns.Tour and ns.Tour.HasSteps()) then return "Nothing is hidden right now" end
-        end, tip = "Draws a box around each hidden frame and says how to bring it back." },
-    })
-
-    p:Card("Hide until needed", "Keybinds keep working when a bar is invisible.")
     local missing = {}
     for _, row in ipairs(ns.data.fade) do
         if fade:Exists(row) then
@@ -1233,31 +1198,70 @@ PAGES[#PAGES + 1] = { key = "fade", title = "Minimalism", icon = "Interface\\Ico
     if #missing > 0 then
         p:Text(#missing .. " more are not shown because those frames do not exist in this client: " .. table.concat(missing, ", ") .. ".")
     end
-
-    p:Card("Chat")
-    p:Toggle("Clean chat", ("Chat lines fade after %ds (scroll or hover to see them again). Tabs and background only show on mouseover."):format(ns.data.chat.fadeAfter),
-        function() return ns.db.chatTweaks end, function(on) fade:SetChat(on) end)
 end }
 
-PAGES[#PAGES + 1] = { key = "buttons", title = "Action bars & interface", icon = "Interface\\Icons\\Ability_DualWield", build = function(p)
-    local ab, tw = M("actionbuttons"), M("tweaks")
-    p:Title("Action bars & interface", "See at a glance why a button doesn't work, plus small tweaks that declutter the screen.")
+PAGES[#PAGES + 1] = { key = "buttons", title = "Bars & interface", icon = "Interface\\Icons\\Ability_DualWield", build = function(p)
+    local ab, tw, fade = M("actionbuttons"), M("tweaks"), M("fade")
+    p:Title("Bars & interface", "See at a glance why a button doesn't work, plus small tweaks that declutter the screen.")
 
     p:Card("Action buttons", C.red .. "Red" .. C.r .. " = out of range, " .. C.blue .. "blue" .. C.r .. " = not enough mana, dark grey = can't be used right now.")
     for _, o in ipairs(ab.options) do
         p:Toggle(o.label, o.desc, function() return ab:IsOn(o.id) end, function(on) ab:Set(o.id, on) end)
     end
 
-    local last
-    for _, o in ipairs(tw.options) do
-        local group = o.group or "Quest tracker"
-        if group ~= last then
-            p:Card(group)
-            last = group
+    -- the tweaks of one group, in the order Tweaks lists them
+    local function Tweaks(group)
+        for _, o in ipairs(tw.options) do
+            if (o.group or "Quest tracker") == group then
+                p:Toggle(o.label, o.desc, function() return tw:IsOn(o.id) end, function(on) tw:Set(o.id, on) end,
+                    o.avail and { avail = o.avail } or nil)
+            end
         end
-        p:Toggle(o.label, o.desc, function() return tw:IsOn(o.id) end, function(on) tw:Set(o.id, on) end,
-            o.avail and { avail = o.avail } or nil)
     end
+
+    p:Card("Quest tracker")
+    Tweaks("Quest tracker")
+
+    p:Card("Tooltips")
+    Tweaks("Tooltips")
+
+    p:Card("Chat")
+    p:Toggle("Clean chat", ("Chat lines fade after %ds (scroll or hover to see them again). Tabs and background only show on mouseover."):format(ns.data.chat.fadeAfter),
+        function() return ns.db.chatTweaks end, function(on) fade:SetChat(on) end)
+    Tweaks("Chat")
+
+    -- Edit Mode can't be saved in combat: SaveMap keeps the size and saves it when combat ends
+    local function SaveMap(v, what)
+        local ok, err = tw.SaveMap(v, true)
+        if InCombatLockdown() then
+            S:Notify("In combat: the minimap size is saved when combat ends.", "warn")
+            return
+        end
+        S:Notify(ok and (what .. ": " .. v .. "%") or ("Minimap not saved in the layout: " .. tostring(err)), ok and "good" or "warn")
+    end
+    local function NoEditMode() if not EditModeAvailable() then return "Needs Edit Mode" end end
+    p:Card("Minimap")
+    p:Slider("Minimap size", "Drag to preview. Saved in the Edit Mode layout when you let go.",
+        tw.MAP_MIN, tw.MAP_MAX, tw.MAP_STEP, "%d%%",
+        function() return tw.MapSize() end,
+        function(v) tw.PreviewMap(v) end,
+        function(v) SaveMap(v, "Minimap size saved") end,
+        { avail = NoEditMode })
+    Tweaks("Minimap")
+    p:Toggle("Show the minimap button", "Left-click opens this window, right-click opens a quick menu, SHIFT-click reloads when a reload is needed. Drag it to move it around the minimap.",
+        function() return not (ns.db.minimap and ns.db.minimap.hide) end,
+        function(on)
+            if not ns.MinimapButton then return end
+            ns.MinimapButton:SetHidden(not on)
+            if not on then S:Notify("Type /mlz to open this window again.", "info") end
+        end)
+    p:Buttons({
+        { text = "Reset to " .. tw.MAP_DEFAULT .. "%", width = 140, fn = function() SaveMap(tw.MAP_DEFAULT, "Minimap size reset to") end,
+          avail = NoEditMode, tip = "Puts the minimap back to the size MLZ UI uses and saves it in the layout." },
+    })
+
+    p:Card("Info")
+    Tweaks("Info")
 end }
 
 PAGES[#PAGES + 1] = { key = "qol", title = "Helpers", icon = "Interface\\Icons\\INV_Misc_Coin_01", build = function(p)
@@ -1309,9 +1313,30 @@ PAGES[#PAGES + 1] = { key = "qol", title = "Helpers", icon = "Interface\\Icons\\
     p:Choice("Announce my interrupts", "\"Interrupted <mob>'s <spell>\" when you or your pet interrupt a cast. Say and Group only post while you are in a group.",
         IA.CHANNELS, IA.Get, IA.Set, 62)
 
-    local R, X = ns.Reminders, ns.XPRate
-    if R then
-    p:Card("Reminders", "Small icons below the middle of the screen, out of combat only. They go away once it is fixed.")
+    local X = ns.XPRate
+    if X then
+    p:Card("Leveling", "Counted since you logged in or reloaded. Also on the overview and with /mlz xp.")
+    p:Value("XP per hour", function() return X.Text() or "You are at max level." end,
+        function() return X.Badge() or (C.grey .. (X.Stats() and "counting" or "max level") .. C.r) end, { width = 120, descLines = 2 })
+    p:Buttons({
+        { text = "Start counting again", width = 170, style = "subtle", fn = function()
+            X.Reset()
+            ns.FireState()
+            S:Notify("XP per hour counts from now.", "info")
+        end, tip = "Clears the XP counted so far, for example after a break." },
+    })
+    end
+end }
+
+PAGES[#PAGES + 1] = { key = "reminders", title = "Reminders", icon = "Interface\\Icons\\INV_Misc_PocketWatch_01", build = function(p)
+    local R = ns.Reminders
+    p:Title("Reminders", "Small icons below the middle of the screen, out of combat only. They go away once it is fixed.")
+    if not R then
+        p:Card("Not available")
+        p:Text(C.amber .. "Reminders could not load in this client." .. C.r)
+        return
+    end
+    p:Card("What to check")
     p:Toggle("Missing self buffs", "Inner Fire, Arcane Intellect, aspects, poisons, weapon imbues and similar. "
         .. "Not shown in cities and inns.",
         function() return R.Get("buffs") end, function(on) R.Set("buffs", on) end)
@@ -1351,20 +1376,6 @@ PAGES[#PAGES + 1] = { key = "qol", title = "Helpers", icon = "Interface\\Icons\\
                     if not R.Get(master) then return "Needs the switch above" end
                 end })
         end
-    end
-    end
-
-    if X then
-    p:Card("Leveling", "Counted since you logged in or reloaded. Also on the overview and with /mlz xp.")
-    p:Value("XP per hour", function() return X.Text() or "You are at max level." end,
-        function() return X.Badge() or (C.grey .. (X.Stats() and "counting" or "max level") .. C.r) end, { width = 120, descLines = 2 })
-    p:Buttons({
-        { text = "Start counting again", width = 170, style = "subtle", fn = function()
-            X.Reset()
-            ns.FireState()
-            S:Notify("XP per hour counts from now.", "info")
-        end, tip = "Clears the XP counted so far, for example after a break." },
-    })
     end
 end }
 
@@ -1419,6 +1430,10 @@ PAGES[#PAGES + 1] = { key = "addons", title = "Other addons", icon = "Interface\
         .. "is installed but switched off. Nothing is printed in chat.",
         function() return ns.db.healthWarn ~= false end, function(on) ns.db.healthWarn = on and true or false; ns.FireState() end,
         { tip = "Turn this off if you switch some of these addons off on purpose." })
+    p:Buttons({
+        { text = "List addon problems", width = 170, fn = function() ns.RunCommand("health") end,
+          tip = "Prints supported addons that are switched off or not installed, in chat." },
+    })
 end }
 
 -- "2026-10-13 14:02:11" -> "Today 14:02", "Yesterday 09:15" or "2026-10-01 18:40"
@@ -1542,14 +1557,18 @@ PAGES[#PAGES + 1] = { key = "about", title = "About & help", icon = "Interface\\
     p:Text("The " .. C.white .. "setup wizard" .. C.r .. " is for the first install and for re-applying the whole setup with a backup. "
         .. "This window is for everyday changes. Everything here applies at once, and hovering a setting tells you more.")
 
-    p:Card("Minimap button")
-    p:Toggle("Show the minimap button", "Left-click opens this window, right-click opens a quick menu, SHIFT-click reloads when a reload is needed. Drag it to move it around the minimap.",
-        function() return not (ns.db.minimap and ns.db.minimap.hide) end,
-        function(on)
-            if not ns.MinimapButton then return end
-            ns.MinimapButton:SetHidden(not on)
-            if not on then S:Notify("Type /mlz to open this window again.", "info") end
-        end)
+    p:Buttons({
+        { text = "Show me around", width = 150, fn = function()
+            if InCombatLockdown() then
+                S:Notify("The tour can't run in combat. Try again after combat.", "warn")
+                return
+            end
+            S.frame:Hide()
+            ns.Tour.Start()
+        end, avail = function()
+            if not (ns.Tour and ns.Tour.HasSteps()) then return "Nothing is hidden right now" end
+        end, tip = "Draws a box around each hidden frame and says how to bring it back." },
+    })
 
     p:Card("Chat commands")
     p:Text(C.white .. "/mlz" .. C.r .. "   opens or closes this window\n"
@@ -1569,10 +1588,21 @@ PAGES[#PAGES + 1] = { key = "about", title = "About & help", icon = "Interface\\
     p:Buttons({
         { text = "Collect client info", width = 170, fn = function() ns.RunCommand("probe") end,
           tip = "Writes facts about your game client to MLZ UI's saved data after the next reload. Useful for bug reports." },
-        { text = "List addon problems", width = 170, fn = function() ns.RunCommand("health") end,
-          tip = "Prints supported addons that are switched off or not installed, in chat." },
     })
 end }
+
+-- Sidebar order, independent of where each page is defined above. Pages not listed go last.
+local PAGE_ORDER = { "overview", "healer", "layout", "nameplates", "fade", "buttons", "qol", "reminders",
+    "addons", "profiles", "about" }
+do
+    local rank = {}
+    for i, key in ipairs(PAGE_ORDER) do rank[key] = i end
+    for i, page in ipairs(PAGES) do page.defined = i end
+    table.sort(PAGES, function(a, b)
+        local ra, rb = rank[a.key] or (100 + a.defined), rank[b.key] or (100 + b.defined)
+        return ra < rb
+    end)
+end
 
 ------------------------------------------------------------------------
 -- Window

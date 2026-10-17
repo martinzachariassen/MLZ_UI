@@ -62,7 +62,7 @@ function Role:Preview()
             keepVisible = true,
             note = "Tank, healer and DPS get different nameplates, role layouts and a few game settings. "
                 .. "Auto reads your talents, form and group role. Pick a role if the detected one is wrong. "
-                .. "Click the value to change it. You can change this later in /mlz.",
+                .. "Click the value to change it (right-click goes back). You can change this later in /mlz.",
         },
     }
 end

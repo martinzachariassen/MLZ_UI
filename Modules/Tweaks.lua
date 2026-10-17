@@ -17,7 +17,7 @@ local OPTIONS = {
       desc = "No tracked quests on screen. The quest log and the quest markers on the map work as before." },
     { id = "fps", label = "FPS counter in the bottom-right corner", group = "Info",
       desc = "Small text with frame rate and ping. Green is smooth, amber and red are slow. Clicks pass through it." },
-    { id = "cleanCombatFont", label = "Clean combat text font", group = "Combat text",
+    { id = "cleanCombatFont", label = "Clean combat text font", group = "Info",
       desc = "Uses Roboto Bold for floating damage and healing numbers." },
     { id = "tooltipClass", label = "Class colors in unit tooltips", group = "Tooltips",
       desc = "Player names in the mouseover tooltip use their class color, so you see the class at a glance." },
@@ -25,12 +25,12 @@ local OPTIONS = {
       desc = 'Adds a "Target:" line to the mouseover tooltip. Shows "you" in amber when it targets you.' },
     { id = "chatClassNames", label = "Class colors on names in chat", group = "Chat",
       desc = "Player names in say, party, raid, guild, whispers and channels use their class color." },
-    { id = "squareMinimap", label = "Square minimap with a thin border", group = "Style", default = false,
-      desc = "A square map with a 1px border instead of the round ring. Minimap rotation stays off while it is square." },
-    { id = "flatChatInput", label = "Flat chat input box", group = "Style",
+    { id = "flatChatInput", label = "Flat chat input box", group = "Chat",
       desc = "The box you type chat in gets a dark flat background and a thin border instead of the textured frame." },
-    { id = "chatFont", label = "Roboto font in chat", group = "Style", default = false,
+    { id = "chatFont", label = "Roboto font in chat", group = "Chat", default = false,
       desc = "Chat text uses Roboto Bold, the font of the MLZ UI headings. The size you picked stays the same." },
+    { id = "squareMinimap", label = "Square minimap with a thin border", group = "Minimap", default = false,
+      desc = "A square map with a 1px border instead of the round ring. Minimap rotation stays off while it is square." },
 }
 
 -- Rows that can't be used return the reason (shown in amber in the settings window and the wizard)
@@ -555,7 +555,7 @@ Tweaks.SaveMap = SaveMap
 
 ns.AddCommand("map", "changes the minimap size (opens the settings, or e.g. /mlz map 120)", function(arg)
     local n = tonumber(arg)
-    if n then SaveMap(n) elseif ns.Settings then ns.Settings:Open("layout") end
+    if n then SaveMap(n) elseif ns.Settings then ns.Settings:Open("buttons") end
 end)
 
 ns.AddCommand("quests", "hides/shows the entire quest tracker", function()

@@ -138,6 +138,20 @@ local function SizeText(spec)
     return size and ("  " .. size .. "%") or ""
 end
 
+-- "Bar 1, 2, 3" for the bars shown today, from the proxy settings (nil when the client has none)
+local function ShownBarsText()
+    if not (Settings and Settings.GetValue) then return nil end
+    local shown, any = { 1 }, false
+    for n = 2, 8 do
+        local ok, v = pcall(Settings.GetValue, "PROXY_SHOW_ACTIONBAR_" .. n)
+        if ok and v ~= nil then
+            any = true
+            if v then shown[#shown + 1] = n end
+        end
+    end
+    return any and ("Bar " .. table.concat(shown, ", ")) or nil
+end
+
 ------------------------------------------------------------------------
 -- Module interface
 ------------------------------------------------------------------------
@@ -169,8 +183,10 @@ function Layout:Preview()
     }
     items[#items + 1] = {
         id = "__bars", label = "Show action bars", group = "Setup",
-        old = "", new = "Bar " .. table.concat(data.showBars, ", "), enabled = ns.Enabled("layout", "__bars", fresh),
+        old = ShownBarsText() or "", new = "Bar " .. table.concat(data.showBars, ", "),
+        enabled = ns.Enabled("layout", "__bars", fresh),
     }
+    items[#items].alreadySet = items[#items].old == items[#items].new
     if data.healer then
         local names = table.concat(self:VariantNames(), ", ")
         items[#items + 1] = {
@@ -188,6 +204,9 @@ function Layout:Preview()
                   or (AnchorText({ point = spec.point, relativeTo = spec.relTo, offsetX = spec.x, offsetY = spec.y }) .. SizeText(spec)),
             enabled = sys ~= nil and ns.Enabled("layout", "frame" .. i, fresh),
         }
+        if i == 1 and inUse then
+            item.groupNote = "Unticked because you already use this layout, so your own Edit Mode changes stay. Tick a frame to move it back."
+        end
         local own = spec.anchorOverride and ns.db.overrides and ns.db.overrides[spec.anchorOverride]
         if own then item.new = AnchorText(own) .. SizeText(spec) .. "  (your saved position)" end
         if not sys then

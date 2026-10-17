@@ -2,7 +2,7 @@
 -- A small row of icons below the middle of the screen, out of combat only: self buffs you forgot
 -- (Inner Fire, aspects, poisons, ...), reagents and ammo that run low, and worn-out gear.
 -- Buffs are not nagged about while resting (cities, inns); reagents are, since that is where you buy them.
--- Worn gear also gets one chat line when it drops below the limit. Settings: /mlz > Helpers.
+-- Worn gear also gets one chat line when it drops below the limit. Settings: /mlz > Reminders.
 -- What is checked lives in Data/Reminders.lua.
 
 local _, ns = ...

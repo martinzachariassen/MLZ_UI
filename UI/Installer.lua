@@ -28,24 +28,23 @@ ns.Installer = Installer
 -- Same order as the backup module uses (undo runs it in reverse)
 local APPLY_ORDER = ns.Backup.APPLY_ORDER
 
--- Module pages are numbered automatically ("3. Game settings", "Step 3 of 9"). Titles match the control center.
+-- Module pages are numbered automatically ("3. Game settings", "Step 3 of 8"). Titles match the control center.
+-- A page can hold several modules (keys): their rows are drawn one after the other, and "Use this step"
+-- turns all of them on or off. Modules, their saved choices and backups don't know about pages.
+-- groups = heading for a module whose rows have no group of their own.
 local PAGES = {
     { kind = "intro", title = "Welcome to MLZ UI" },
     { kind = "module", key = "role", title = "Your character" },
-    { kind = "module", key = "scale", title = "UI scale",
-      text = "Sets the UI scale so edges are crisp and everything is the same size regardless of resolution. The scale is recalculated automatically if you change resolution." },
-    { kind = "module", key = "layout", title = "Screen layout",
-      text = "Makes an Edit Mode layout of its own with bars at bottom center, player/target on the sides, chat at bottom left and minimap/buffs at top right. You can fine-tune everything in Edit Mode afterwards." },
+    { kind = "module", keys = { "scale", "layout" }, title = "Scale & layout", groups = { scale = "Scale" },
+      text = "A crisp UI scale for your screen, and an Edit Mode layout of its own: bars at bottom center, player and target on the sides, chat at bottom left, minimap and buffs at top right. Fine-tune it in Edit Mode afterwards." },
     { kind = "module", key = "settings", title = "Game settings",
       text = "Good default settings. Rows marked (already) have the right value. Hover over a row for an explanation." },
     { kind = "module", key = "bindings", title = "Keybinds",
       text = "The same 12 keys on three layers: no modifier = Bar 1, " .. C.white .. "SHIFT" .. C.r .. " = Bar 2, " .. C.white .. "CTRL" .. C.r .. " = Bar 3. " .. C.red .. "Red" .. C.r .. " = the key does something else today. Panels you lose a key for move to " .. C.white .. "ALT" .. C.r .. "." },
     { kind = "module", key = "fade", title = "Minimalism",
-      text = "Things you rarely use stay invisible until you hover over them, and things you only need in combat are dimmed otherwise. Untick a row that is on to turn it off." },
-    { kind = "module", key = "actionbuttons", title = "Action buttons",
-      text = "See at a glance why a button isn't working: " .. C.red .. "red" .. C.r .. " = out of range, " .. C.blue .. "blue" .. C.r .. " = low mana, dark grey = can't be used right now. Short hotkeys and no macro names make for cleaner bars." },
-    { kind = "module", key = "tweaks", title = "Interface tweaks",
-      text = "Smaller things that declutter the screen: the minimap, chat, tooltips and the quest tracker." },
+      text = "Things you rarely use stay invisible until you hover over them, and things you only need in combat are dimmed otherwise. Rows that are already on are folded away at the bottom: show them to turn one off." },
+    { kind = "module", keys = { "actionbuttons", "tweaks" }, title = "Bars & interface",
+      text = "See at a glance why a button isn't working: " .. C.red .. "red" .. C.r .. " = out of range, " .. C.blue .. "blue" .. C.r .. " = low mana, dark grey = can't be used right now. Plus smaller things that declutter the quest tracker, tooltips, chat and minimap." },
     { kind = "module", key = "addons", title = "Other addons",
       text = "Settings for supported addons that are installed and loaded; the rest are skipped. Some addons only pick up the changes after a reload; the last page tells you if that is the case." },
     { kind = "module", key = "nameplates", title = "Nameplates",
@@ -54,17 +53,21 @@ local PAGES = {
     { kind = "done", title = "All set" },
 }
 
--- Number of each module page, and how many there are
+-- Number of each module page, how many there are, and which page each module is on
 local NUM_STEPS = 0
-for _, page in ipairs(PAGES) do
+local PAGE_OF = {}
+for i, page in ipairs(PAGES) do
     if page.kind == "module" then
+        page.keys = page.keys or { page.key }
+        page.key = page.key or page.keys[1] -- the page's name for PAGE_TEXT and showAlready
         NUM_STEPS = NUM_STEPS + 1
         page.number = NUM_STEPS
+        for _, key in ipairs(page.keys) do PAGE_OF[key] = i end
     end
 end
 
 -- Shown once, under the list, on every step
-local LEGEND = "Ticked = included     " .. C.green .. "Green" .. C.r .. " = will change     " .. C.red .. "Red" .. C.r
+local LEGEND = C.blue .. "Blue" .. C.r .. " = click to change     " .. C.green .. "Green" .. C.r .. " = will change     " .. C.red .. "Red" .. C.r
     .. " = replaces what you use today     " .. C.amber .. "Amber" .. C.r .. " = changes how the game plays"
 
 -- Text under the title of some steps depends on your class and role
@@ -75,7 +78,14 @@ local PAGE_TEXT = {
         return ("MLZ UI adapts to how you play. For your %s it sees %s%s%s (%s). Tank, healer and DPS get different nameplates, role layouts and a few game settings. Change the role below if that is wrong."):format(
             class, C.white, ns.ArchetypeText(arch), C.r, ns.SOURCE_TEXT[source] or tostring(source))
     end,
-    layout = function(base)
+    scale = function(base)
+        -- a role picked in step 1 is not saved yet, so name it instead of the layout for today's role
+        local role = ns.modules.role
+        local picked = role and role.pending
+        if picked and Installer.stepOn and Installer.stepOn.role and picked ~= "auto" and picked ~= ns.GetRoleForce() then
+            return base .. "\n" .. C.grey .. "Role layouts switch by themselves. They follow the role you picked in step 1 ("
+                .. (ns.ROLE_TEXT[picked] or picked) .. ")." .. C.r
+        end
         local want = ns.Healer and ns.Healer.Wanted and ns.Healer.Wanted()
         if not want then return base end
         return base .. "\n" .. C.grey .. "Role layouts switch by themselves. With your current role: " .. want .. "." .. C.r
@@ -183,12 +193,15 @@ function Installer:Build()
 
     f.stepCheck = W.Toggle(f, function(_, on)
         local page = PAGES[self.page]
-        if page.key then
-            self.stepOn[page.key] = on
-            self:RefreshDependents(page.key)
-            self:UpdateSelButtons()
-            self:RenderList()
+        if not page.keys then return end
+        for _, key in ipairs(page.keys) do
+            if ns.modules[key] then
+                self.stepOn[key] = on
+                self:RefreshDependents(key)
+            end
         end
+        self:UpdateSelButtons()
+        self:RenderList()
     end, "Use this step")
     f.stepCheck:SetPoint("TOPLEFT", f.desc, "BOTTOMLEFT", 0, -10)
 
@@ -264,20 +277,12 @@ function Installer:Build()
     f.back:SetPoint("BOTTOMLEFT", PAD, FOOT_Y)
     f.next = W.Button(f, "Next", 150, 28, function() self:Next() end, "primary")
     f.next:SetPoint("BOTTOMRIGHT", -PAD, FOOT_Y)
-    f.skip = W.Button(f, "Skip this step", 130, 28, function()
-        local page = PAGES[self.page]
-        if page.key then
-            self.stepOn[page.key] = false
-            self:RefreshDependents(page.key)
-        end
-        self:Go(self.page + 1)
-    end, "subtle")
-    f.skip:SetPoint("RIGHT", f.next, "LEFT", -8, 0)
+    -- No "Skip" button: "Use this step" off plus Next does the same, and says what it does.
     -- Welcome page: take the suggestions as they are and go straight to the review
     f.quick = W.Button(f, "Use recommended", 150, 28, function() self:ApplyPreset("recommended") end)
     f.quick:SetPoint("RIGHT", f.next, "LEFT", -8, 0)
     f.quick.tipText = "Takes every suggestion as it is and shows the review. Nothing changes until you press Apply changes there."
-    f.looks = W.Button(f, "Looks only", 120, 28, function() self:ApplyPreset("looks") end)
+    f.looks = W.Button(f, "Looks only", 120, 28, function() self:ApplyPreset("looks") end, "subtle")
     f.looks:SetPoint("RIGHT", f.quick, "LEFT", -8, 0)
     f.looks.tipText = "Layout, scale, minimalism and nameplates only. Game settings, keybinds and other addons are left alone. Nothing changes until you press Apply changes."
 
@@ -362,6 +367,14 @@ function Installer:WillChange(modKey, item)
     return item.enabled and not item.alreadySet and true or false
 end
 
+-- Folded away under "N settings are already right": a value that already matches, or a feature that is
+-- already on and stays on. Unticking an on-row (expanded view) makes it a change, so it shows again.
+local function IsAlreadyRight(item)
+    if item.fixed or item.touched or item.keepVisible or item.unavailable then return false end
+    if item.toggle then return (item.isOn and item.enabled) and true or false end
+    return item.alreadySet and true or false
+end
+
 ------------------------------------------------------------------------
 -- Rows
 ------------------------------------------------------------------------
@@ -427,6 +440,7 @@ local function CreateRow(parent)
     r.newText = W.Text(r.new, "GameFontHighlightSmall")
     r.newText:SetAllPoints()
     r.newText:SetWordWrap(false)
+    r.new:RegisterForClicks("LeftButtonUp", "RightButtonUp") -- right-click steps a choice backwards
     -- Group heading: a bit of air above, a thin line below
     r.groupText = W.Text(r, "MLZUI_FontHead")
     r.groupText:SetTextColor(unpack(W.T.accent))
@@ -544,7 +558,9 @@ function Installer:SetItemRow(r, item, modKey, stepOn, readOnly)
     -- Choice values (< ... >) are clicked separately; other values let the click through to the row
     local canChoose = item.choices and not readOnly and live
     r.new:EnableMouse(canChoose and true or false)
-    r.new:SetScript("OnClick", canChoose and function() self:CycleChoice(modKey, item) end or nil)
+    r.new:SetScript("OnClick", canChoose and function(_, button)
+        self:CycleChoice(modKey, item, button == "RightButton" and -1 or 1)
+    end or nil)
 
     -- No checkbox in the summary, on fixed rows, or on rows that are already right (unless they can be turned off)
     if readOnly or item.fixed or (already and not item.toggle) then
@@ -567,29 +583,40 @@ end
 -- (unticking those would turn the feature off).
 function Installer:SetAll(on)
     local page = PAGES[self.page]
-    local key = page.key
-    if not key or not self.stepOn[key] then return end
-    for _, item in ipairs(self.items[key] or {}) do
-        local eligible = not item.unavailable and not item.fixed and (item.toggle or not item.alreadySet)
-        if eligible then
-            item.enabled = on or (item.toggle and item.isOn) or false
-            ns.SetEnabled(key, item.id, item.enabled)
+    for _, key in ipairs(page.keys or {}) do
+        if self.stepOn[key] then
+            for _, item in ipairs(self.items[key] or {}) do
+                local eligible = not item.unavailable and not item.fixed and (item.toggle or not item.alreadySet)
+                if eligible then
+                    item.enabled = on or (item.toggle and item.isOn) or false
+                    ns.SetEnabled(key, item.id, item.enabled)
+                end
+            end
+            self:RefreshDependents(key)
         end
     end
     self:RenderList()
 end
 
+-- Is any module on this page on? (Opened for one step, only that module is.)
+function Installer:PageOn(page)
+    for _, key in ipairs(page.keys or {}) do
+        if self.stepOn[key] then return true end
+    end
+    return false
+end
+
 -- Tick all / Untick all only make sense while the step is on
 function Installer:UpdateSelButtons()
-    local page = PAGES[self.page]
-    local on = page.key and self.stepOn[page.key] and true or false
+    local on = self:PageOn(PAGES[self.page])
     self.frame.selAll:SetEnabled(on)
     self.frame.selNone:SetEnabled(on)
 end
 
-function Installer:CycleChoice(modKey, item)
+-- dir = 1 for the next value (left-click), -1 for the previous one (right-click)
+function Installer:CycleChoice(modKey, item, dir)
     local n = #item.choices
-    item.choiceIndex = (item.choiceIndex or 1) % n + 1
+    item.choiceIndex = ((item.choiceIndex or 1) - 1 + (dir or 1)) % n + 1
     local choice = item.choices[item.choiceIndex]
     item.value, item.new = choice.value, choice.text
     item.touched = true -- stays in the list even when the new value is what you have today
@@ -654,26 +681,29 @@ function Installer:RenderList()
     end
 
     if page.kind == "module" then
-        local stepOn = self.stepOn[page.key]
+        -- rows from every module on the page; each row remembers its module (requires, toggles and choices are per module)
+        -- Expanded, the rows that are already right stay in their own place, so a group heading never repeats.
+        local expanded = self.showAlready[page.key]
         local shown, unavailable, already = {}, {}, {}
-        for _, item in ipairs(self.items[page.key] or {}) do
-            if item.unavailable and not item.attention then
-                unavailable[#unavailable + 1] = item
-            elseif item.alreadySet and not item.toggle and not item.fixed and not item.touched and not item.keepVisible then
-                already[#already + 1] = item
-            else
-                shown[#shown + 1] = item
+        for _, key in ipairs(page.keys) do
+            for _, item in ipairs(self.items[key] or {}) do
+                local entry = { item = item, key = key, group = item.group or (page.groups and page.groups[key]) }
+                if item.unavailable and not item.attention then
+                    unavailable[#unavailable + 1] = item
+                elseif IsAlreadyRight(item) then
+                    already[#already + 1] = entry
+                    if expanded then shown[#shown + 1] = entry end
+                else
+                    shown[#shown + 1] = entry
+                end
             end
         end
-        local expanded = self.showAlready[page.key]
-        if expanded then
-            for _, item in ipairs(already) do shown[#shown + 1] = item end
-        end
         local lastGroup
-        for _, item in ipairs(shown) do
-            if item.group and item.group ~= lastGroup then
-                Group(item.group)
-                lastGroup = item.group
+        for _, entry in ipairs(shown) do
+            local item = entry.item
+            if entry.group and entry.group ~= lastGroup then
+                Group(entry.group)
+                lastGroup = entry.group
                 if item.groupNote then
                     -- why these settings are here, in one muted line
                     n = n + 1
@@ -682,7 +712,7 @@ function Installer:RenderList()
                     stripe = 0
                 end
             end
-            Item(item, page.key, stepOn, false)
+            Item(item, entry.key, self.stepOn[entry.key], false)
         end
         if #shown == 0 and #unavailable == 0 and #already == 0 then
             n = n + 1
@@ -716,10 +746,16 @@ function Installer:RenderList()
             y = y + ROW_H
         end
     elseif page.kind == "summary" then
+        -- applied in APPLY_ORDER, but listed in the order the player went through the steps
         local sels = self:Selections()
+        table.sort(sels, function(a, b)
+            local pa, pb = PAGE_OF[a.mod.key] or 99, PAGE_OF[b.mod.key] or 99
+            if pa ~= pb then return pa < pb end
+            return a.order < b.order
+        end)
         if #sels == 0 then Group(C.grey .. "Nothing to change." .. C.r, false) end
         for _, sel in ipairs(sels) do
-            Group(("%s  %s(%d %s)%s"):format(self:StepTitle(sel.mod.key) or sel.mod.title, C.grey, sel.count,
+            Group(("%s  %s(%d %s)%s"):format(self:StepTitle(sel.mod.key, true) or sel.mod.title, C.grey, sel.count,
                 sel.count == 1 and "change" or "changes", C.r))
             for _, item in ipairs(sel.items) do
                 -- Fixed rows (the movement choice) only when they differ from today
@@ -746,9 +782,8 @@ function Installer:Go(index)
     -- Progress strip: green = behind you, blue = here, amber = skipped, grey = ahead (all green on Review and Done)
     for _, seg in ipairs(f.progress) do
         local i, c = seg.pageIndex
-        local key = PAGES[i].key
         if i == index then c = W.T.accent
-        elseif not self.singleStep and key and self.stepOn[key] == false and i < index then c = W.T.amber
+        elseif not self.singleStep and not self:PageOn(PAGES[i]) and i < index then c = W.T.amber
         elseif i < index then c = W.T.green
         else c = W.T.off end
         seg.bar:SetColorTexture(unpack(c))
@@ -765,7 +800,7 @@ function Installer:Go(index)
 
     local nothing = false
     if page.kind == "module" then
-        f.stepCheck:SetChecked(self.stepOn[page.key])
+        f.stepCheck:SetChecked(self:PageOn(page))
         self:UpdateSelButtons()
     elseif page.kind == "summary" then
         local t = self:Totals()
@@ -775,6 +810,10 @@ function Installer:Go(index)
             or ("%d change%s in %d step%s%s. They are made when you press %sApply changes%s. A backup is taken first."):format(
                 t.changes, t.changes == 1 and "" or "s", t.steps, t.steps == 1 and "" or "s",
                 t.already > 0 and (", " .. t.already .. " already right") or "", C.white, C.r)
+        if t.skipped > 0 then
+            text = text .. "\n" .. C.grey .. t.skipped .. " step" .. (t.skipped == 1 and " is" or "s are")
+                .. " turned off and left as they are." .. C.r
+        end
         if t.attention > 0 then
             text = text .. "\n" .. C.amber .. t.attention .. " key" .. (t.attention == 1 and "" or "s")
                 .. " will lose their action. See the amber rows." .. C.r
@@ -787,7 +826,7 @@ function Installer:Go(index)
     end
 
     local done = page.kind == "done"
-    f.back:SetShown(not done)
+    f.back:SetShown(not done and page.kind ~= "intro")
     f.settings:SetShown(done)
     f.tour:SetShown(done and self.appliedAny and ns.Tour and ns.Tour.HasSteps() or false)
     f.keys:SetShown(done and self.appliedAny and ns.Keys ~= nil)
@@ -801,7 +840,6 @@ function Installer:Go(index)
         f.keys:SetPoint("BOTTOMLEFT", PAD, f.rowY)
     end
     f.next:SetShown(not done)
-    f.skip:SetShown(page.kind == "module")
     f.quick:SetShown(page.kind == "intro")
     f.looks:SetShown(page.kind == "intro")
     -- also after an undo (appliedAny is false then), since some addon settings only restore on reload
@@ -819,6 +857,8 @@ function Installer:Go(index)
         f.next:SetText(nothing and "Finish" or "Apply changes")
     elseif page.kind == "intro" then
         f.next:SetText("Step by step")
+    elseif page.number == NUM_STEPS or (self.singleStep and page.kind == "module") then
+        f.next:SetText("Review")
     else
         f.next:SetText("Next")
     end
@@ -831,6 +871,11 @@ function Installer:Next()
     local page = PAGES[self.page]
     if page.kind == "summary" then
         self:ApplyAll()
+    elseif self.singleStep and page.kind == "module" then
+        -- opened for one step: the other steps are off, so go straight to the review
+        for i, p in ipairs(PAGES) do
+            if p.kind == "summary" then self:Go(i) return end
+        end
     else
         self:Go(self.page + 1)
     end
@@ -855,17 +900,23 @@ function Installer:Selections()
                     chosen[#chosen + 1] = item
                 end
             end
-            if count > 0 then sels[#sels + 1] = { mod = mod, items = chosen, count = count } end
+            if count > 0 then sels[#sels + 1] = { mod = mod, items = chosen, count = count, order = #sels + 1 } end
         end
     end
     return sels
 end
 
--- The name of a step as the player sees it in the wizard ("Game settings"), not the module's own title
-function Installer:StepTitle(key)
-    for _, page in ipairs(PAGES) do
-        if page.key == key then return page.title end
+-- The name of a step as the player sees it in the wizard ("Game settings"), not the module's own title.
+-- detail = on a step with several modules, add which part ("Scale & layout: Layout").
+function Installer:StepTitle(key, detail)
+    local page = PAGES[PAGE_OF[key] or 0]
+    if not page then return nil end
+    if detail and #page.keys > 1 then
+        local mod = ns.modules[key]
+        local part = (page.groups and page.groups[key]) or (mod and mod.title) or key
+        return page.title .. ": " .. part
     end
+    return page.title
 end
 
 -- Numbers for the review: changes, steps with changes, settings already right, skipped steps, keys that get lost
@@ -876,17 +927,17 @@ function Installer:Totals()
         t.steps = t.steps + 1
     end
     for _, key in ipairs(APPLY_ORDER) do
-        if self.items[key] then
-            if self.stepOn[key] then
-                for _, item in ipairs(self.items[key]) do
-                    if item.attention and self:ParentChanges(key, item) then t.attention = t.attention + 1 end
-                    if item.alreadySet and not item.toggle and not item.fixed and not item.keepVisible then
-                        t.already = t.already + 1
-                    end
-                end
-            elseif not self.singleStep then
-                t.skipped = t.skipped + 1
+        if self.items[key] and self.stepOn[key] then
+            for _, item in ipairs(self.items[key]) do
+                if item.attention and self:ParentChanges(key, item) then t.attention = t.attention + 1 end
+                if IsAlreadyRight(item) then t.already = t.already + 1 end
             end
+        end
+    end
+    -- skipped counts steps as the player saw them, not modules
+    if not self.singleStep then
+        for _, page in ipairs(PAGES) do
+            if page.keys and not self:PageOn(page) then t.skipped = t.skipped + 1 end
         end
     end
     return t
@@ -914,7 +965,7 @@ function Installer:ApplyAll()
 
     local lines, failed, partly = {}, 0, 0
     for _, sel in ipairs(sels) do
-        local title = self:StepTitle(sel.mod.key) or sel.mod.title
+        local title = self:StepTitle(sel.mod.key, true) or sel.mod.title
         local ok, result = pcall(sel.mod.Apply, sel.mod, sel.items)
         if not ok then
             failed = failed + 1
@@ -990,27 +1041,26 @@ end
 function Installer:Preview(stepKey)
     self.items, self.stepOn = {}, {}
     local broken = {}
-    for _, page in ipairs(PAGES) do
-        if page.key then
-            local mod = ns.modules[page.key]
-            local ok, items = false, nil
-            if mod and mod.Preview then ok, items = pcall(mod.Preview, mod) end
-            if ok then
-                self.items[page.key] = items
-            else
-                if mod then
-                    broken[#broken + 1] = mod.title
-                    ns.Debug("Preview failed for", mod.title, items)
-                end
-                self.items[page.key] = {}
+    for key in pairs(PAGE_OF) do
+        local mod = ns.modules[key]
+        local ok, items = false, nil
+        if mod and mod.Preview then ok, items = pcall(mod.Preview, mod) end
+        if ok then
+            self.items[key] = items
+        else
+            if mod then
+                broken[#broken + 1] = mod.title
+                ns.Debug("Preview failed for", mod.title, items)
             end
-            -- Opened for one step (e.g. "Re-apply layout"): only that step is on
-            self.stepOn[page.key] = mod ~= nil and ((stepKey == nil) or (page.key == stepKey))
+            self.items[key] = {}
         end
+        -- Opened for one module (e.g. "Re-apply layout"): only that module is on, even on a shared step
+        self.stepOn[key] = mod ~= nil and ((stepKey == nil) or (key == stepKey))
     end
     self.singleStep = stepKey ~= nil
     self.presetPending = nil
     if #broken > 0 then
+        table.sort(broken)
         ns.Print(C.amber .. "Could not read the current state of: " .. table.concat(broken, ", ")
             .. ". Those steps are empty. /mlz debug shows why." .. C.r)
     end
@@ -1026,19 +1076,13 @@ function Installer:Open(stepKey)
     self:Build()
     self.hiddenByCombat = nil
     self.appliedAny, self.showAlready = false, {}
-    for _, page in ipairs(PAGES) do
-        local mod = page.key and ns.modules[page.key]
+    for key in pairs(PAGE_OF) do
+        local mod = ns.modules[key]
         if mod and mod.BeginWizard then pcall(mod.BeginWizard, mod) end
     end
     self:Preview(stepKey)
     self.frame:Show()
-    local start = 1
-    if stepKey then
-        for i, page in ipairs(PAGES) do
-            if page.key == stepKey then start = i end
-        end
-    end
-    self:Go(start)
+    self:Go(stepKey and PAGE_OF[stepKey] or 1)
 end
 
 -- Steps in "Looks only": how things look, not how the game plays
