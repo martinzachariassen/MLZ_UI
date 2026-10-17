@@ -1,0 +1,21 @@
+name: Lint
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Syntax check (Lua 5.1)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq lua5.1
+          git ls-files '*.lua' | xargs -n 1 luac5.1 -p
+
+      - name: Luacheck
+        uses: lunarmodules/luacheck@v1

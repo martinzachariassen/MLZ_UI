@@ -82,8 +82,9 @@ Applies to UI text, chat output, tooltips, docs and commit messages.
 
 - **Dev setup:** symlink the repo into `Interface/AddOns/MLZ_UI`, then `/reload` after each change.
 - **Debugging:** `/mlz debug` for verbose output, BugGrabber + BugSack for Lua errors, `/mlz probe` to dump client facts (APIs, CVars, Edit Mode, bindings) into `SavedVariables/MLZ_UI.lua`. Verify against the probe instead of guessing what the client has.
+- **Lint:** `luacheck .` must be clean (config in `.luacheckrc`, also runs in CI). When you use a new WoW API global, add it to `read_globals` there.
 - **Before you finish a change:** `/reload` without errors, run the affected wizard step, apply, then `/mlz undo` and check that everything is back. Test once in combat for anything that touches frames or bindings.
-- **Release checklist:** bump the version in all three places (`## Version` in `MLZ_UI.toc`, `ns.version` in `Core.lua`, the badge in `README.md`), update the README if commands, pages or supported addons changed, and re-render screenshots if the UI changed.
+- **Release checklist:** bump the version in all three places (`## Version` in `MLZ_UI.toc`, `ns.version` in `Core.lua`, the badge in `README.md`), update the README if commands, pages or supported addons changed, re-render screenshots if the UI changed, move "Unreleased" in `CHANGELOG.md` under the new version, then tag `vX.Y.Z` and push the tag (the release workflow packages and uploads it).
 - **Commits:** Conventional Commits, matching the history: `feat(nameplates): ...`, `fix(fade): ...`, `refactor: ...`, `docs: ...`. Imperative, lowercase, no period.
 - Don't commit or push unless asked.
 

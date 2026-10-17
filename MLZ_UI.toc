@@ -8,6 +8,10 @@
 ## AddonCompartmentFunc: MLZUI_OnAddonCompartmentClick
 ## AddonCompartmentFuncOnEnter: MLZUI_OnAddonCompartmentEnter
 ## AddonCompartmentFuncOnLeave: MLZUI_OnAddonCompartmentLeave
+## X-License: MIT
+# Fill in and remove the leading "# " to publish to CurseForge and Wago (see .github/workflows/release.yml)
+# ## X-Curse-Project-ID: 000000
+# ## X-Wago-ID: xxxxxxxx
 
 Core.lua
 Probe.lua

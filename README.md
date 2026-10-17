@@ -269,7 +269,7 @@ Everything the wizard offers is defined in `Data/`:
 - [ ] **Addon manager**: installed / missing / outdated state for supported addons
 - [ ] Install and update supported addons through a small companion app (the game's Lua sandbox can't write files)
 - [ ] Version-aware settings for other addons
-- [ ] Packaged releases on CurseForge, Wago and GitHub Releases
+- [x] Release packaging for GitHub Releases (CurseForge and Wago once their project IDs are set)
 
 ## Contributing
 
@@ -282,7 +282,7 @@ For development, symlink the folder into AddOns, turn on `/mlz debug` and instal
 
 ## License
 
-No license has been added yet. Until one is, all rights are reserved by the author. Roboto is licensed under the Apache License 2.0 (see [`Media/Roboto-LICENSE.txt`](Media/Roboto-LICENSE.txt)).
+MLZ UI is released under the [MIT License](LICENSE). Roboto is licensed under the Apache License 2.0 (see [`Media/Roboto-LICENSE.txt`](Media/Roboto-LICENSE.txt)).
 
 ## Credits
 

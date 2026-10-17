@@ -90,6 +90,7 @@ end
 
 -- Platynator prints a line on every import and every /platy config. Mute the chat frame while
 -- calling it (the override is an instance field, removed again afterwards).
+-- luacheck: push ignore 122
 local function Quiet(fn, ...)
     local chat = DEFAULT_CHAT_FRAME
     local had = chat and rawget(chat, "AddMessage")
@@ -98,6 +99,7 @@ local function Quiet(fn, ...)
     if chat then chat.AddMessage = had end
     return ok, err
 end
+-- luacheck: pop
 
 local function ProfileString()
     local profile = ns.CopyTable(CurrentProfile())
