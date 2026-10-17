@@ -22,6 +22,9 @@ local function Disabled()
     return AtMaxLevel() or (IsXPUserDisabled and IsXPUserDisabled())
 end
 
+-- Still earning XP: below max level and XP not turned off
+function X.Leveling() return not Disabled() end
+
 local function Reset()
     startTime, gained = GetTime(), 0
     lastXP, lastMax = UnitXP("player"), UnitXPMax("player")

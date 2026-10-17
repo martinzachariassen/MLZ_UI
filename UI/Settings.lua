@@ -1403,6 +1403,12 @@ PAGES[#PAGES + 1] = { key = "reminders", title = "Reminders", icon = "Interface\
         { avail = function() if not HasKind("reagent") then return "Nothing to check for your class" end end })
     p:Toggle("Worn gear", ("An icon and one chat line when your most worn item drops to %d%% durability."):format(R.DurabilityLimit()),
         function() return R.Get("durability") end, function(on) R.Set("durability", on) end)
+    p:Toggle("Food while leveling", "Solo and below max level: an icon when you are not Well Fed, for the extra XP.",
+        function() return R.Get("levelFood") end, function(on) R.Set("levelFood", on) end,
+        { tip = "Only when you are not in a group and still earn XP. Never at max level, and not in cities and inns.",
+          avail = function()
+              if not (ns.XPRate and ns.XPRate.Leveling and ns.XPRate.Leveling()) then return "You are at max level" end
+          end })
     p:Toggle("Food and flask in raids", "Inside a raid: an icon when you are not Well Fed, or carry a flask that is not up.",
         function() return R.Get("raidFood") end, function(on) R.Set("raidFood", on) end,
         { tip = "Only inside raid instances, never in the open world or in dungeons.\n\n"
@@ -1417,11 +1423,16 @@ PAGES[#PAGES + 1] = { key = "reminders", title = "Reminders", icon = "Interface\
                 or e.sub == "pet" and "Shown when your pet is not out."
                 or e.kind == "buff" and "Shown when you don't have it on you."
                 or ("Shown when you carry fewer than %d."):format(e.min or 1)
-            if e.roles then
+            local function RoleNames(set)
                 local names = {}
-                for r in pairs(e.roles) do names[#names + 1] = ns.ROLE_TEXT[r] or r end
+                for r in pairs(set) do names[#names + 1] = ns.ROLE_TEXT[r] or r end
                 table.sort(names)
-                desc = desc .. " Only as " .. table.concat(names, " or ") .. "."
+                return table.concat(names, " or ")
+            end
+            if e.roles and e.solo then
+                desc = desc .. " Only as " .. RoleNames(e.roles) .. ", or as " .. RoleNames(e.solo) .. " when solo."
+            elseif e.roles then
+                desc = desc .. " Only as " .. RoleNames(e.roles) .. "."
             end
             p:Toggle(e.name, desc, function() return not R.IsMuted(e.key) end, function(on) R.SetMuted(e.key, not on) end,
                 { avail = function()

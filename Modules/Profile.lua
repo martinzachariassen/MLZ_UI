@@ -20,7 +20,7 @@ local SWITCHES = {
     { key = "automate", mod = function() return ns.Automate end,
       keys = { "acceptQuests", "turnInQuests", "summon", "resurrect", "bopSolo", "declineDuels" } },
     { key = "group", mod = function() return ns.Group end, keys = { "buffCheck", "leaderAll" } },
-    { key = "reminders", mod = function() return ns.Reminders end, keys = { "buffs", "reagents", "durability", "raidFood" } },
+    { key = "reminders", mod = function() return ns.Reminders end, keys = { "buffs", "reagents", "durability", "raidFood", "levelFood" } },
 }
 
 -- Fading: only the rows that differ. Returns true when something changed.

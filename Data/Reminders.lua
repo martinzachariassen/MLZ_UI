@@ -7,10 +7,12 @@
 --            gives the icon and name.
 --   also   = extra spell IDs that count as "has it" (group versions cast by someone else, Demonic Sacrifice)
 --   roles  = (optional) only for these roles
+--   solo   = (optional) extra roles that count while you are not in a group (Thorns for a solo DPS druid)
 --   kind   = "aura" (default), "weapon" (weapon enchant on each hand that holds a weapon: poisons, imbues)
 --            or "pet" (no pet out), or "happiness" (hunter pet out but not happy)
 -- reagents: shown when you know `spell` and carry fewer than `min` of `item`.
 --   item = item ID, or "ammo" for the equipped ammo (hunters)
+-- leveling: solo and below max level, with its own switch (food for the extra XP).
 -- raid: only inside a raid instance, with its own switch (food and flask in raids).
 --   food  = spell IDs whose aura name counts as fed (every "Well Fed" buff shares the name)
 --   flasks = { item, buff }: reminded only when you carry the flask but don't have its buff
@@ -28,7 +30,8 @@ ns.data.reminders = {
         { class = "MAGE", spells = { 6117, 7302, 168 } },                -- Mage Armor, Ice Armor, Frost Armor
         { class = "DRUID", spells = { 1126 }, also = { 21849 } },        -- Mark of the Wild / Gift of the Wild
         { class = "DRUID", spells = { 16864 } },                         -- Omen of Clarity (talent)
-        { class = "DRUID", spells = { 467 }, roles = { TANK = true } },  -- Thorns
+        { class = "DRUID", spells = { 467 }, roles = { TANK = true },    -- Thorns: always as tank,
+          solo = { DAMAGER = true } },                                   -- and as DPS when you play alone
         { class = "WARLOCK", spells = { 706, 687 } },                    -- Demon Armor, Demon Skin
         { class = "WARLOCK", kind = "pet", spells = { 688, 697, 712, 691 },
           also = { 18789, 18790, 18791, 18792 } },                       -- Summon Imp, Voidwalker, Succubus, Felhunter (no pet after Demonic Sacrifice)
@@ -78,6 +81,12 @@ ns.data.reminders = {
         { class = "MAGE", label = "Arcane Intellect", spells = { 1459 }, also = { 23028 },
           skip = { WARRIOR = true, ROGUE = true } },
         { class = "DRUID", label = "Mark of the Wild", spells = { 1126 }, also = { 21849 } },
+    },
+
+    -- leveling: solo and below max level, with its own switch (buff food for the extra XP from kills).
+    --   food = spell IDs whose aura name counts as fed. Add the WoW Forever XP food buff here.
+    leveling = {
+        food = { 19705 }, -- Well Fed
     },
 
     raid = {

@@ -10,7 +10,7 @@ local _, ns = ...
 local R = {}
 ns.Reminders = R
 
-local DEFAULTS = { buffs = false, reagents = false, durability = true, raidFood = false }
+local DEFAULTS = { buffs = false, reagents = false, durability = true, raidFood = false, levelFood = false }
 local ICON, GAP, MAX_ICONS = 28, 10, 8
 local REPAIR_ICON = "Interface\\Icons\\Trade_BlackSmithing"
 
@@ -107,6 +107,19 @@ end
 
 local FOOD_ICON = "Interface\\Icons\\INV_Misc_Food_14"
 
+-- True when an aura with the name of one of these spells is on you (every "Well Fed" shares a name)
+local function HasAny(have, ids)
+    for _, id in ipairs(ids or {}) do
+        local n = SpellName(id)
+        if n and have[n] then return true end
+    end
+    return false
+end
+
+local function Leveling()
+    return ns.XPRate and ns.XPRate.Leveling and ns.XPRate.Leveling()
+end
+
 local function InRaidInstance()
     if not IsInInstance then return false end
     local _, kind = IsInInstance()
@@ -138,11 +151,13 @@ local function Missing()
     -- What you do right now: a Feral druid in Cat Form is not a tank
     local role = ns.LiveRole and ns.LiveRole() or "DAMAGER"
     local ignore = cfg.ignore or {}
+    local solo = not IsInGroup()
 
     if cfg.buffs and not IsResting() then
         local have = PlayerBuffs()
         for _, b in ipairs(data.buffs or {}) do
-            if b.class == class and (not b.roles or b.roles[role]) and not ignore["b:" .. b.spells[1]] then
+            local forRole = not b.roles or b.roles[role] or (solo and b.solo and b.solo[role])
+            if b.class == class and forRole and not ignore["b:" .. b.spells[1]] then
                 local known
                 for _, id in ipairs(b.spells) do
                     if Knows(id) then known = id break end
@@ -200,15 +215,17 @@ local function Missing()
         end
     end
 
+    if cfg.levelFood and solo and not IsResting() and Leveling() then
+        if not HasAny(PlayerBuffs(), (data.leveling or {}).food) then
+            list[#list + 1] = { icon = FOOD_ICON, text = "Food",
+                why = "You are not Well Fed. Buff food gives extra XP from kills while you level." }
+        end
+    end
+
     if cfg.raidFood and InRaidInstance() then
         local raid = data.raid or {}
         local have = PlayerBuffs()
-        local fed = false
-        for _, id in ipairs(raid.food or {}) do
-            local n = SpellName(id)
-            if n and have[n] then fed = true break end
-        end
-        if not fed then
+        if not HasAny(have, raid.food) then
             list[#list + 1] = { icon = FOOD_ICON, text = "Food",
                 why = "You are not Well Fed. Eat buff food before the pull." }
         end
@@ -304,7 +321,7 @@ end
 local function Update()
     if not ns.db then return end
     local cfg = Cfg()
-    if not (cfg.buffs or cfg.reagents or cfg.durability or cfg.raidFood) or Hidden() then
+    if not (cfg.buffs or cfg.reagents or cfg.durability or cfg.raidFood or cfg.levelFood) or Hidden() then
         if row then row:Hide() end
         return
     end
@@ -382,7 +399,7 @@ ns.TryOn("UNIT_PET", function(_, unit) if unit == "player" then Schedule() end e
 ns.TryOn("UNIT_HAPPINESS", function(_, unit) if unit == "pet" then Schedule() end end)
 for _, event in ipairs({ "BAG_UPDATE_DELAYED", "PLAYER_REGEN_DISABLED", "PLAYER_REGEN_ENABLED", "PLAYER_UPDATE_RESTING",
     "SPELLS_CHANGED", "PLAYER_DEAD", "PLAYER_UNGHOST", "PLAYER_ALIVE", "PLAYER_CONTROL_GAINED", "PLAYER_CONTROL_LOST",
-    "PLAYER_MOUNT_DISPLAY_CHANGED", "GROUP_ROSTER_UPDATE", "ZONE_CHANGED_NEW_AREA" }) do
+    "PLAYER_MOUNT_DISPLAY_CHANGED", "GROUP_ROSTER_UPDATE", "ZONE_CHANGED_NEW_AREA", "PLAYER_LEVEL_UP" }) do
     ns.TryOn(event, Schedule)
 end
 -- Hide right away when combat starts, no delay
@@ -401,7 +418,7 @@ ns.On("PLAYER_ENTERING_WORLD", function()
     if not ticker and C_Timer.NewTicker then
         ticker = C_Timer.NewTicker(10, function()
             local c = ns.db and Cfg()
-            if c and (c.buffs or c.reagents or c.raidFood) and not InCombatLockdown() then Schedule() end
+            if c and (c.buffs or c.reagents or c.raidFood or c.levelFood) and not InCombatLockdown() then Schedule() end
         end)
     end
 end)
@@ -418,7 +435,7 @@ end
 function R.Durability() return LowestDurability() end
 
 -- Everything this class can be reminded about, for the settings window:
--- { key, name, kind = "buff" | "reagent", known = bool, min = number (reagents), roles = {...} (buffs) }
+-- { key, name, kind = "buff" | "reagent", known = bool, min = number (reagents), roles = {...}, solo = {...} (buffs) }
 -- known = false while you have not learned the spell yet.
 function R.Entries()
     local data = ns.data.reminders or {}
@@ -433,7 +450,7 @@ function R.Entries()
             name = SpellName(known or b.spells[1])
             if name then
                 out[#out + 1] = { key = "b:" .. b.spells[1], name = name, kind = "buff", sub = b.kind, known = known ~= nil,
-                    roles = b.roles }
+                    roles = b.roles, solo = b.solo }
             end
         end
     end

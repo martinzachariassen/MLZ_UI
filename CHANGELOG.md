@@ -6,6 +6,9 @@
   resurrections, confirm bind on pickup loot when solo, decline duels. Hold SHIFT to skip once.
   Options that Leatrix Plus already handles step aside.
 - Reminders: a hunter pet that is not happy, and food and flask inside raids (own switch, off by default).
+- Reminders: Thorns now also shows for a DPS druid who plays solo, not only for tanks.
+- Reminders: food while leveling (own switch, off by default). Solo and below max level, an icon when you
+  are not Well Fed, for the extra XP from kills.
 - New "Group & raid" card on Helpers: a buff check on ready check lists who misses a buff you can cast
   (or every class buff when you lead), only in your own chat. `/mlz buffs` checks at any time.
 - Pull timer: `/mlz pull [seconds]` or a key in Key Bindings > AddOns > MLZ UI. Uses the game's countdown
