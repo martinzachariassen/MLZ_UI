@@ -50,7 +50,7 @@ local BASE = 30                                -- bottom edge of bar 1 (leaves r
 local GAP = 8                                  -- gap between the stack and player/target
 local UNIT_Y = BASE + 40                       -- bottom edge of player/target (room for target of target below)
 
-local STACK_TOP = BASE + 3 * ROW               -- top edge of bar 3 (top of the stack)
+local STACK_TOP = BASE + 3 * ROW               -- top of the stack: bar 3's top edge (142) plus one PAD of air
 
 -- Above the stack, bottom to top (all centered on the middle of the screen):
 --   cast bar  ->  swing off hand  ->  swing main hand  ->  swing ranged
@@ -68,9 +68,14 @@ local SWING = { Scale = 0, Opacity = 100, Width = 453, Height = 15, ShowBarTitle
 -- Healer layouts: copies of the main layout where the group frames sit in the middle of the screen, right above
 -- the cast bar, and the swing timers are hidden (a healer has no use for them; that is also where the room comes from).
 -- Player and target keep their place left and right of the bars, so your own character stays in view.
--- The group frames are anchored by their bottom edge in the center and grow upward.
+-- The group frames are anchored by their bottom edge in the center (check in game which way extra rows grow).
 local HEAL_Y = CAST_Y + 34                     -- bottom edge of the group frames (the cast time text hangs under the cast bar)
 local SWING_HIDDEN = { Visibility = 2 }        -- 0 = always, 1 = in combat, 2 = hidden
+-- Edit Mode stores group frame sizes in steps of 10. 5 x 90 = 450, the width of the action bars (454).
+local HEAL_W = 90
+
+-- Stance bar height (60 % icons) and the gap above it, for frames stacked on top of it
+local STANCE_H = math.floor(45 * 60 / 100 + 0.5) -- 27
 
 -- Chat at bottom left, with bar 6 (no hotkeys) right above it
 local CHAT_Y = 40                              -- bottom edge of chat (room for the input box below)
@@ -186,16 +191,18 @@ ns.data.layout = {
         { label = "Buffs", system = "AuraFrame", indexEnum = "EditModeAuraFrameSystemIndices", index = "BuffFrame",
           point = "TOPRIGHT", relPoint = "TOPLEFT", relTo = "MinimapCluster", x = -6, y = -2,
           settingEnum = "EditModeAuraFrameSetting", settings = { IconSize = 70, IconPadding = 5 } },
+        -- Debuffs hang under the buffs, so a second row of buffs pushes them down instead of covering them
         { label = "Debuffs", system = "AuraFrame", indexEnum = "EditModeAuraFrameSystemIndices", index = "DebuffFrame",
-          point = "TOPRIGHT", relPoint = "TOPLEFT", relTo = "MinimapCluster", x = -6, y = -104,
+          point = "TOPRIGHT", relPoint = "BOTTOMRIGHT", relTo = "BuffFrame", x = 0, y = -GAP,
           settingEnum = "EditModeAuraFrameSetting", settings = { IconSize = 80, IconPadding = 5 } },
 
         -- Quest tracker: top left, short (hidden in combat, see Data/Fade.lua)
         { label = "Quest tracker", system = "ObjectiveTracker",
           point = "TOPLEFT", relPoint = "TOPLEFT", x = 10, y = -10,
           settingEnum = "EditModeObjectiveTrackerSetting", settings = { Height = 400, TextSize = 12 } },
+        -- Boss frames under the minimap (they follow /mlz map), and left of bars 4-5 (2 x 32 + gaps from the edge)
         { label = "Boss frames", system = "UnitFrame", indexEnum = UFI, index = "Boss",
-          point = "TOPRIGHT", relPoint = "TOPRIGHT", x = -60, y = -240 },
+          point = "TOPRIGHT", relPoint = "BOTTOMRIGHT", relTo = "MinimapCluster", x = -(4 + 2 * (32 + PAD) + GAP), y = -GAP },
 
         -- Bottom left: small chat (400 x 170). Raised 40 units so the input box below chat is visible.
         { label = "Chat", system = "ChatFrame",
@@ -213,7 +220,7 @@ ns.data.layout = {
         { label = "Bar 4 (mouseover)", system = "ActionBar", indexEnum = ABI, index = "RightBar1",
           point = "RIGHT", relPoint = "RIGHT", x = -4, y = -60, settingEnum = AB, settings = SIDE_BAR },
         { label = "Bar 5", system = "ActionBar", indexEnum = ABI, index = "RightBar2",
-          point = "RIGHT", relPoint = "RIGHT", x = -40, y = -60, settingEnum = AB, settings = SIDE_BAR },
+          point = "RIGHT", relPoint = "RIGHT", x = -(4 + 32 + PAD), y = -60, settingEnum = AB, settings = SIDE_BAR },
 
         -- Bottom right: the "clutter corner" (hidden until mouseover). Raised 14 units: the FPS counter sits at the very bottom.
         { label = "Bags", system = "Bags",
@@ -231,23 +238,24 @@ ns.data.layout = {
     -- A variant has either `kind` (a healer in a "party" or "raid") or `archetypes` (see Data/Classes.lua).
     healer = {
         variants = {
-            -- Dungeon (party of 5): one wide row, big frames, easy to read dispels and debuffs
+            -- Dungeon (party of 5): one row as wide as the bars, tall enough to read dispels and debuffs
             {
                 name = "MLZ UI Heal Dungeon", kind = "party",
                 frames = {
                     ["Party"] = { point = "BOTTOM", relPoint = "BOTTOM", x = 0, y = HEAL_Y,
-                                  settings = { FrameWidth = 110, FrameHeight = 55, BuffIconSize = 60 } },
+                                  settings = { FrameWidth = HEAL_W, FrameHeight = 50, BuffIconSize = 60 } },
                     ["Swing timer off hand"]   = { rawSettings = SWING_HIDDEN },
                     ["Swing timer main hand"]  = { rawSettings = SWING_HIDDEN },
                     ["Swing timer ranged"]     = { rawSettings = SWING_HIDDEN },
                 },
             },
-            -- Raid: 5 per row = as wide as the action bars (450); 25 players = 5 rows, tanks first, then healers, then dps
+            -- Raid: 5 per row = as wide as the action bars (450). 40 high, so 8 rows (40 players) end below the
+            -- middle of the screen. Tanks first, then healers, then dps.
             {
                 name = "MLZ UI Heal Raid", kind = "raid",
                 frames = {
                     ["Raid"] = { point = "BOTTOM", relPoint = "BOTTOM", x = 0, y = HEAL_Y,
-                                 settings = { FrameWidth = 90, FrameHeight = 45, BuffIconSize = 55 } },
+                                 settings = { FrameWidth = HEAL_W, FrameHeight = 40, BuffIconSize = 50 } },
                     ["Swing timer off hand"]   = { rawSettings = SWING_HIDDEN },
                     ["Swing timer main hand"]  = { rawSettings = SWING_HIDDEN },
                     ["Swing timer ranged"]     = { rawSettings = SWING_HIDDEN },
@@ -261,6 +269,9 @@ ns.data.layout = {
                     ["Swing timer off hand"]   = { rawSettings = SWING_HIDDEN },
                     ["Swing timer main hand"]  = { rawSettings = SWING_HIDDEN },
                     ["Swing timer ranged"]     = { relTo = "PlayerCastingBarFrame", y = CAST_GAP },
+                    -- The ranged timer moved down to the stance bar's height, so Focus (anchored to it in the main
+                    -- layout) would cover the stance bar. Stack it on top of the stance bar instead.
+                    ["Focus"] = { relTo = "PlayerCastingBarFrame", relPoint = "TOP", y = CAST_GAP + STANCE_H + GAP },
                 },
             },
         },

@@ -15,7 +15,8 @@ local _, ns = ...
 ns.data.fade = {
     { id = "bar45", label = "Bars 4 and 5", mode = "mouseover", enabled = true,
       frames = { "MultiBarRight", "MultiBarLeft" },
-      desc = "Rarely used bars. Shown when you hover over them at the bottom right." },
+      desc = "Rarely used bars on the right edge, shown on mouseover. Keys bound to them (such as the extra "
+          .. "keys for forms and stances on bar 5) still work while they are hidden." },
     { id = "micro", label = "Micro menu", mode = "mouseover", enabled = true,
       frames = { "MicroMenuContainer", "MicroMenu" },
       desc = "The character, spellbook etc. buttons. You still have the keys (C, P, N ... or the Alt variant)." },

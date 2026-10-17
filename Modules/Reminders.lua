@@ -201,13 +201,13 @@ R.Missing = Missing
 -- Icon row
 ------------------------------------------------------------------------
 local row, icons = nil, {}
+local Place
 
 local function Build()
     if row then return end
     local W = ns.W
     row = CreateFrame("Frame", "MLZUI_Reminders", UIParent)
     row:SetSize(ICON, ICON + 16)
-    row:SetPoint("TOP", UIParent, "CENTER", 0, -170)
     row:SetFrameStrata("LOW")
     row:EnableMouse(false) -- never blocks clicks into the world
     for i = 1, MAX_ICONS do
@@ -220,10 +220,35 @@ local function Build()
         f.border = W.Border(f, W.T.border)
         f.label = W.Text(f, "GameFontHighlightSmall", "", "CENTER")
         f.label:SetPoint("TOP", f, "BOTTOM", 0, -3)
+        f.label:SetWidth(ICON + GAP + 36) -- the slot width, so long names end in "..." instead of running together
         f.label:SetWordWrap(false)
         f:Hide()
         icons[i] = f
     end
+end
+
+-- Below the middle of the screen, or right above the group frames when they reach that high
+-- (the healer raid layout puts them in the middle). Only runs out of combat, like the row itself.
+local DEFAULT_Y = -170
+function Place()
+    row:ClearAllPoints()
+    local scale = UIParent:GetEffectiveScale()
+    local wantTop = UIParent:GetHeight() / 2 + DEFAULT_Y -- in UIParent units, from the bottom
+    for _, name in ipairs({ "CompactRaidFrameContainer", "CompactPartyFrame", "PartyFrame" }) do
+        local g = _G[name]
+        local top = g and g:IsVisible() and g:GetTop()
+        if top then
+            top = top * g:GetEffectiveScale() / scale
+            local left, right = g:GetLeft(), g:GetRight()
+            local cx = left and right and (left + right) / 2 * g:GetEffectiveScale() / scale
+            -- only when the frames sit in the middle and would reach into the row
+            if cx and math.abs(cx - UIParent:GetWidth() / 2) < 200 and top > wantTop - ICON - 16 then
+                row:SetPoint("BOTTOM", UIParent, "BOTTOMLEFT", UIParent:GetWidth() / 2, top + 12)
+                return
+            end
+        end
+    end
+    row:SetPoint("TOP", UIParent, "CENTER", 0, DEFAULT_Y)
 end
 
 local function Hidden()
@@ -275,6 +300,7 @@ local function Update()
         end
     end
     row:SetWidth(width)
+    Place()
     row:Show()
 end
 R.Update = Update
