@@ -45,7 +45,7 @@ read_globals = {
     -- Functions
     "ActionButton_UpdateHotkeys", "ActionButton_UpdateUsable", "CanGuildBankRepair", "CanMerchantRepair",
     "CombatLogGetCurrentEventInfo", "CreateFont", "CreateFrame", "FCF_SetWindowAlpha",
-    "GetActionBarToggles", "GetActionInfo", "GetActionText", "GetActionTexture", "GetAddOnInfo",
+    "GetActionBarToggles", "GetActionInfo", "GetActionText", "GetActionTexture", "GetAddOnInfo", "GetAddOnMetadata", "EnableAddOn",
     "GetBinding", "GetBindingAction", "GetBindingKey", "GetBuildInfo", "GetChatWindowInfo",
     "GetCoinTextureString", "GetContainerItemInfo", "GetContainerNumSlots", "GetCreatureDifficultyColor",
     "GetCurrentBindingSet", "GetCursorPosition", "GetCVar", "GetFramerate", "GetGuildBankWithdrawMoney",

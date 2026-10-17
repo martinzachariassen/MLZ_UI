@@ -1,26 +1,83 @@
 -- MLZ UI: Export / import of your MLZ UI choices
--- /mlz export gives a string with the wizard choices that live in MLZUIDB (which key movement,
--- which rows are ticked, scale mode, spell queue window, nameplate auto switching).
--- /mlz import applies such a string, after taking a backup that /mlz undo can restore.
--- This does not include the settings that live in the game or other addons; run the wizard for those.
+-- /mlz export gives a string with your MLZ UI choices: the wizard choices (key movement, ticked rows,
+-- scale mode, spell queue window, nameplates), faded frames, helpers, reminders, and the role and
+-- situation profiles of this character. /mlz import applies such a string, after taking a backup that
+-- /mlz undo can restore. Settings that live in the game or other addons are not included; run the wizard.
 
 local _, ns = ...
 
-local PREFIX = "MLZ!1!"
+local PREFIX = "MLZ!2!"
+local OLD_PREFIXES = { "MLZ!1!" } -- older strings still import (they simply have fewer keys)
 
 local Profile = ns.RegisterModule({ key = "profile", title = "MLZ UI choices" })
+
+local NP_KEYS = { "auto", "mode", "style", "threat", "pvp", "healerFriends" }
+local NP_MODES = { tank = true, healer = true, dps = true, solo = true }
+
+-- On/off helpers that travel with the string: db key -> module and the keys it knows
+local SWITCHES = {
+    { key = "vendor", mod = function() return ns.Vendor end, keys = { "repair", "guild", "sell" } },
+    { key = "automate", mod = function() return ns.Automate end,
+      keys = { "acceptQuests", "turnInQuests", "summon", "resurrect", "bopSolo", "declineDuels" } },
+    { key = "group", mod = function() return ns.Group end, keys = { "buffCheck", "leaderAll" } },
+    { key = "reminders", mod = function() return ns.Reminders end, keys = { "buffs", "reagents", "durability", "raidFood" } },
+}
+
+-- Fading: only the rows that differ. Returns true when something changed.
+local function LoadFade(saved)
+    local fade = ns.modules.fade
+    if not (fade and saved) then return false end
+    local changed = false
+    for _, row in ipairs(ns.data.fade or {}) do
+        local want = saved[row.id] and true or false
+        if fade:IsOn(row.id) ~= want then
+            fade:SetRow(row.id, want)
+            changed = true
+        end
+    end
+    return changed
+end
+
+local function Switches()
+    local out = {}
+    for _, s in ipairs(SWITCHES) do
+        local mod = s.mod()
+        if mod then
+            out[s.key] = {}
+            for _, k in ipairs(s.keys) do out[s.key][k] = mod.Get(k) end
+        end
+    end
+    return out
+end
+
+local function SetSwitches(all)
+    for _, s in ipairs(SWITCHES) do
+        local mod, saved = s.mod(), all[s.key]
+        if mod and type(saved) == "table" then
+            for _, k in ipairs(s.keys) do
+                if saved[k] ~= nil and mod.Get(k) ~= saved[k] then mod.Set(k, saved[k]) end
+            end
+        end
+    end
+end
 
 local function Export()
     local db = ns.db
     local np = db.nameplates or {}
-    return {
+    local char = ns.CharDB()
+    local data = {
         toggles = db.toggles,
         movement = db.movement,
         spellQueueWindow = db.spellQueueWindow,
         scale = db.scale and { mode = db.scale.mode } or nil,
         nameplatesAuto = np.auto,
         nameplates = { mode = np.mode, style = np.style, threat = np.threat, pvp = np.pvp, healerFriends = np.healerFriends },
+        fade = ns.CopyTable(db.fade or {}),
+        switches = Switches(),
+        roleProfiles = char.roleProfiles,
+        situationProfiles = char.situationProfiles,
     }
+    return data
 end
 
 local function Encode(tbl)
@@ -29,14 +86,73 @@ end
 
 -- Returns the table, or nil and a reason
 local function Decode(text)
-    if type(text) ~= "string" or text:sub(1, #PREFIX) ~= PREFIX then
-        return nil, "not an MLZ UI string (should start with " .. PREFIX .. ")"
+    if type(text) ~= "string" then return nil, "not an MLZ UI string" end
+    local used
+    for _, p in ipairs({ PREFIX, unpack(OLD_PREFIXES) }) do
+        if text:sub(1, #p) == p then used = p break end
     end
+    if not used then return nil, "not an MLZ UI string (should start with " .. PREFIX .. ")" end
     local ok, data = pcall(function()
-        return C_EncodingUtil.DeserializeCBOR(C_EncodingUtil.DecompressString(C_EncodingUtil.DecodeBase64(text:sub(#PREFIX + 1))))
+        return C_EncodingUtil.DeserializeCBOR(C_EncodingUtil.DecompressString(C_EncodingUtil.DecodeBase64(text:sub(#used + 1))))
     end)
     if not ok or type(data) ~= "table" then return nil, "could not read the string (damaged or cut off?)" end
     return data
+end
+
+------------------------------------------------------------------------
+-- Validation: only known keys with the right types get in
+------------------------------------------------------------------------
+local function FadeMap(t)
+    if type(t) ~= "table" then return nil end
+    local known, out = {}, {}
+    for _, row in ipairs(ns.data.fade or {}) do known[row.id] = true end
+    for k, v in pairs(t) do
+        if known[k] and v == true then out[k] = true end
+    end
+    return out
+end
+
+local function NameplateOpts(n, withAuto)
+    if type(n) ~= "table" then return nil end
+    local out = {}
+    if type(n.mode) == "string" and NP_MODES[n.mode] then out.mode = n.mode end
+    for _, k in ipairs({ "style", "threat", "pvp", "healerFriends" }) do
+        if type(n[k]) == "boolean" then out[k] = n[k] end
+    end
+    if withAuto and type(n.auto) == "boolean" then out.auto = n.auto end
+    return out
+end
+
+local function Stamp(t)
+    return type(t) == "string" and #t <= 20 and t or nil
+end
+
+local function RoleSnap(s)
+    if type(s) ~= "table" then return nil end
+    local out = { nameplates = NameplateOpts(s.nameplates, true) or {}, fade = FadeMap(s.fade) or {}, time = Stamp(s.time) }
+    if type(s.manaTick) == "boolean" then out.manaTick = s.manaTick end
+    if type(s.interrupt) == "string" and #s.interrupt <= 20 then out.interrupt = s.interrupt end
+    return out
+end
+
+local function SituationSnap(s)
+    if type(s) ~= "table" then return nil end
+    local out = { fade = FadeMap(s.fade) or {}, tracker = {}, time = Stamp(s.time) }
+    if type(s.tracker) == "table" then
+        for _, k in ipairs({ "trackerHide", "trackerHeader" }) do
+            if type(s.tracker[k]) == "boolean" then out.tracker[k] = s.tracker[k] end
+        end
+    end
+    if type(s.threat) == "boolean" then out.threat = s.threat end
+    return out
+end
+
+local function Profiles(t, kinds, snapFn)
+    if type(t) ~= "table" then return nil end
+    local out = {}
+    for _, kind in ipairs(kinds) do out[kind] = snapFn(t[kind]) end
+    if type(t.auto) == "boolean" then out.auto = t.auto end
+    return next(out) and out or nil
 end
 
 -- Only known keys with the right types are accepted
@@ -60,28 +176,39 @@ local function Validate(data)
         clean.scale = { mode = data.scale.mode }
     end
     if type(data.nameplatesAuto) == "boolean" then clean.nameplatesAuto = data.nameplatesAuto end
-    if type(data.nameplates) == "table" then
-        local n, out = data.nameplates, {}
-        local modes = { tank = true, healer = true, dps = true, solo = true }
-        if type(n.mode) == "string" and modes[n.mode] then out.mode = n.mode end
-        for _, k in ipairs({ "style", "threat", "pvp", "healerFriends" }) do
-            if type(n[k]) == "boolean" then out[k] = n[k] end
+    local np = NameplateOpts(data.nameplates)
+    if np and next(np) then clean.nameplates = np end
+    -- MLZ!2! keys
+    clean.fade = FadeMap(data.fade)
+    if type(data.switches) == "table" then
+        local out = {}
+        for _, s in ipairs(SWITCHES) do
+            local saved = data.switches[s.key]
+            if type(saved) == "table" then
+                out[s.key] = {}
+                for _, k in ipairs(s.keys) do
+                    if type(saved[k]) == "boolean" then out[s.key][k] = saved[k] end
+                end
+            end
         end
-        if next(out) then clean.nameplates = out end
+        if next(out) then clean.switches = out end
     end
+    clean.roleProfiles = Profiles(data.roleProfiles, { "TANK", "HEALER", "DAMAGER" }, RoleSnap)
+    clean.situationProfiles = Profiles(data.situationProfiles, { "solo", "party", "raid", "pvp" }, SituationSnap)
     -- roleForce is never imported: your role belongs to this character, not to a shared setup
     return clean
 end
-
-local NP_KEYS = { "auto", "mode", "style", "threat", "pvp", "healerFriends" }
 
 function Profile:Backup()
     local np = ns.db.nameplates or {}
     local npCopy = {}
     for _, k in ipairs(NP_KEYS) do npCopy[k] = np[k] end
+    local char = ns.CharDB()
     return ns.CopyTable({
         toggles = ns.db.toggles, movement = ns.db.movement, spellQueueWindow = ns.db.spellQueueWindow,
         scale = ns.db.scale, nameplates = npCopy, roleForce = ns.GetRoleForce(), hasRoleForce = true,
+        fade = ns.db.fade or {}, switches = Switches(),
+        roleProfiles = char.roleProfiles or {}, situationProfiles = char.situationProfiles or {}, hasProfiles = true,
     })
 end
 
@@ -98,8 +225,17 @@ function Profile:Restore(snap)
     end
     if ns.db.nameplates.auto == nil then ns.db.nameplates.auto = true end
     if snap.hasRoleForce then ns.GetRoleForce(); ns.CharDB().roleForce = snap.roleForce end
+    -- backups made before 0.9 have none of these
+    if snap.fade then LoadFade(snap.fade) end
+    if snap.switches then SetSwitches(snap.switches) end
+    if snap.hasProfiles then
+        local char = ns.CharDB()
+        char.roleProfiles = snap.roleProfiles
+        char.situationProfiles = snap.situationProfiles
+    end
     if ns.FireRole then ns.FireRole() end
     if ns.NP and ns.NP.Apply then ns.NP.Apply() end -- nameplate options may have changed
+    ns.FireState()
 end
 
 local function Import(text)
@@ -133,6 +269,16 @@ local function Import(text)
     if clean.nameplatesAuto ~= nil then ns.db.nameplates.auto = clean.nameplatesAuto end
     if clean.nameplates then
         for k, v in pairs(clean.nameplates) do ns.db.nameplates[k] = v end
+    end
+    if clean.fade then LoadFade(clean.fade) end
+    if clean.switches then SetSwitches(clean.switches) end
+    -- profiles are merged: a role or place the string doesn't have keeps what you saved here
+    local char = ns.CharDB()
+    for _, key in ipairs({ "roleProfiles", "situationProfiles" }) do
+        if clean[key] then
+            char[key] = char[key] or {}
+            for k, v in pairs(clean[key]) do char[key][k] = v end
+        end
     end
     if ns.FireRole then ns.FireRole() end
     if ns.NP and ns.NP.Apply then ns.NP.Apply() end -- nameplate options may have changed
@@ -184,21 +330,6 @@ local function Capture()
     if ns.ManaTick then snap.manaTick = ns.ManaTick.IsOn() end
     if ns.Interrupt then snap.interrupt = ns.Interrupt.Get() end
     return snap
-end
-
--- Fading: only the rows that differ. Returns true when something changed.
-local function LoadFade(saved)
-    local fade = ns.modules.fade
-    if not (fade and saved) then return false end
-    local changed = false
-    for _, row in ipairs(ns.data.fade or {}) do
-        local want = saved[row.id] and true or false
-        if fade:IsOn(row.id) ~= want then
-            fade:SetRow(row.id, want)
-            changed = true
-        end
-    end
-    return changed
 end
 
 local function Load(snap)

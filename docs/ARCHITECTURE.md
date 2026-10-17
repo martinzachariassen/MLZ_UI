@@ -24,8 +24,10 @@ MLZ_UI/
 │   ├── Role.lua          "Your character" wizard step: confirm or change your role
 │   ├── Scale.lua  Settings.lua  Bindings.lua  Layout.lua  Healer.lua
 │   ├── Fade.lua  ActionButtons.lua  Tweaks.lua  Plates.lua  Nameplates.lua  Addons.lua
-│   ├── Health.lua  Vendor.lua  ManaTick.lua  Interrupt.lua  Profile.lua
-│   └── Reminders.lua  XPRate.lua
+│   ├── Health.lua        Addon state and versions, switch addons on, /mlz health
+│   ├── Vendor.lua  Automate.lua  Group.lua  ManaTick.lua  Interrupt.lua
+│   ├── Profile.lua       Export/import, role profiles, situation profiles
+│   └── Reminders.lua  XPRate.lua  Cooking.lua
 ├── UI/
 │   ├── Widgets.lua       Theme tokens (W.T, W.C), fonts and every widget
 │   ├── Installer.lua     Setup wizard
@@ -86,11 +88,15 @@ Rules:
 - `Restore` must work on a snapshot from an older version of the addon, or skip it safely.
 - Anything that touches protected frames or bindings goes through `ns.RunOutOfCombat`.
 
-Feature-only modules (`Vendor`, `ManaTick`, `Interrupt`, `Health`, `Plates`, `Reminders`, `XPRate`) don't register. They hook events through `ns.On` and expose a small table on `ns` (e.g. `ns.Vendor`) for the control center.
+Feature-only modules (`Vendor`, `Automate`, `Group`, `ManaTick`, `Interrupt`, `Health`, `Plates`, `Reminders`, `XPRate`) don't register. They hook events through `ns.On` and expose a small table on `ns` (e.g. `ns.Vendor`) for the control center. Their settings live in a lazily filled `ns.db.<key>` table (`DEFAULTS` plus `Cfg()`), every new helper is off by default, and SHIFT skips an automation once.
+
+`Bindings.xml` sits next to the `.toc` and is loaded by the game, not listed in the `.toc`. Its names come from `BINDING_HEADER_MLZUI` and `BINDING_NAME_MLZUI_*` in `Modules/Group.lua`.
+
+Export strings start with `MLZ!2!` (`MLZ!1!` still imports). `Validate` in `Modules/Profile.lua` lets only known keys with the right types through. A new exported key needs a line there, in `Profile:Backup` and in `Profile:Restore`.
 
 ## Settings for other addons
 
-`Data/Addons.lua` has one entry per addon and `Modules/Addons.lua` reads, backs up, writes and restores the rows. Settings go straight into the addon's own saved variables, so a row only works for the version you have installed. Check key names against the addon's source before you add one.
+`Data/Addons.lua` has one entry per addon and `Modules/Addons.lua` reads, backs up, writes and restores the rows. Settings go straight into the addon's own saved variables, so a row only works for the version you have installed. Check key names against the addon's source before you add one. A row can carry `minVersion`/`maxVersion` (compared with the version in the addon's `.toc`) and an entry can carry `tested`, the newest version its rows were checked with.
 
 - **Entry:** `addon` (folder name), optional `alt` (a port that installs under another folder name, e.g. `CliqueForever`), `title`, `root` (function returning the table that `path` starts from), `live = true` when the addon reads the value while it runs (no reload), and `manual = "text"` when the addon overwrites outside changes at logout (the rows are shown but never written).
 - **Row:** `id`, `label`, `desc`, and either `path` + `value` or `set = { { path, value }, ... }` with `show` for the wizard text. `enabled = false` lists the row but leaves it unticked.

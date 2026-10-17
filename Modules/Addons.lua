@@ -136,6 +136,21 @@ local function MissingDependency(entry)
     end
 end
 
+-- Text when a row only exists in other versions of the addon (row.minVersion / row.maxVersion), else nil.
+-- Without a readable version the row is tried as usual: the missing key check still protects it.
+local function WrongVersion(entry, row)
+    if not (row.minVersion or row.maxVersion) or not ns.AddonVersion then return nil end
+    local name = ns.IsAddOnLoaded(entry.addon) and entry.addon or entry.alt
+    local have = ns.AddonVersion(name)
+    if not have then return nil end
+    if row.minVersion and ns.CompareVersions(have, row.minVersion) == -1 then
+        return "needs " .. row.minVersion .. " or newer, you have " .. have
+    end
+    if row.maxVersion and ns.CompareVersions(have, row.maxVersion) == 1 then
+        return "not in " .. have .. " (only up to " .. row.maxVersion .. ")"
+    end
+end
+
 -- Leatrix keeps its settings in a private table and writes them over its saved file at logout.
 -- Its own "nosave" command stops that for this session, so what we write stays. Without the
 -- command (an older Leatrix) the rows are shown but never written.
@@ -168,6 +183,13 @@ local function PreviewRow(entry, row)
     if missing then
         item.old, item.new = "-", missing
         item.enabled, item.unavailable, item.attention = false, true, true
+        return item
+    end
+    local wrong = WrongVersion(entry, row)
+    if wrong then
+        item.old, item.new = "-", "not in your version"
+        item.enabled, item.unavailable = false, true
+        item.note = wrong:sub(1, 1):upper() .. wrong:sub(2) .. "."
         return item
     end
     local values = Read(entry, row)
@@ -292,7 +314,8 @@ function Addons:Summary()
     local list = {}
     for _, entry in ipairs(ns.data.addons) do
         local s = { title = entry.title, addon = entry.addon, loaded = Loaded(entry) and true or false,
-            differ = 0, total = 0, rows = 0, missing = {}, manual = not Writable(entry) and entry.manual or nil }
+            differ = 0, total = 0, rows = 0, missing = {}, manual = not Writable(entry) and entry.manual or nil,
+            status = ns.AddonStatus and ns.AddonStatus(entry) or nil }
         for _, row in ipairs(entry.rows) do
             if ForMe(row) then s.rows = s.rows + 1 end
         end
@@ -301,7 +324,10 @@ function Addons:Summary()
             s.missing[1] = entry.title .. " - " .. missing
         elseif s.loaded then
             for _, row in ipairs(entry.rows) do
-                if ForMe(row) then
+                local wrong = ForMe(row) and WrongVersion(entry, row)
+                if wrong then
+                    s.missing[#s.missing + 1] = row.label .. " - " .. wrong
+                elseif ForMe(row) then
                     local ok, values = pcall(Read, entry, row)
                     if ok and values then
                         s.total = s.total + 1

@@ -40,6 +40,67 @@ end
 
 ns.HealthProblems = Problems
 
+------------------------------------------------------------------------
+-- Versions
+------------------------------------------------------------------------
+local GetMeta = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
+
+-- The version an addon reports in its .toc, or nil (not installed, or no version line)
+function ns.AddonVersion(addon)
+    if not (GetMeta and addon) then return nil end
+    local ok, v = pcall(GetMeta, addon, "Version")
+    if not ok or type(v) ~= "string" or v == "" or v:find("@", 1, true) then return nil end
+    return v
+end
+
+-- Compares the numbers in two version strings part by part ("v11.2.1-classic" vs "11.2").
+-- Returns -1, 0 or 1, or nil when either has no numbers.
+function ns.CompareVersions(a, b)
+    if type(a) ~= "string" or type(b) ~= "string" then return nil end
+    local pa, pb = {}, {}
+    for n in a:gmatch("%d+") do pa[#pa + 1] = tonumber(n) end
+    for n in b:gmatch("%d+") do pb[#pb + 1] = tonumber(n) end
+    if #pa == 0 or #pb == 0 then return nil end
+    for i = 1, math.max(#pa, #pb) do
+        local x, y = pa[i] or 0, pb[i] or 0
+        if x ~= y then return x < y and -1 or 1 end
+    end
+    return 0
+end
+
+-- State of one addon from Data/Addons.lua (or any { addon, alt, tested } table):
+-- { state = "loaded" | "off" | "missing", version, tested, newer = installed is newer than tested }
+function ns.AddonStatus(entry)
+    local name = entry.addon
+    if entry.alt and not ns.IsAddOnLoaded(entry.addon) and (ns.IsAddOnLoaded(entry.alt) or Installed(entry.alt)) then
+        name = entry.alt
+    end
+    local s = { addon = name, tested = entry.tested }
+    if ns.IsAddOnLoaded(name) then
+        s.state = "loaded"
+    elseif Installed(name) then
+        s.state = "off"
+    else
+        s.state = "missing"
+        return s
+    end
+    s.version = ns.AddonVersion(name)
+    s.newer = entry.tested and ns.CompareVersions(s.version, entry.tested) == 1 or false
+    return s
+end
+
+-- Switches an installed addon on for this character. Returns true, or false and the reason.
+local EnableFn = (C_AddOns and C_AddOns.EnableAddOn) or EnableAddOn
+function ns.CanEnableAddons() return EnableFn ~= nil end
+function ns.EnableAddon(addon)
+    if not EnableFn then return false, "This client can't switch addons on from here" end
+    if not Installed(addon) then return false, addon .. " is not installed" end
+    local ok = pcall(EnableFn, addon, UnitName("player"))
+    if not ok then return false, "The game did not allow it" end
+    ns.MarkReload("addon switched on")
+    return true
+end
+
 -- Installed but switched off, for the overview and the minimap tooltip. Empty when the warning is off.
 function ns.HealthOff()
     if ns.db and ns.db.healthWarn == false then return {} end

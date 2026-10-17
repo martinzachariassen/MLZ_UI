@@ -1442,28 +1442,67 @@ PAGES[#PAGES + 1] = { key = "addons", title = "Other addons", icon = "Interface\
     p.sum = addons:Summary()
     p:OnRefresh(function() p.sum = addons:Summary() end) -- runs before the rows below
 
-    p:Card("Supported addons", "Hover over a row to see settings that could not be read.")
+    local function State(i)
+        local s = p.sum[i]
+        return s and s.status and s.status.state or (s and s.loaded and "loaded") or "missing"
+    end
+    p:Card("Your addons", "The addons MLZ UI can set up, their version and how many settings differ. "
+        .. "Hover over a row for details.")
     for i, entry in ipairs(ns.data.addons) do
         p:Status(entry.title, function()
-            local s = p.sum[i]
-            if not s or not s.loaded then return "Not loaded" end
+            local s, state = p.sum[i], State(i)
+            if state == "missing" then return "Not installed" end
+            local st = s and s.status or {}
+            local ver = st.version and ("Version " .. st.version .. ". ") or ""
+            if state == "off" then return ver .. "Installed but switched off in the addon list." end
             local text = s.differ == 0 and ("All %d settings match MLZ UI"):format(s.total)
                 or ("%d of %d settings differ from MLZ UI"):format(s.differ, s.total)
             if #s.missing > 0 then text = text .. ", " .. #s.missing .. " not available" end
-            return text
+            return ver .. text .. "."
         end, function()
-            local s = p.sum[i]
-            if not s or not s.loaded then return "off", "Not loaded" end
+            local s, state = p.sum[i], State(i)
+            if state == "missing" then return "na", "Not installed" end
+            if state == "off" then return "warn", "Switched off" end
             if s.differ > 0 then return "warn", "Differs" end
             return "on", "Matches"
-        end, { tip = function()
+        end, { descLines = 2, tip = function()
             local s = p.sum[i]
-            if s and #s.missing > 0 then return "Not available:\n" .. table.concat(s.missing, "\n") end
+            if not s then return nil end
+            local lines = {}
+            local st = s.status
+            if st and st.newer then
+                lines[#lines + 1] = ("Settings were checked with %s, you have %s. Settings that are gone are skipped.")
+                    :format(st.tested, st.version)
+            end
+            if #s.missing > 0 then lines[#lines + 1] = "Not available:\n" .. table.concat(s.missing, "\n") end
+            if #lines > 0 then return table.concat(lines, "\n\n") end
         end })
+    end
+    local function SwitchedOff()
+        local list = {}
+        for i, entry in ipairs(ns.data.addons) do
+            if State(i) == "off" then list[#list + 1] = { entry = entry, name = p.sum[i].status.addon } end
+        end
+        return list
     end
     p:Buttons({
         { text = "Apply addon settings...", width = 190, style = "primary", fn = function() OpenWizard("addons") end,
           tip = "Opens the setup wizard at the addons step, so you can see and pick each change." },
+        { text = "Turn on switched-off", width = 180, fn = function()
+            local done, failed = {}, nil
+            for _, o in ipairs(SwitchedOff()) do
+                local ok, why = ns.EnableAddon(o.name)
+                if ok then done[#done + 1] = o.entry.title else failed = failed or why end
+            end
+            if #done > 0 then
+                S:Notify("Turned on: " .. table.concat(done, ", ") .. ". Reload to load them.", "warn")
+            elseif failed then
+                S:Notify(failed .. ".", "bad")
+            end
+        end, avail = function()
+            if not (ns.CanEnableAddons and ns.CanEnableAddons()) then return "This client can't switch addons on from here" end
+            if #SwitchedOff() == 0 then return "Nothing is switched off" end
+        end, tip = "Switches the supported addons that are off back on for this character. They load after a reload." },
     })
 
     if ns.Recommendations then
@@ -1591,7 +1630,8 @@ PAGES[#PAGES + 1] = { key = "profiles", title = "Profiles & backup", icon = "Int
     })
     end
 
-    p:Card("Share your setup", "Export gives a string with your MLZ UI choices. Import it on another character or computer.")
+    p:Card("Share your setup", "Export gives a string with your MLZ UI choices: wizard choices, faded frames, helpers, "
+        .. "reminders, and the role and situation profiles of this character. Import it on another character or computer.")
     p:Buttons({
         { text = "Export", width = 120, fn = function() ns.RunCommand("export") end,
           tip = "Shows a text string with your MLZ UI choices that you can copy to another character or share." },

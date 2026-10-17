@@ -13,6 +13,11 @@
 - Situation profiles on Profiles & backup: save fading, the quest tracker and threat colors for solo,
   dungeon, raid and battleground. With switching on, the saved one loads when you get there, on top of
   your role profile.
+- Other addons: the "Your addons" card shows each supported addon as loaded, switched off or missing,
+  with its version. "Turn on switched-off" switches them back on for this character (after a reload).
+- Settings for other addons can be limited to the addon versions that have them ("not in your version").
+- Export now covers faded frames, helpers, reminders, and the role and situation profiles of this
+  character. Strings start with `MLZ!2!`; `MLZ!1!` strings still import, and undo puts everything back.
 - Lint (luacheck and a Lua 5.1 syntax check) runs on every push and pull request.
 - Tagged versions are packaged and published to GitHub Releases, and to CurseForge and Wago when they are set up.
 - MIT license.

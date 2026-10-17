@@ -136,7 +136,7 @@ If the guess is wrong, set your role by hand with `/mlz role`, on the Your role 
 **Ecosystem**
 - Recommended settings for 15 addons, many of them per role: a healer and a tank do not get the same Questie, DBM or Details setup
 - Optional: Platynator as the nameplate engine, with modes per role and archetype and a clean style
-- Role and situation profiles, export/import strings and a health check for missing addons
+- Role and situation profiles, one export string for all your MLZ UI choices, and an addon overview (loaded, switched off, missing, version)
 
 ## Quick start
 
@@ -162,7 +162,7 @@ If the guess is wrong, set your role by hand with `/mlz role`, on the Your role 
 | `/mlz role tank\|healer\|dps\|auto` | Set your role for this character |
 | `/mlz heal on\|off\|auto\|build` | Healer layouts: status, switch them, or rebuild |
 | `/mlz np auto\|tank\|healer\|dps\|solo` | Nameplate mode (also `engine mlz\|platynator\|off`, `style`, `threat`, `pvp`, `save`, `load`, `export`) |
-| `/mlz export` · `/mlz import` | Share your choices as a string |
+| `/mlz export` · `/mlz import` | Share your choices as a string (wizard choices, fading, helpers, reminders, role and situation profiles) |
 | `/mlz keys` | A keyboard map of your keybinds, with the SHIFT, CTRL and ALT layers |
 | `/mlz tour` | Show where the hidden bars and buttons are |
 | `/mlz scale [auto\|0.64\|...]` | Recalculate and reapply the UI scale |
@@ -223,7 +223,7 @@ Rows that only fit one role or archetype show only for you. Settings that don't 
 | **Role profiles** | Nameplates, fading, tick bar and interrupt announce saved per role, loaded automatically when your role changes. Situation profiles (solo, dungeon, raid, battleground) save fading, the quest tracker and threat colors, and load on top when you get there. |
 | **Tweaks** | Minimap size, FPS counter, calmer combat text (Roboto Bold), hide the quest tracker or its header, class colors and a target line in unit tooltips, class colored names in chat (your old choice per chat type comes back when you turn it off). Style: square minimap with a 1px border (rotation off while square, skipped when Leatrix Plus styles the minimap), flat chat input box, Roboto chat font. |
 | **Backup / undo** | A stack of up to 5 backups. Every wizard run is reversible. |
-| **Health check** | Warns after login if a configured addon is installed but not loaded. |
+| **Addon overview** | Each supported addon shows as loaded, switched off or missing, with its version. Switched-off addons can be turned back on. Rows that only exist in some versions of an addon say "not in your version". The overview and minimap button point out a switched-off addon after login. |
 
 </details>
 
@@ -240,7 +240,7 @@ Rows that only fit one role or archetype show only for you. Settings that don't 
 | Bars & interface | Button colors and hotkeys, quest tracker, tooltips, chat (clean chat, class names, flat input, Roboto font), minimap (size, square, minimap button), FPS counter and combat text |
 | Helpers | Repair and sell greys, fewer clicks, group and raid (buff check, pull timer), mana tick bar, cooking tooltips, interrupt announce, XP per hour |
 | Reminders | Missing self buffs, pet happiness, reagents, ammo, durability, and food and flask in raids, with one switch per reminder for your class |
-| Other addons | Which supported addons are loaded and how many settings differ, addons worth a look for your role, list addon problems |
+| Other addons | Your addons (loaded, switched off or missing, version, how many settings differ, turn switched-off addons back on), addons worth a look for your role, list addon problems |
 | Profiles & backup | Role profiles, situation profiles, export/import, backups, undo |
 | About & help | How it works, show me around, commands, debug |
 
@@ -270,9 +270,10 @@ Everything the wizard offers is defined in `Data/`:
 - [x] Control center, minimap button and role profiles
 - [x] Interface previews in this README
 - [ ] In-game screenshots and a short demo
-- [ ] **Addon manager**: installed / missing / outdated state for supported addons
+- [x] **Addon manager**: loaded, switched off or missing, the version you have, and switch addons back on
 - [ ] Install and update supported addons through a small companion app (the game's Lua sandbox can't write files)
-- [ ] Version-aware settings for other addons
+- [x] Version-aware settings for other addons
+- [x] Fewer clicks, group and raid helpers, and situation profiles
 - [x] Release packaging for GitHub Releases (CurseForge and Wago once their project IDs are set)
 
 ## Contributing

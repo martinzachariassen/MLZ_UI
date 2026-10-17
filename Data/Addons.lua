@@ -13,6 +13,8 @@
 --             Without that command the rows fall back to `manual`.
 --   refresh = (optional) function that redraws the addon from its new settings. Return true if it did,
 --             and no reload is asked for.
+--   tested  = (optional) the newest version of the addon these rows were checked against. A newer installed
+--             version is pointed out on the Other addons page (rows still run; missing keys are skipped).
 --   title   = heading in the wizard
 --   live    = true if the addon reads these settings while it runs, so no reload is asked for
 --   root    = function returning the table that `path` starts from (nil = not available yet)
@@ -20,6 +22,8 @@
 --             `enabled = false` means the row is listed but off until you tick it.
 --             `roles = { HEALER = true }` and `archetypes = { CASTER = true, RANGED = true }` limit a row to
 --             the role or archetype you picked (TANK, HEALER, DAMAGER / TANK, HEALER, MELEE, RANGED, CASTER).
+--             `minVersion = "x.y"` / `maxVersion = "x.y"` limit a row to versions of the addon that have
+--             the setting; other versions show "not in your version".
 --             A row can have its own `root`. Instead of path/value a row can set several keys at
 --             once: set = { { path = {...}, value = ... }, ... } and show = "%s %s" (format for the
 --             wizard, one %s per key in order).
