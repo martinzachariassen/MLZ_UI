@@ -32,7 +32,7 @@ MLZ_UI/
 │   ├── Settings.lua      Control center (/mlz), including the overview tips
 │   ├── MinimapButton.lua Minimap button, tooltip, quick menu
 │   ├── Keys.lua          Keyboard map of your keybinds (/mlz keys)
-│   └── Tour.lua          "Where did things go?" tour over the faded frames (/mlz tour)
+│   └── Tour.lua          "Show me around" tour over the faded frames (/mlz tour)
 ├── Media/                Roboto Bold + license
 └── docs/
     ├── ARCHITECTURE.md
@@ -77,6 +77,8 @@ function Tweaks:Restore(snap)    -- puts a snapshot back
 A preview item is a table with at least `id`, `label`, `old` and `new`. Optional fields include `group`, `groupNote`, `note`, `enabled`, `toggle`/`isOn`, `behaviour` (changes how the game plays, drawn in amber), `keepVisible`, and `unavailable = true` with the reason in `new` (e.g. "tracker not found"). `attention = true` on an unavailable row keeps it in the list, in amber (a key that will be lost). The wizard draws one row per item, as *now → will become*.
 
 If `Apply` returns a text, the last wizard page shows the step as "PARTLY" with that text. A module can set `dependents = { "settings" }`: those steps are previewed again when a choice in this one changes (the role step does this).
+
+Wizard steps and modules are not 1:1. `PAGES` in `UI/Installer.lua` lists the 8 steps, and a step can hold several modules with `keys = { "actionbuttons", "tweaks" }` (plus optional `groups` headings per module). Each module still has its own row toggles (`ns.db.toggles[key]`), backup and place in `APPLY_ORDER`. "Use this step" turns all of the step's modules on or off, and the review lists changes in step order. A new module joins an existing step by adding its key there.
 
 Rules:
 - `Preview` must not change anything.
@@ -161,6 +163,6 @@ The schema is versioned with `DB_VERSION` in `Core.lua`. When you change the sha
 
 ## UI layer
 
-All UI is built from `UI/Widgets.lua` (`W.Window`, `W.Card`, `W.Button`, `W.Toggle`, `W.Segmented`, `W.Stepper`, `W.Slider`, `W.Badge`, `W.ScrollArea`, `W.Tooltip`) and the theme tokens `W.T` / `W.C`. The control center pages in `UI/Settings.lua` use a small page builder (`Title`, `Card`, `Row`, `Toggle`, `Choice`, `Step`, `Slider`, `Value`, `Status`, `Buttons`, `Text`), so every page looks and behaves the same.
+All UI is built from `UI/Widgets.lua` (`W.Window`, `W.Card`, `W.Button`, `W.Toggle`, `W.Segmented`, `W.Stepper`, `W.Slider`, `W.Badge`, `W.ScrollArea`, `W.Tooltip`) and the theme tokens `W.T` / `W.C`. The control center pages in `UI/Settings.lua` use a small page builder (`Title`, `Card`, `Row`, `Toggle`, `Choice`, `Step`, `Slider`, `Value`, `Status`, `Buttons`, `Text`), so every page looks and behaves the same. Pages register in `SECTIONS` and the sidebar order comes from `PAGE_ORDER`. A page for a feature-only module (Reminders, Cooking, XP rate) checks that `ns.X` exists and shows an amber line when it doesn't.
 
 Design rules are in [`CLAUDE.md`](../CLAUDE.md#ui-design-language).

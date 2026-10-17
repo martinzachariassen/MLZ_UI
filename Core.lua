@@ -5,7 +5,7 @@ local ADDON, ns = ...
 MLZUI = ns -- global for /dump MLZUI during development
 
 ns.name = "MLZ UI"
-ns.version = "0.7.0"
+ns.version = "0.8.0"
 ns.modules = {}       -- registered modules, in load order (see MLZ_UI.toc), also indexed by key
 ns.data = {}          -- data tables (Data/*.lua)
 

@@ -8,6 +8,7 @@ window.MLZ_ICONS = {
     fade:       '<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
     buttons:    '<rect x="3" y="7" width="5" height="10"/><rect x="9.5" y="7" width="5" height="10"/><rect x="16" y="7" width="5" height="10"/>',
     qol:        '<circle cx="12" cy="12" r="8"/><path d="M12 8v8M9.5 10.5h4a1.5 1.5 0 010 3h-3a1.5 1.5 0 000 3h4"/>',
+    reminders:  '<circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2M9 3h6"/>',
     addons:     '<path d="M5 8h14l-1 12H6L5 8z"/><path d="M9 8V6a3 3 0 016 0v2"/>',
     profiles:   '<path d="M6 3h9l4 4v14H6z"/><path d="M9 12h7M9 16h7"/>',
     about:      '<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 114 2c-1 .6-1.5 1.2-1.5 2.5M12 17h.01"/>',

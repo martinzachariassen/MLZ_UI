@@ -2,7 +2,7 @@
 ## Title: MLZ UI
 ## Notes: Sets up scaling, layout, keybinds and settings via an installation wizard. Built for WoW Forever, all classes. /mlz
 ## Author: Martin
-## Version: 0.7.0
+## Version: 0.8.0
 ## SavedVariables: MLZUIDB
 ## IconTexture: Interface\Icons\INV_Misc_Gear_01
 ## AddonCompartmentFunc: MLZUI_OnAddonCompartmentClick

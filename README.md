@@ -4,7 +4,7 @@
 
 **A clean, minimal World of Warcraft UI in one guided setup, built for WoW Forever and every class. Every change previewed, every change undoable.**
 
-![Version](https://img.shields.io/badge/version-0.7.0-33a0ff?style=flat-square)
+![Version](https://img.shields.io/badge/version-0.8.0-33a0ff?style=flat-square)
 ![Client](https://img.shields.io/badge/client-WoW%20Forever-33a0ff?style=flat-square)
 ![Interface](https://img.shields.io/badge/interface-16001-20242b?style=flat-square)
 ![Lua](https://img.shields.io/badge/lua-5.1-000080?style=flat-square&logo=lua)
@@ -34,20 +34,20 @@ MLZ UI sets up the **Blizzard UI you already have** (Edit Mode, CVars, keybinds 
 3. **Apply.** MLZ UI takes a backup first, then sets Edit Mode, CVars, keybinds, fading and the settings of the addons you have installed. Some addons need a `/reload`. The footer tells you when.
 4. **Live with it.** `/mlz` opens the control center: one status line per area, one switch per setting, and everything applies at once. If you change your mind, `/mlz undo` puts the last run back.
 
-The wizard has 10 steps:
+The wizard has 8 steps, then a review of everything that will change:
 
 | Step | What it sets up |
 |---|---|
 | 1. Your character | Your role. Detected from talents, form or group, and you can override it |
-| 2. UI scale | Pixel-perfect scale for your resolution |
-| 3. Screen layout | A dedicated Edit Mode layout: bars bottom center, player and target on the sides |
-| 4. Game settings | Opt-in CVars in groups: loot, combat, unit frames, action bars, camera, combat text, nameplates, raid frames, threat |
-| 5. Keybinds | ESDF or WASD, 12 keys on three layers, with conflicts shown in red |
-| 6. Minimalism | Bars, bags and menus fade until you hover |
-| 7. Action buttons | Range, mana and usability colors, short hotkeys, no macro names |
-| 8. Interface tweaks | Minimap size, FPS counter, combat text, tooltips, chat style |
-| 9. Other addons | The settings of the addons below, filtered for your role |
-| 10. Nameplates | Engine and mode, clean style, threat colors |
+| 2. Scale & layout | Pixel-perfect scale for your resolution, and a dedicated Edit Mode layout: bars bottom center, player and target on the sides |
+| 3. Game settings | Opt-in CVars in groups: loot, combat, unit frames, action bars, camera, combat text, nameplates, raid frames, threat |
+| 4. Keybinds | ESDF or WASD, 12 keys on three layers, with conflicts shown in red |
+| 5. Minimalism | Bars, bags and menus fade until you hover, clean chat |
+| 6. Bars & interface | Range, mana and usability colors, short hotkeys, minimap, FPS counter, combat text, tooltips, chat style |
+| 7. Other addons | The settings of the addons below, filtered for your role |
+| 8. Nameplates | Engine and mode, clean style, threat colors |
+
+Blue values can be clicked to pick another option (right-click goes back).
 
 ## Supported game version
 
@@ -177,7 +177,7 @@ If the guess is wrong, set your role by hand with `/mlz role`, on the Your role 
 | `/mlz debug` · `/mlz probe` | Verbose output, and a dump of client facts into SavedVariables |
 | `/mlz help` | List the main commands (the table above has all of them) |
 
-The minimap button: left-click opens the control center, right-click opens a quick menu (nameplate mode, your role, pause fading, FPS counter, settings, wizard, My keybinds, Where did things go?, Reload UI), Shift-click reloads, drag moves it. It is also in the addon compartment.
+The minimap button: left-click opens the control center, right-click opens a quick menu (nameplate mode, your role, pause fading, FPS counter, settings, wizard, My keybinds, Show me around, Reload UI), Shift-click reloads, drag moves it. It is also in the addon compartment.
 
 ## Supported addons
 
@@ -229,15 +229,16 @@ Rows that only fit one role or archetype show only for you. Settings that don't 
 | Page | What you see and change |
 |---|---|
 | Overview | One status line per area, up to 3 next steps (missing buffs, missing role layouts, reminders off), a tip card, and a banner only when setup or a reload is pending |
-| Layout & scale | Scale mode, screen layout (Edit Mode), minimap size, pet bar position |
-| Nameplates | Engine (MLZ, Platynator or off), current mode and why, mode picker, friendly names, threat colors, PvP tweak, what the plates show, size, Platynator profile save/restore |
 | Your role | Your role and where it comes from, your class and archetype, role layouts now and for your role, rebuild role layouts |
-| Minimalism | One switch per faded frame, pause fading, clean chat |
-| Action bars & interface | Button colors and hotkeys, quest tracker, FPS counter, combat text, tooltips, style |
-| Helpers | Repair / sell greys, mana tick bar, cooking tooltips, interrupt announce, reminders (with one switch per reminder for your class), XP per hour |
-| Other addons | Which supported addons are loaded and how many settings differ, plus addons worth a look for your role |
+| Layout & scale | Scale mode, screen layout (Edit Mode), pet bar position |
+| Nameplates | Engine (MLZ, Platynator or off), mode picker with the active mode and why, friendly names, threat colors, PvP tweak, what the plates show, size, Platynator profile save/restore |
+| Minimalism | Pause fading, one switch per faded frame |
+| Bars & interface | Button colors and hotkeys, quest tracker, tooltips, chat (clean chat, class names, flat input, Roboto font), minimap (size, square, minimap button), FPS counter and combat text |
+| Helpers | Repair and sell greys, mana tick bar, cooking tooltips, interrupt announce, XP per hour |
+| Reminders | Missing self buffs, reagents, ammo and durability, with one switch per reminder for your class |
+| Other addons | Which supported addons are loaded and how many settings differ, addons worth a look for your role, list addon problems |
 | Profiles & backup | Role profiles, export/import, backups, undo |
-| About & help | How it works, minimap button, commands, debug |
+| About & help | How it works, show me around, commands, debug |
 
 The footer always shows whether a reload is needed and why.
 
