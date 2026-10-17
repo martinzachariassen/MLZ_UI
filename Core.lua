@@ -9,7 +9,7 @@ ns.version = "0.7.0"
 ns.modules = {}       -- registered modules, in load order (see MLZ_UI.toc), also indexed by key
 ns.data = {}          -- data tables (Data/*.lua)
 
-local DB_VERSION = 5
+local DB_VERSION = 6
 
 ------------------------------------------------------------------------
 -- Output
@@ -543,6 +543,10 @@ local migrations = {
     -- (the per chat type "color names" choice from before MLZ UI changed it).
     [5] = function(db)
         if db.reminders ~= nil and type(db.reminders) ~= "table" then db.reminders = nil end
+    end,
+    -- v6: new optional key, nothing to convert. cooking = { tooltip } (Modules/Cooking.lua fills in defaults)
+    [6] = function(db)
+        if db.cooking ~= nil and type(db.cooking) ~= "table" then db.cooking = nil end
     end,
 }
 

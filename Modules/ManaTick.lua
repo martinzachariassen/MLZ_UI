@@ -21,6 +21,20 @@ local COLORS = {
     energy = { 1.00, 0.85, 0.20 },
 }
 
+-- In combat the client can hand back "secret" numbers. Addon code may not compare or calculate with them,
+-- so Num() gives a plain number or nil and callers skip the maths when it is nil.
+local issecretvalue = issecretvalue
+local function Num(v)
+    if v == nil or (issecretvalue and issecretvalue(v)) then return nil end
+    return v
+end
+
+local function Full(power)
+    local cur, max = Num(UnitPower("player", power)), Num(UnitPowerMax("player", power))
+    if not (cur and max) then return false end
+    return cur >= max
+end
+
 local function Cfg()
     ns.db.manaTick = ns.db.manaTick or {}
     return ns.db.manaTick
@@ -61,6 +75,11 @@ local function Build()
     bar.spark = bar:CreateTexture(nil, "OVERLAY")
     bar.spark:SetColorTexture(1, 1, 1, 0.9)
     bar.spark:SetSize(2, 9)
+    -- Mana in numbers under the bar, only while a druid is in Bear Form (the bar itself is too thin for text)
+    bar.text = bar:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    bar.text:SetPoint("TOP", bar, "BOTTOM", 0, -2)
+    bar.text:SetTextColor(unpack(COLORS.mana))
+    bar.text:Hide()
     bar:SetMovable(true)
     bar:SetClampedToScreen(true)
     bar:RegisterForDrag("LeftButton")
@@ -92,6 +111,9 @@ end
 local function OnUpdate(self)
     local now = GetTime()
     if testing then
+        self.text:Hide()
+        self.spark:Show()
+        self:SetMinMaxValues(0, 1)
         self:SetValue((now % TICK) / TICK)
         self:SetStatusBarColor(unpack(COLORS.mana))
         self.spark:SetPoint("CENTER", self, "LEFT", self:GetValue() * self:GetWidth(), 0)
@@ -100,8 +122,16 @@ local function OnUpdate(self)
     local kind, shifted = PowerKind()
     local value, color
     if shifted then
-        local max = UnitPowerMax("player", MANA)
-        value, color = max > 0 and UnitPower("player", MANA) / max or 0, COLORS.mana
+        local cur, max = UnitPower("player", MANA), UnitPowerMax("player", MANA)
+        color = COLORS.mana
+        -- the bar scales the value itself, so this works with secret numbers too
+        self:SetMinMaxValues(0, max)
+        self:SetValue(cur)
+        self.text:SetFormattedText("%s / %s", cur, max)
+        self.text:Show()
+        self:SetStatusBarColor(unpack(color))
+        self.spark:Hide()
+        return
     elseif kind == "mana" and now - lastSpend < FIVE then
         value, color = (now - lastSpend) / FIVE, COLORS.five
     elseif kind and lastTick[kind] then
@@ -109,6 +139,9 @@ local function OnUpdate(self)
     else
         value, color = 0, COLORS[kind or "mana"]
     end
+    self.text:Hide()
+    self:SetMinMaxValues(0, 1)
+    self.spark:Show()
     self:SetValue(value)
     self:SetStatusBarColor(unpack(color))
     self.spark:SetPoint("CENTER", self, "LEFT", value * self:GetWidth(), 0)
@@ -122,9 +155,9 @@ local function UpdateShown()
     local kind = cfg.enabled and PowerKind()
     local show = false
     if kind == "mana" and not cfg.noMana then
-        show = UnitPower("player", MANA) < UnitPowerMax("player", MANA) or InCombatLockdown()
+        show = not Full(MANA) or InCombatLockdown()
     elseif kind == "energy" and not cfg.noEnergy then
-        show = UnitPower("player", ENERGY) < UnitPowerMax("player", ENERGY) or InCombatLockdown()
+        show = not Full(ENERGY) or InCombatLockdown()
     end
     if UnitIsDeadOrGhost("player") then show = false end
     bar:SetShown(show)
@@ -135,9 +168,9 @@ local function OnPower(_, unit, powerToken)
     local now = GetTime()
     for kind, id in pairs({ mana = MANA, energy = ENERGY }) do
         if not powerToken or powerToken == (kind == "mana" and "MANA" or "ENERGY") then
-            local p = UnitPower("player", id)
+            local p = Num(UnitPower("player", id))
             local old = lastPower[kind]
-            if old then
+            if p and old then
                 if p < old and kind == "mana" then
                     lastSpend = now
                 elseif p > old then
@@ -145,7 +178,7 @@ local function OnPower(_, unit, powerToken)
                     lastTick[kind] = now
                 end
             end
-            lastPower[kind] = p
+            if p then lastPower[kind] = p end
         end
     end
     UpdateShown()
@@ -154,8 +187,8 @@ end
 local function Start()
     Build()
     bar:SetScript("OnUpdate", OnUpdate)
-    lastPower.mana = UnitPower("player", MANA)
-    lastPower.energy = UnitPower("player", ENERGY)
+    lastPower.mana = Num(UnitPower("player", MANA))
+    lastPower.energy = Num(UnitPower("player", ENERGY))
     UpdateShown()
 end
 

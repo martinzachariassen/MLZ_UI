@@ -214,6 +214,7 @@ SECTIONS[#SECTIONS + 1] = function(Add)
     if V.Get("repair") then names[#names + 1] = "auto-repair" end
     if V.Get("sell") then names[#names + 1] = "sell greys" end
     if MT.IsOn() then names[#names + 1] = "mana tick bar" end
+    if ns.Cooking and ns.Cooking.Get() then names[#names + 1] = "cooking tips" end
     if IA.Get() ~= "off" then names[#names + 1] = "interrupt announce" end
     if ns.RoleProfiles.Auto() then names[#names + 1] = "role profiles" end
     local R = ns.Reminders
@@ -1240,6 +1241,19 @@ PAGES[#PAGES + 1] = { key = "qol", title = "Helpers", icon = "Interface\\Icons\\
             S:Notify("The tick bar is back under your player frame.", "info")
         end, avail = NoTick },
     })
+
+    local CK = ns.Cooking
+    p:Card("Cooking", "Keep the meat and fish you can cook. The number is the Cooking skill the recipe needs.")
+    p:Toggle("Show cooking uses in tooltips", "Meat, fish, eggs and spices show which dishes they make, colored by your Cooking skill.",
+        CK.Get, CK.Set,
+        { avail = CK.Unavailable,
+          tip = "Up to 3 dishes per ingredient, easiest first.\n\n"
+            .. C.amber .. "Orange|r: a skill point every time.\n"
+            .. C.gold .. "Yellow|r: usually a skill point.\n"
+            .. C.green .. "Green|r: a skill point now and then.\n"
+            .. C.grey .. "Grey|r: no more skill points.\n"
+            .. C.red .. "Red|r: your Cooking skill is too low.\n\n"
+            .. "White means you haven't learned Cooking yet. Learn it from any Cooking trainer." })
 
     p:Card("Interrupts")
     p:Choice("Announce my interrupts", "\"Interrupted <mob>'s <spell>\" when you or your pet interrupt a cast. Say and Group only post while you are in a group.",

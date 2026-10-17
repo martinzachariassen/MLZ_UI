@@ -120,6 +120,7 @@ If the guess is wrong, set your role by hand with `/mlz role`, on the Your role 
 - Class-aware key hints, extra form keys, pet keys, and reminders for all 9 classes
 - Our own flat nameplates: health, cast bar, quest marker, your debuffs and threat colors per role. Platynator is optional
 - Auto-repair, sell greys, a mana tick bar and an interrupt announce
+- Cooking uses in item tooltips: meat, fish and spices show which dishes they make, colored by your Cooking skill
 - Reminders for missing self buffs, low reagents and ammo, and worn gear (out of combat only)
 - XP per hour and time to the next level while leveling
 - Class colored names and a "Target:" line in unit tooltips, and class colored names in chat
@@ -213,7 +214,7 @@ Rows that only fit one role or archetype show only for you. Settings that don't 
 | **Minimalism** | Bars 4-5, micro menu, bags, chat buttons and XP bar hidden until hover. Bars 2-3 dimmed out of combat. Damage meter only in a group. |
 | **Action buttons** | Red = out of range, blue = no resource, grey = unusable. Short hotkeys (`S1`, `C1`) and hidden macro names. Stance, pet and bonus bars included. |
 | **Nameplates** | MLZ nameplates (or Platynator). Tank / Healer / DPS / Solo picked from your role. Healer: unclickable friendly names, dimmed enemies. Tank: bigger target, your debuffs on every mob. Quest marker, cast bar, level only when it matters. Applies at once, no `/reload`. |
-| **Helpers** | Auto-repair (guild money first), sell greys (hold Shift to skip), mana tick / 5-second rule bar (energy tick for rogues and cats), interrupt announce. Reminder icons for missing self buffs (not in cities), low reagents and ammo, and gear at 25% durability or less. XP per hour and time to level. |
+| **Helpers** | Auto-repair (guild money first), sell greys (hold Shift to skip), mana tick / 5-second rule bar (energy tick for rogues and cats), interrupt announce. Cooking uses in item tooltips (dish and skill needed, colored by your Cooking skill). Reminder icons for missing self buffs (not in cities), low reagents and ammo, and gear at 25% durability or less. XP per hour and time to level. |
 | **Classes and roles** | All 9 classes. Role is tank, healer or DPS, and DPS is melee, ranged or caster. Defensive Stance, Bear Form and Righteous Fury count as tanking. Data in `Data/Classes.lua`. |
 | **Role profiles** | Nameplates, fading, tick bar and interrupt announce saved per role, loaded automatically when your role changes. |
 | **Tweaks** | Minimap size, FPS counter, calmer combat text (Roboto Bold), hide the quest tracker or its header, class colors and a target line in unit tooltips, class colored names in chat (your old choice per chat type comes back when you turn it off). Style: square minimap with a 1px border (rotation off while square, skipped when Leatrix Plus styles the minimap), flat chat input box, Roboto chat font. |
@@ -233,7 +234,7 @@ Rows that only fit one role or archetype show only for you. Settings that don't 
 | Your role | Your role and where it comes from, your class and archetype, role layouts now and for your role, rebuild role layouts |
 | Minimalism | One switch per faded frame, pause fading, clean chat |
 | Action bars & interface | Button colors and hotkeys, quest tracker, FPS counter, combat text, tooltips, style |
-| Helpers | Repair / sell greys, mana tick bar, interrupt announce, reminders (with one switch per reminder for your class), XP per hour |
+| Helpers | Repair / sell greys, mana tick bar, cooking tooltips, interrupt announce, reminders (with one switch per reminder for your class), XP per hour |
 | Other addons | Which supported addons are loaded and how many settings differ, plus addons worth a look for your role |
 | Profiles & backup | Role profiles, export/import, backups, undo |
 | About & help | How it works, minimap button, commands, debug |

@@ -242,6 +242,10 @@ ns.data.addons = {
         rows = {
             { id = "minimap", label = "Hide minimap button", desc = "Keeps the minimap clean. Open the settings with /questie.",
               path = { "minimap", "hide" }, value = true },
+            -- The guide addon already lists the quest steps. The other tracker rows stay harmless when this is on.
+            { id = "tracker_off", label = "Hide Questie quest tracker",
+              desc = "Turns the Questie tracker off. Map icons and tooltips still work. Needs a reload.",
+              path = { "trackerEnabled" }, value = false },
             -- Questie refuses both at once (hide and minimize exclude each other), so each role gets one of them.
             -- Healers and ranged classes watch the raid or the target, so the list goes away. Tanks and melee
             -- keep the header, so the quest list is one click away in a quiet moment.
@@ -515,8 +519,8 @@ ns.data.addons = {
               desc = "The world map only shows waypoints for the zone you are looking at.",
               path = { "worldmap", "otherzone" }, value = false },
             { id = "block", label = "Hide the coordinate box",
-              desc = "Removes the small box with your coordinates. The world map still shows them. Off by default: tick it if you never read it.",
-              path = { "block", "enable" }, value = false, enabled = false },
+              desc = "Removes the small box with your coordinates. The minimap and the world map still show them.",
+              path = { "block", "enable" }, value = false },
         },
     },
 }

@@ -21,6 +21,7 @@ Data\Nameplates.lua
 Data\Addons.lua
 Data\Reminders.lua
 Data\Tips.lua
+Data\Cooking.lua
 
 Modules\Backup.lua
 Modules\Role.lua
@@ -41,6 +42,7 @@ Modules\ManaTick.lua
 Modules\Interrupt.lua
 Modules\Reminders.lua
 Modules\XPRate.lua
+Modules\Cooking.lua
 Modules\Profile.lua
 
 UI\Widgets.lua

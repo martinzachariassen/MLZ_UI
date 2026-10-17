@@ -33,6 +33,7 @@ local API_LIST = {
     "C_Container.GetContainerItemInfo", "C_Container.UseContainerItem", "GetContainerItemInfo",
     "CanMerchantRepair", "GetRepairAllCost", "RepairAllItems", "CanGuildBankRepair",
     "CombatLogGetCurrentEventInfo", "C_AddOns.IsAddOnLoaded",
+    "TooltipDataProcessor.AddTooltipPostCall", "GetNumSkillLines", "GetSkillLineInfo", "TradeSkillTypeColor",
     "InCombatLockdown", "C_Timer.After", "ReloadUI",
 }
 
