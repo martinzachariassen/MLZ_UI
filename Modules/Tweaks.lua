@@ -498,7 +498,7 @@ function Tweaks:Set(id, on)
     ns.FireState()
 end
 
-ns.AddCommand("fps", "shows/hides the FPS counter in the bottom right", function()
+ns.AddCommand("fps", "shows or hides the FPS counter in the bottom right", function()
     Tweaks:Set("fps", not Tweaks:IsOn("fps"))
     ns.Print("FPS counter:", Tweaks:IsOn("fps") and "on" or "off")
 end)
@@ -558,12 +558,12 @@ ns.AddCommand("map", "changes the minimap size (opens the settings, or e.g. /mlz
     if n then SaveMap(n) elseif ns.Settings then ns.Settings:Open("buttons") end
 end)
 
-ns.AddCommand("quests", "hides/shows the entire quest tracker", function()
+ns.AddCommand("quests", "hides or shows the whole quest tracker", function()
     Tweaks:Set("trackerHide", not Tweaks:IsOn("trackerHide"))
     ns.Print("Quest tracker:", Tweaks:IsOn("trackerHide") and "hidden" or "shown")
 end)
 
-ns.AddCommand("tracker", 'hides/shows the "All Objectives" line in the quest tracker', function()
+ns.AddCommand("tracker", 'hides or shows the "All Objectives" line in the quest tracker', function()
     Tweaks:Set("trackerHeader", not Tweaks:IsOn("trackerHeader"))
     ns.Print('"All Objectives" line:', Tweaks:IsOn("trackerHeader") and "hidden" or "shown")
 end)

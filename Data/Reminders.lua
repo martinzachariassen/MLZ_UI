@@ -11,7 +11,9 @@
 --   kind   = "aura" (default), "weapon" (weapon enchant on each hand that holds a weapon: poisons, imbues)
 --            or "pet" (no pet out), or "happiness" (hunter pet out but not happy)
 -- reagents: shown when you know `spell` and carry fewer than `min` of `item`.
---   item = item ID, or "ammo" for the equipped ammo (hunters)
+--   item  = item ID, or "ammo" for the equipped ammo (hunters)
+--   group = (optional) ranks of one spell that use different reagents, highest rank first.
+--           Only the highest rank you know is checked.
 -- leveling: solo and below max level, with its own switch (food for the extra XP).
 -- raid: only inside a raid instance, with its own switch (food and flask in raids).
 --   food  = spell IDs whose aura name counts as fed (every "Well Fed" buff shares the name)
@@ -67,10 +69,12 @@ ns.data.reminders = {
         { class = "MAGE", spell = 11418, item = 17032, min = 1, label = "Portal rune" },       -- Portal: Undercity
         { class = "MAGE", spell = 11420, item = 17032, min = 1, label = "Portal rune" },       -- Portal: Thunder Bluff
         { class = "MAGE", spell = 23028, item = 17020, min = 5, label = "Arcane Powder" },     -- Arcane Brilliance
-        { class = "PRIEST", spell = 21562, item = 17029, min = 5, label = "Sacred Candle" },   -- Prayer of Fortitude
+        { class = "PRIEST", spell = 21564, item = 17029, min = 5, label = "Sacred Candle", group = "fort" }, -- Prayer of Fortitude 2
+        { class = "PRIEST", spell = 21562, item = 17028, min = 5, label = "Holy Candle", group = "fort" },   -- Prayer of Fortitude 1
         { class = "PALADIN", spell = 25782, item = 21177, min = 10, label = "Symbol of Kings" }, -- Greater Blessing of Might
         { class = "PALADIN", spell = 19752, item = 17033, min = 1, label = "Symbol of Divinity" }, -- Divine Intervention
-        { class = "DRUID", spell = 21849, item = 17021, min = 5, label = "Wild Thornroot" },   -- Gift of the Wild
+        { class = "DRUID", spell = 21850, item = 17026, min = 5, label = "Wild Thornroot", group = "gotw" }, -- Gift of the Wild 2
+        { class = "DRUID", spell = 21849, item = 17021, min = 5, label = "Wild Berries", group = "gotw" },   -- Gift of the Wild 1
     },
 
     -- Buff check on ready check (Modules/Group.lua): long buffs one class gives the whole group.

@@ -134,7 +134,7 @@ function W.Tooltip(frame, title, text)
         local body = type(text) == "function" and text() or text
         if not title and not body then return end
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        if title then GameTooltip:SetText(title, 1, 1, 1) end
+        if title then GameTooltip:SetText(title, unpack(T.white, 1, 3)) end
         if body then GameTooltip:AddLine(body, nil, nil, nil, true) end
         GameTooltip:Show()
     end)
@@ -248,7 +248,7 @@ function W.Button(parent, text, width, height, onClick, style)
         if self:IsEnabled() then self.bg:SetColorTexture(unpack(self.style.hover)) end
         if self.tipTitle or self.tipText then
             GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-            GameTooltip:SetText(self.tipTitle or self:GetText() or "", 1, 1, 1)
+            GameTooltip:SetText(self.tipTitle or self:GetText() or "", unpack(T.white, 1, 3))
             if self.tipText then GameTooltip:AddLine(self.tipText, nil, nil, nil, true) end
             GameTooltip:Show()
         end

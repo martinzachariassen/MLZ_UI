@@ -41,7 +41,7 @@ The wizard has 8 steps, then a review of everything that will change:
 | 1. Your character | Your role. Detected from talents, form or group, and you can override it |
 | 2. Scale & layout | Pixel-perfect scale for your resolution, and a dedicated Edit Mode layout: bars bottom center, player and target on the sides |
 | 3. Game settings | Opt-in CVars in groups: loot, combat, unit frames, action bars, camera, combat text, nameplates, raid frames, threat |
-| 4. Keybinds | ESDF or WASD, 12 keys on three layers, with conflicts shown in red |
+| 4. Keybinds | ESDF or WASD, 12 keys on 3 layers, with conflicts shown in red |
 | 5. Minimalism | Bars, bags and menus fade until you hover, clean chat |
 | 6. Bars & interface | Range, mana and usability colors, short hotkeys, minimap, FPS counter, combat text, tooltips, chat style |
 | 7. Other addons | The settings of the addons below, filtered for your role |
@@ -55,7 +55,7 @@ Blue values can be clicked to pick another option (right-click goes back).
 
 ## Classes and roles
 
-All 9 classes are supported. MLZ UI reads your class, your talents and your form or stance, and sets up the UI for how you play. DPS is split in three, so a mage and a rogue do not get the same UI.
+All 9 classes are supported. MLZ UI reads your class, your talents and your form or stance, and sets up the UI for how you play. DPS is split in 3, so a mage and a rogue do not get the same UI.
 
 | Class | How MLZ UI sees you | What adapts |
 |---|---|---|
@@ -63,11 +63,11 @@ All 9 classes are supported. MLZ UI reads your class, your talents and your form
 | **Paladin** | Holy: healer. Protection: tank. Retribution: melee DPS. Righteous Fury counts as tank | Aura keys, aura and Righteous Fury reminders, Symbol of Kings and Divinity |
 | **Hunter** | Ranged DPS | Pet keys, aspect and pet reminders, ammo, only the ranged swing timer |
 | **Rogue** | Melee DPS | Stealth key, poison reminder for both hands, energy tick, powders |
-| **Priest** | Discipline and Holy: healer. Shadow: caster DPS | Shadowform key, Fortitude and Inner Fire reminders, mana tick |
+| **Priest** | Discipline and Holy: healer. Shadow: caster DPS | Shadowform key, Fortitude and Inner Fire reminders, candles, mana tick |
 | **Shaman** | Elemental: caster DPS. Enhancement: melee DPS. Restoration: healer | Imbue reminder for both hands, Lightning Shield, Ankh |
 | **Mage** | Caster DPS | Armor and Arcane Intellect reminders, teleport and portal runes, mana tick |
 | **Warlock** | Caster DPS | Pet keys and pet reminder, Demon Armor, Soul Shards |
-| **Druid** | Balance: caster DPS. Feral: tank in Bear Form, melee DPS in Cat Form. Restoration: healer | Form keys, mana bar stays in Bear Form, Mark of the Wild, Thorns, Wild Thornroot |
+| **Druid** | Balance: caster DPS. Feral: tank in Bear Form, melee DPS in Cat Form. Restoration: healer | Form keys, mana bar stays in Bear Form, Mark of the Wild, Thorns, Wild Berries and Wild Thornroot |
 
 What follows your role:
 - **Layouts.** Healers in a dungeon or raid get the group frames in the middle of the screen. Casters, hunters and healers on their own lose the melee swing timers. Everyone else keeps the main layout.
@@ -110,7 +110,7 @@ If the guess is wrong, set your role by hand with `/mlz role`, on the Your role 
 **Setup**
 - Pixel-perfect UI scale, recalculated when your resolution changes
 - A dedicated Edit Mode layout. Your other layouts are never touched.
-- ESDF or WASD keybinds in three layers (none, Shift, Ctrl), with conflict detection
+- ESDF or WASD keybinds in 3 layers (none, SHIFT, CTRL), with conflict detection
 - Opt-in CVars: auto loot, cast on key down, camera distance and more
 
 **In play**
@@ -123,7 +123,7 @@ If the guess is wrong, set your role by hand with `/mlz role`, on the Your role 
 - Fewer clicks (all off until you turn them on): accept and turn in quests, accept summons and resurrections, confirm bind on pickup loot when solo, decline duels
 - Group and raid: a buff check on ready check (only in your own chat) and a pull timer on `/mlz pull` or a key
 - Cooking uses in item tooltips: meat, fish and spices show which dishes they make, colored by your Cooking skill
-- Reminders for missing self buffs, an unhappy hunter pet, low reagents and ammo, worn gear, and food and flask in raids (out of combat only)
+- Reminders for missing self buffs, an unhappy hunter pet, low reagents and ammo, worn gear, buff food while leveling, and food and flask in raids (out of combat only)
 - XP per hour and time to the next level while leveling
 - Class colored names and a "Target:" line in unit tooltips, and class colored names in chat
 - Optional style: square minimap with a 1px border, flat chat input box, Roboto chat font
@@ -158,7 +158,7 @@ If the guess is wrong, set your role by hand with `/mlz role`, on the Your role 
 | `/mlz` | Open the control center |
 | `/mlz search [words]` | Find a setting in the control center, for example `/mlz search minimap` |
 | `/mlz install` | Open the setup wizard |
-| `/mlz undo` | Undo the last wizard run |
+| `/mlz undo` | Undo the last wizard run or import |
 | `/mlz backups` | List saved backups |
 | `/mlz role tank\|healer\|dps\|auto` | Set your role for this character |
 | `/mlz heal on\|off\|auto\|build` | Healer layouts: status, switch them, or rebuild |
@@ -182,7 +182,7 @@ If the guess is wrong, set your role by hand with `/mlz role`, on the Your role 
 | `/mlz debug` · `/mlz probe` | Verbose output, and a dump of client facts into SavedVariables |
 | `/mlz help` | List the main commands (the table above has all of them) |
 
-The minimap button: left-click opens the control center, right-click opens a quick menu (nameplate mode, your role, pause fading, FPS counter, settings, wizard, My keybinds, Show me around, Reload UI), Shift-click reloads, drag moves it. It is also in the addon compartment.
+The minimap button: left-click opens the control center, right-click opens a quick menu (nameplate mode, your role, pause fading, FPS counter, settings, wizard, My keybinds, Show me around, Reload UI), SHIFT-click reloads, drag moves it. It is also in the addon compartment.
 
 ## Supported addons
 
@@ -214,12 +214,12 @@ Rows that only fit one role or archetype show only for you. Settings that don't 
 |---|---|
 | **Pixel-perfect scale** | Calculates the scale from screen height (`k * 768 / height`). Stores the *mode*, not the number, and handles scales below Blizzard's 0.64 CVar limit. |
 | **Edit Mode layout** | Bars stacked bottom center, player/target flanking, swing timers and cast bar aligned, corners kept for glance-only info. Separate healer layouts for dungeons and raids, and one without melee swing timers for casters and hunters. |
-| **Keybinds** | 12 reach-sorted base keys per movement setup. Classes with stances or forms get extra keys on bar 5 buttons: druids 5, warriors and paladins 3, rogues and shadow priests 1. Drag your forms there and choose which key does what. Bar 5 does not change page when you shift. With ESDF the keys are 1, Shift+1, Ctrl+1, V and Shift+V. With WASD they are Shift+1/2/3, G and V, and bar 2 buttons 1-3 move to Shift+G/V/T. Displaced actions (e.g. Character panel) move to Alt. |
+| **Keybinds** | 12 reach-sorted base keys per movement setup. Classes with stances or forms get extra keys on bar 5 buttons: druids 5, warriors and paladins 3, rogues and shadow priests 1. Drag your forms there and choose which key does what. Bar 5 does not change page when you shift. With ESDF the keys are 1, SHIFT-1, CTRL-1, V and SHIFT-V. With WASD they are SHIFT-1/2/3, G and V, and bar 2 buttons 1-3 move to SHIFT-G/V/T. Displaced actions (e.g. Character panel) move to ALT. |
 | **Settings (CVars)** | Each CVar is optional. CVars your client doesn't have are skipped. |
 | **Minimalism** | Bars 4-5, micro menu, bags, chat buttons and XP bar hidden until hover. Bars 2-3 dimmed out of combat. Damage meter only in a group. |
 | **Action buttons** | Red = out of range, blue = no resource, grey = unusable. Short hotkeys (`S1`, `C1`) and hidden macro names. Stance, pet and bonus bars included. |
 | **Nameplates** | MLZ nameplates (or Platynator). Tank / Healer / DPS / Solo picked from your role. Healer: unclickable friendly names, dimmed enemies. Tank: bigger target, your debuffs on every mob. Quest marker, cast bar, level only when it matters. Applies at once, no `/reload`. |
-| **Helpers** | Auto-repair (guild money first), sell greys (hold Shift to skip), fewer clicks (accept and turn in quests, summons, resurrections, BoP loot when solo, decline duels; all off by default, Shift skips once), buff check on ready check and a pull timer, mana tick / 5-second rule bar (energy tick for rogues and cats), interrupt announce. Cooking uses in item tooltips (dish and skill needed, colored by your Cooking skill). Reminder icons for missing self buffs (not in cities), low reagents and ammo, and gear at 25% durability or less. XP per hour and time to level. |
+| **Helpers** | Auto-repair (guild money first), sell greys (hold SHIFT to skip), fewer clicks (accept and turn in quests but never grey ones, summons, resurrections, BoP loot when solo, decline duels; all off by default, SHIFT skips once), buff check on ready check and a pull timer, mana tick / 5-second rule bar (energy tick for rogues and cats), interrupt announce. Cooking uses in item tooltips (dish and skill needed, colored by your Cooking skill). Reminder icons for missing self buffs (not in cities), an unhappy hunter pet, low reagents and ammo, gear at 25% durability or less, buff food while leveling solo, and food and flask in raids. XP per hour and time to level. |
 | **Classes and roles** | All 9 classes. Role is tank, healer or DPS, and DPS is melee, ranged or caster. Defensive Stance, Bear Form and Righteous Fury count as tanking. Data in `Data/Classes.lua`. |
 | **Role profiles** | Nameplates, fading, tick bar and interrupt announce saved per role, loaded automatically when your role changes. Situation profiles (solo, dungeon, raid, battleground) save fading, the quest tracker and threat colors, and load on top when you get there. |
 | **Tweaks** | Minimap size, FPS counter, calmer combat text (Roboto Bold), hide the quest tracker or its header, class colors and a target line in unit tooltips, class colored names in chat (your old choice per chat type comes back when you turn it off). Style: square minimap with a 1px border (rotation off while square, skipped when Leatrix Plus styles the minimap), flat chat input box, Roboto chat font. |
@@ -233,19 +233,19 @@ Rows that only fit one role or archetype show only for you. Settings that don't 
 
 | Page | What you see and change |
 |---|---|
-| Overview | One status line per area, up to 3 next steps (missing buffs, missing role layouts, reminders off), a tip card, and a banner only when setup or a reload is pending |
+| Overview | One status line per area, up to 3 next steps (missing buffs, missing role layouts, reminders off, Platynator not ready, take the tour), a tip card, and a banner only when setup or a reload is pending |
 | Your role | Your role and where it comes from, your class and archetype, role layouts now and for your role, rebuild role layouts |
 | Layout & scale | Scale mode, screen layout (Edit Mode), pet bar position |
 | Nameplates | Engine (MLZ, Platynator or off), mode picker with the active mode and why, friendly names, threat colors, PvP tweak, what the plates show, size, Platynator profile save/restore |
 | Minimalism | Pause fading, one switch per faded frame |
 | Bars & interface | Button colors and hotkeys, quest tracker, tooltips, chat (clean chat, class names, flat input, Roboto font), minimap (size, square, minimap button), FPS counter and combat text |
 | Helpers | Repair and sell greys, fewer clicks, group and raid (buff check, pull timer), mana tick bar, cooking tooltips, interrupt announce, XP per hour |
-| Reminders | Missing self buffs, pet happiness, reagents, ammo, durability, and food and flask in raids, with one switch per reminder for your class |
+| Reminders | Missing self buffs, pet happiness, reagents, ammo, durability, food while leveling, and food and flask in raids, with one switch per reminder for your class |
 | Other addons | Your addons (loaded, switched off or missing, version, how many settings differ, turn switched-off addons back on), addons worth a look for your role, list addon problems |
-| Profiles & backup | Role profiles, situation profiles, export/import, backups, undo |
-| About & help | How it works, show me around, commands, debug |
+| Profiles & backup | Role profiles, situation profiles, export and import, backups, undo |
+| About & help | Game version, how it works, show me around, commands, debug, collect client info |
 
-The footer always shows whether a reload is needed and why.
+The search box at the top of the sidebar finds any setting by its name, its description or a common word for it (also `/mlz search`). The footer always shows whether a reload is needed and why.
 
 </details>
 
@@ -262,6 +262,11 @@ Everything the wizard offers is defined in `Data/`:
 | [`Data/Fade.lua`](Data/Fade.lua) | What fades, when and how much |
 | [`Data/Nameplates.lua`](Data/Nameplates.lua) | Nameplate modes, PvP tweak, threat colors, MLZ nameplate sizes and colors |
 | [`Data/Addons.lua`](Data/Addons.lua) | Settings applied to other addons |
+| [`Data/Classes.lua`](Data/Classes.lua) | Class facts: roles, archetypes, extra keys, key hints |
+| [`Data/Reminders.lua`](Data/Reminders.lua) | Buffs, reagents and food the reminders check |
+| [`Data/Tips.lua`](Data/Tips.lua) | Tips on the overview page |
+| [`Data/Cooking.lua`](Data/Cooking.lua) | Which dishes each cooking ingredient makes |
+| [`Data/Search.lua`](Data/Search.lua) | Extra words the settings search understands |
 
 </details>
 

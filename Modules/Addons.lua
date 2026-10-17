@@ -205,7 +205,7 @@ local function PreviewRow(entry, row)
     if not Writable(entry) and not item.alreadySet then
         -- shown so you know what to change, but never written
         item.enabled, item.unavailable = false, true
-        item.note = entry.manual .. (row.desc and ("  " .. row.desc) or "")
+        item.note = (entry.manual or "Change this in the addon itself.") .. (row.desc and ("  " .. row.desc) or "")
     end
     return item
 end

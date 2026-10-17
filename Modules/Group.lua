@@ -162,6 +162,12 @@ end
 function G.Pull(seconds)
     seconds = math.floor(tonumber(seconds) or 10)
     if seconds < 1 or seconds > 60 then seconds = 10 end
+    -- In a raid the countdown (and DBM's) is ignored without lead or assist, with no message
+    if IsInRaid and IsInRaid() and not (UnitIsGroupLeader and UnitIsGroupLeader("player"))
+        and not (UnitIsGroupAssistant and UnitIsGroupAssistant("player")) then
+        ns.Print("A pull timer in a raid needs raid lead or assist.")
+        return false
+    end
     if C_PartyInfo and C_PartyInfo.DoCountdown then
         C_PartyInfo.DoCountdown(seconds)
         return true

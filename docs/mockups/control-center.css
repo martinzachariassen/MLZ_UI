@@ -1,4 +1,4 @@
-/* Control center layout (UI/Settings.lua): 860x580, sidebar 180, footer 44, page 628 */
+/* Control center layout (UI/Settings.lua): 860x580, sidebar 180, footer 44, page 638 */
 .cc { width: 860px; height: 580px; }
 .cc-body { flex: 1; display: flex; min-height: 0; }
 
@@ -35,9 +35,9 @@
 
 .page {
     flex: 1; position: relative; overflow: hidden;
-    padding: 16px 0 0 20px;
+    padding: 14px 0 0 20px;
 }
-.page-inner { width: 628px; }
+.page-inner { width: 638px; }
 .page-title { margin: 0 0 6px 2px; }
 .page-sub { margin: 0 0 14px 2px; }
 
@@ -52,7 +52,7 @@
 .banner::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--green); }
 .banner.amber::before { background: var(--amber); }
 
-.slist { padding: 4px 1px; margin-bottom: 16px; }
+.slist { padding: 4px 1px; margin-bottom: 14px; }
 .sline { position: relative; height: 38px; display: flex; align-items: center; padding: 0 14px; gap: 12px; }
 .sline + .sline::after { content: ""; position: absolute; top: 0; left: 13px; right: 13px; height: 1px; background: var(--border); }
 .sline::before { content: ""; position: absolute; left: 0; top: 9px; bottom: 9px; width: 3px; background: var(--green); }
@@ -60,10 +60,17 @@
 .sline.off::before, .sline.na::before { background: var(--off); }
 .sline .ttl { width: 144px; flex: none; }
 .sline .txt { flex: 1; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.sline .badge { width: 104px; justify-content: flex-end; flex: none; }
+.sline .badge { width: 120px; justify-content: flex-end; flex: none; }
 .sline .open { color: var(--accent); opacity: .45; flex: none; margin-left: 4px; }
 .sline.hover { background: rgba(255,255,255,.04); }
 .sline.hover .open { opacity: 1; }
+
+/* Overview tip card: accent strip, TIP heading, one tip, action and "Next tip" buttons (TIP_H 58) */
+.tipcard { position: relative; min-height: 58px; display: flex; align-items: center; padding: 0 14px; gap: 8px; }
+.tipcard::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--accent); }
+.tipcard .tip-body { flex: 1; padding: 9px 0 10px; white-space: nowrap; }
+.tipcard .tip-body .f-sbold { color: var(--muted); margin-bottom: 4px; }
+.tipcard .btn { height: 24px; flex: none; }
 
 .cards { display: grid; grid-template-columns: 308px 308px; gap: 12px; margin-bottom: 16px; }
 .scard { position: relative; height: 78px; padding: 12px 12px 0 14px; }
@@ -94,7 +101,7 @@
 .footer {
     height: 44px; flex: none;
     background: var(--panel); border-top: 1px solid var(--border);
-    display: flex; align-items: center; padding: 0 10px 0 16px; gap: 10px;
+    display: flex; align-items: center; padding: 0 13px; gap: 10px;
 }
 .footer .dot { width: 8px; height: 8px; background: var(--green); flex: none; }
 .footer .dot.amber { background: var(--amber); }

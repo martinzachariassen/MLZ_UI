@@ -1,5 +1,5 @@
 -- MLZ UI: Minimap button (no libraries)
---   Left-click   opens/closes the control center
+--   Left-click   opens or closes the control center
 --   Right-click  quick menu (nameplate mode, healer, pause fading, reload ...)
 --   Shift-click  reloads the UI, only when a reload is pending
 --   Drag         moves the button around the minimap edge (saved in MLZUIDB.minimap.angle)
@@ -58,7 +58,7 @@ local function ShowTooltip(owner)
     if not owner then return end
     tipOwner = owner
     GameTooltip:SetOwner(owner, owner == button and "ANCHOR_LEFT" or "ANCHOR_RIGHT")
-    GameTooltip:SetText("MLZ UI  " .. C.grey .. "v" .. (ns.version or "") .. C.r, 1, 1, 1)
+    GameTooltip:SetText("MLZ UI  " .. C.grey .. "v" .. (ns.version or "") .. C.r, unpack(T.white, 1, 3))
     if not ns.db.installed then
         GameTooltip:AddLine("Not set up yet. Left-click to start the setup wizard.", T.amber[1], T.amber[2], T.amber[3], true)
     end
@@ -159,7 +159,7 @@ local function BuildMenu()
                 local reason = why()
                 if not reason or reason == "" then return end
                 GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-                GameTooltip:SetText(text, 1, 1, 1)
+                GameTooltip:SetText(text, unpack(T.white, 1, 3))
                 GameTooltip:AddLine(reason, T.amber[1], T.amber[2], T.amber[3], true)
                 GameTooltip:Show()
             end)

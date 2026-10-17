@@ -7,6 +7,7 @@ How MLZ UI is put together. For conventions and style, see [`CLAUDE.md`](../CLAU
 ```
 MLZ_UI/
 ├── MLZ_UI.toc            Load order, interface version, SavedVariables (MLZUIDB)
+├── Bindings.xml          Key Bindings entry (pull timer), loaded by the game
 ├── Core.lua              Namespace, events, combat queue, state, roles, commands, migrations
 ├── Probe.lua             /mlz probe: dumps client facts to SavedVariables
 ├── Data/                 WHAT to set (plain tables, no logic)
@@ -17,8 +18,10 @@ MLZ_UI/
 │   ├── Fade.lua
 │   ├── Nameplates.lua
 │   ├── Addons.lua
-│   ├── Reminders.lua     Self buffs, reagents and the durability limit per class
-│   └── Tips.lua          Tips for the overview card
+│   ├── Reminders.lua     Self buffs, reagents, food and group buffs per class
+│   ├── Tips.lua          Tips for the overview card
+│   ├── Cooking.lua       Which dishes each cooking ingredient makes
+│   └── Search.lua        Aliases, stopwords and examples for the control center search
 ├── Modules/              HOW to set it (one feature per file)
 │   ├── Backup.lua        Backup stack, apply order, undo (loads first)
 │   ├── Role.lua          "Your character" wizard step: confirm or change your role
@@ -36,10 +39,15 @@ MLZ_UI/
 │   ├── Keys.lua          Keyboard map of your keybinds (/mlz keys)
 │   └── Tour.lua          "Show me around" tour over the faded frames (/mlz tour)
 ├── Media/                Roboto Bold + license
-└── docs/
-    ├── ARCHITECTURE.md
-    ├── mockups/          HTML sources for the README images + render.sh
-    └── screenshots/      Rendered PNGs used by the README
+├── docs/
+│   ├── ARCHITECTURE.md
+│   ├── mockups/          HTML sources for the README images + render.sh
+│   └── screenshots/      Rendered PNGs used by the README
+├── .github/workflows/    lint.yml (luacheck on main and pull requests), release.yml (packages a tag)
+├── .luacheckrc           Lint config, including every WoW API global we use
+├── .pkgmeta              Packager config: what the release zip leaves out
+├── CHANGELOG.md
+└── LICENSE
 ```
 
 ## Load order
@@ -88,7 +96,9 @@ Rules:
 - `Restore` must work on a snapshot from an older version of the addon, or skip it safely.
 - Anything that touches protected frames or bindings goes through `ns.RunOutOfCombat`.
 
-Feature-only modules (`Vendor`, `Automate`, `Group`, `ManaTick`, `Interrupt`, `Health`, `Plates`, `Reminders`, `XPRate`) don't register. They hook events through `ns.On` and expose a small table on `ns` (e.g. `ns.Vendor`) for the control center. Their settings live in a lazily filled `ns.db.<key>` table (`DEFAULTS` plus `Cfg()`), every new helper is off by default, and SHIFT skips an automation once.
+Feature-only modules (`Vendor`, `Automate`, `Group`, `ManaTick`, `Interrupt`, `Health`, `Healer`, `Plates`, `Reminders`, `XPRate`, `Cooking`) don't register. They hook events through `ns.On` and expose a small table on `ns` (e.g. `ns.Vendor`) for the control center. Their settings live in a lazily filled `ns.db.<key>` table (`DEFAULTS` plus `Cfg()`). Automations that act for you (Fewer clicks, Group) are off by default, and SHIFT skips an automation once. Passive helpers such as repair, sell greys, the durability reminder and the cooking tooltip start on.
+
+`Profile` registers as a module (so an import can be undone) but is not in `APPLY_ORDER`: it only runs through `/mlz import`.
 
 `Bindings.xml` sits next to the `.toc` and is loaded by the game, not listed in the `.toc`. Its names come from `BINDING_HEADER_MLZUI` and `BINDING_NAME_MLZUI_*` in `Modules/Group.lua`.
 
@@ -138,14 +148,17 @@ Use these before writing your own.
 | `ns.Enabled(mod, id, default)` · `ns.SetEnabled` | Remember which wizard rows are ticked. |
 | `ns.Try(fn, ...)` | `pcall` wrapper for APIs that may not exist or may fail. |
 | `ns.IsAddOnLoaded(name)` · `ns.IsAddOnInstalled(name)` | Addon checks that work across client APIs. |
-| `ns.Role()` · `ns.LiveRole()` · `ns.SetRoleForce` · `ns.OnRoleChanged(fn)` | Role detection (tank, healer, DPS) and overrides. `ns.Role(true)` ignores your own choice (what the game detects). `LiveRole` is what you do right now (Bear Form, Defensive Stance, Righteous Fury) and never overrides a role you picked. `ns.WizardRole()` is the role the wizard plans for, including a choice not applied yet. |
+| `ns.Role()` · `ns.LiveRole()` · `ns.SetRoleForce` · `ns.GetRoleForce` · `ns.OnRoleChanged(fn)` | Role detection (tank, healer, DPS) and overrides. `ns.Role(true)` ignores your own choice (what the game detects). `LiveRole` is what you do right now (Bear Form, Defensive Stance, Righteous Fury) and never overrides a role you picked. `ns.WizardRole()` (in `Modules/Role.lua`) is the role the wizard plans for, including a choice not applied yet. |
 | `ns.Archetype()` · `ns.LiveArchetype()` · `ns.ArchetypeText(a)` | Tank, healer, melee, ranged or caster, from `Data/Classes.lua`. Layouts use the stable one, reminders and nameplates the live one. |
 | `ns.ClientInfo()` | Game client facts for the About page. WoW Forever (Interface 16001) is the main client. |
-| `ns.CharDB()` | Per-character table inside `MLZUIDB.chars`. |
-| `ns.AddCommand(name, help, fn)` | Add a `/mlz <name>` subcommand. It shows up in `/mlz help`. |
+| `ns.CharDB()` · `ns.CharKey()` | Per-character table inside `MLZUIDB.chars`, and its key (`Name - Realm`). |
+| `ns.AddCommand(name, help, fn)` · `ns.RunCommand(name, arg)` | Add a `/mlz <name>` subcommand, or run one from code. Only the commands in `LISTED` (`Core.lua`) show in `/mlz help`. |
 | `ns.ShowCopy(title, text, onAccept)` | Copy/paste dialog (export, import, probe). |
 | `ns.Print(...)` · `ns.Debug(...)` | Chat output. `Debug` only prints with `/mlz debug` on. |
+| `ns.Cmd(text)` · `ns.Paint(color, text)` · `ns.Color(name)` | Color a command or a word in chat output. |
 | `ns.CopyTable(t)` | Deep copy for snapshots. |
+| `ns.QueuedCount()` | How many jobs wait for combat to end (footer). |
+| `ns.AddonVersion` · `ns.CompareVersions` · `ns.AddonStatus` · `ns.EnableAddon` · `ns.CanEnableAddons` | In `Modules/Health.lua`: another addon's version and state (loaded, switched off, missing), and switching it back on. Used by the addon overview and version-aware rows. |
 
 ## Nameplates
 
@@ -169,6 +182,8 @@ The schema is versioned with `DB_VERSION` in `Core.lua`. When you change the sha
 
 ## UI layer
 
-All UI is built from `UI/Widgets.lua` (`W.Window`, `W.Card`, `W.Button`, `W.Toggle`, `W.Segmented`, `W.Stepper`, `W.Slider`, `W.Badge`, `W.ScrollArea`, `W.Tooltip`) and the theme tokens `W.T` / `W.C`. The control center pages in `UI/Settings.lua` use a small page builder (`Title`, `Card`, `Row`, `Toggle`, `Choice`, `Step`, `Slider`, `Value`, `Status`, `Buttons`, `Text`), so every page looks and behaves the same. Pages register in `SECTIONS` and the sidebar order comes from `PAGE_ORDER`. A page for a feature-only module (Reminders, Cooking, XP rate) checks that `ns.X` exists and shows an amber line when it doesn't.
+All UI is built from `UI/Widgets.lua` (`W.Window`, `W.Card`, `W.Button`, `W.Check`, `W.Toggle`, `W.Segmented`, `W.Stepper`, `W.Slider`, `W.SearchBox`, `W.Badge`, `W.ScrollArea`, `W.Tooltip`, plus the small parts `W.Text`, `W.Muted`, `W.Line`, `W.Fill`, `W.Border`) and the theme tokens `W.T` / `W.C`. The control center pages in `UI/Settings.lua` use a small page builder (`Title`, `Card`, `Row`, `Toggle`, `Choice`, `Step`, `Slider`, `Value`, `Status`, `Buttons`, `Text`), so every page looks and behaves the same. Pages register in `PAGES` and the sidebar order comes from `PAGE_ORDER`. The status lines on the overview (and in the minimap tooltip) come from `SECTIONS`. A page for a feature-only module (Reminders, Cooking, XP rate) checks that `ns.X` exists and shows an amber line when it doesn't.
+
+**Search.** Every builder call adds an entry to the page's index through `Page:AddToIndex` (label, description, tooltip, card, and card paragraphs as a low-weight `body`), so new rows are found without extra work. `Search.EnsureAll` builds every page once (hidden) before a search. A page whose rows depend on a choice sets `p.IsStale`, and `S:BuildPage` throws a stale hidden page away so the search never sees old rows. `Data/Search.lua` adds aliases (words players type that are not in the text) and stopwords.
 
 Design rules are in [`CLAUDE.md`](../CLAUDE.md#ui-design-language).

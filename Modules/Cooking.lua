@@ -32,19 +32,23 @@ end
 ------------------------------------------------------------------------
 local skillRank, skillDirty = nil, true
 
+-- The skill list only shows lines under expanded headers. When a header is collapsed, keep the
+-- last rank we saw instead of calling it "not learned" (expanding it ourselves would fire
+-- SKILL_LINES_CHANGED again and fight the player's choice).
 local function ReadSkill()
     skillDirty = false
-    skillRank = nil
-    if not (GetNumSkillLines and GetSkillLineInfo) then return end
+    if not (GetNumSkillLines and GetSkillLineInfo) then skillRank = nil return end
     local want = _G.PROFESSIONS_COOKING or SpellName(COOKING_SPELL) or "Cooking"
+    local collapsed = false
     for i = 1, GetNumSkillLines() or 0 do
-        local name, isHeader, _, rank = GetSkillLineInfo(i)
+        local name, isHeader, isExpanded, rank = GetSkillLineInfo(i)
         if name == want and not isHeader then
             skillRank = rank
             return
         end
+        if isHeader and not isExpanded then collapsed = true end
     end
-    skillRank = 0 -- not learned
+    if not collapsed then skillRank = 0 end -- not learned
 end
 
 local function Skill()

@@ -294,7 +294,7 @@ function Fade:CountOn()
     return on, total
 end
 
-ns.AddCommand("fade", "temporarily toggles all fading on/off (until next /reload)", function()
+ns.AddCommand("fade", "turns all fading on or off until the next /reload", function()
     Fade:SetPaused(not ns.fadePaused)
     ns.Print(ns.fadePaused and "Fading paused until you reload or turn it back on." or "Fading on.")
 end)

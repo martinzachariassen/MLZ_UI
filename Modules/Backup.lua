@@ -91,7 +91,7 @@ function Backup:Undo(quiet)
     return ran
 end
 
-ns.AddCommand("undo", "undoes the last run of the setup wizard", function() Backup:Undo() end)
+ns.AddCommand("undo", "undoes the last setup wizard run or import", function() Backup:Undo() end)
 ns.AddCommand("backups", "lists saved backups", function()
     local list = ns.db.backups or {}
     if #list == 0 then ns.Print("No backups.") return end

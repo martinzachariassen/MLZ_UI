@@ -453,7 +453,7 @@ function Page:Card(title, subtitle)
     c.cy = 4
     self.cardTitle = title
     if title then
-        self:AddToIndex({ kind = "card", label = title, desc = subtitle, card = false, y = self.y, frame = c })
+        c.searchEntry = self:AddToIndex({ kind = "card", label = title, desc = subtitle, card = false, y = self.y, frame = c })
     end
     if title then
         local t = W.Text(c, "MLZUI_FontHead", title)
@@ -742,6 +742,12 @@ function Page:Text(text, lines)
     local h = math.max(fs:GetStringHeight(), (lines or 0) * 13)
     fs:SetHeight(h)
     if type(text) == "function" then self:OnRefresh(function() fs:SetText(Eval(text)) end) end
+    -- paragraphs are found through their card ("How it works", the chat commands)
+    local entry = c.searchEntry
+    if entry then
+        local before = entry.body
+        entry.body = function() return (before and (Eval(before) .. " ") or "") .. (Eval(text) or "") end
+    end
     c.cy = c.cy + h + 16
     return fs
 end
@@ -784,7 +790,7 @@ local function StatusLine(parent)
         self.link:SetAlpha(1)
         if self.text:IsTruncated() then
             GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-            GameTooltip:SetText(self.title:GetText(), 1, 1, 1)
+            GameTooltip:SetText(self.title:GetText(), unpack(T.white, 1, 3))
             GameTooltip:AddLine(self.text:GetText(), nil, nil, nil, true)
             GameTooltip:Show()
         end
@@ -1100,6 +1106,7 @@ PAGES[#PAGES + 1] = { key = "nameplates", title = "Nameplates", icon = "Interfac
     -- The engine decides which of the next two cards has rows. The other one is a single amber line,
     -- and the page is rebuilt when the engine changes (here, from the minimap menu or a Platynator load).
     local builtEngine = NP.Engine()
+    p.IsStale = function() return NP.Engine() ~= builtEngine end -- also checked while the page is hidden
     p:OnRefresh(function()
         if NP.Engine() ~= builtEngine then S:RebuildPage("nameplates") end
     end)
@@ -1335,7 +1342,7 @@ PAGES[#PAGES + 1] = { key = "qol", title = "Helpers", icon = "Interface\\Icons\\
     p:Toggle("All class buffs when I lead", "As leader or raid assistant the line covers every class buff the group "
         .. "can give, not just yours.", function() return G.Get("leaderAll") end, function(on) G.Set("leaderAll", on) end,
         { avail = function() if not G.Get("buffCheck") then return "Turn on the buff check first" end end })
-    p:Value("Pull timer key", nil, function()
+    p:Value("Pull timer key", "Press it in a group to start a 10 second pull timer.", function()
         local key = GetBindingKey and GetBindingKey("MLZUI_PULL")
         return key and (C.blue .. key .. C.r) or (C.grey .. "Not set (Key Bindings > AddOns > MLZ UI)" .. C.r)
     end)
@@ -1484,8 +1491,14 @@ PAGES[#PAGES + 1] = { key = "addons", title = "Other addons", icon = "Interface\
             local st = s and s.status or {}
             local ver = st.version and ("Version " .. st.version .. ". ") or ""
             if state == "off" then return ver .. "Installed but switched off in the addon list." end
-            local text = s.differ == 0 and ("All %d settings match MLZ UI"):format(s.total)
-                or ("%d of %d settings differ from MLZ UI"):format(s.differ, s.total)
+            local text
+            if s.total == 0 then
+                text = "No settings MLZ UI can change in this version"
+            elseif s.differ == 0 then
+                text = ("All %d settings match MLZ UI"):format(s.total)
+            else
+                text = ("%d of %d settings differ from MLZ UI"):format(s.differ, s.total)
+            end
             if #s.missing > 0 then text = text .. ", " .. #s.missing .. " not available" end
             return ver .. text .. "."
         end, function()
@@ -1493,6 +1506,7 @@ PAGES[#PAGES + 1] = { key = "addons", title = "Other addons", icon = "Interface\
             if state == "missing" then return "na", "Not installed" end
             if state == "off" then return "warn", "Switched off" end
             if s.differ > 0 then return "warn", "Differs" end
+            if s.total == 0 then return "info", "Nothing to set" end
             return "on", "Matches"
         end, { descLines = 2, tip = function()
             local s = p.sum[i]
@@ -1579,7 +1593,7 @@ PAGES[#PAGES + 1] = { key = "profiles", title = "Profiles & backup", icon = "Int
         .. "With switching on, the right profile is loaded when your role changes (respec or dual spec).")
     p:Toggle("Switch profile with my role", "Only loads a role that has a saved profile.", RP.Auto, RP.SetAuto)
     for _, role in ipairs({ "TANK", "HEALER", "DAMAGER" }) do
-        p:Value(ns.ROLE_TEXT[role] .. " profile", nil, function()
+        p:Value(ns.ROLE_TEXT[role] .. " profile", "Nameplate options, faded frames, tick bar and interrupt announce.", function()
             local t = RP.Time(role)
             return t and ("Saved " .. t) or (C.grey .. "Not saved" .. C.r)
         end)
@@ -1624,7 +1638,7 @@ PAGES[#PAGES + 1] = { key = "profiles", title = "Profiles & backup", icon = "Int
         .. "dungeon puts things back.", SP.Auto, SP.SetAuto,
         { tip = "Checked when you enter a zone or instance, out of combat. One line in chat when something changed." })
     for _, kind in ipairs(SP.ORDER) do
-        p:Value(SP.TEXT[kind] .. " profile", nil, function()
+        p:Value(SP.TEXT[kind] .. " profile", "Faded frames, the quest tracker and threat colors.", function()
             local t = SP.Time(kind)
             local here = (SP.Current() == kind) and (C.blue .. "  (you are here)" .. C.r) or ""
             return (t and ("Saved " .. t) or (C.grey .. "Not saved" .. C.r)) .. here
@@ -1749,6 +1763,7 @@ PAGES[#PAGES + 1] = { key = "about", title = "About & help", icon = "Interface\\
         .. C.white .. "/mlz keys" .. C.r .. "   a map of your keybinds\n"
         .. C.white .. "/mlz tour" .. C.r .. "   shows where the hidden bars and buttons are\n"
         .. C.white .. "/mlz xp" .. C.r .. "   XP per hour and time to your next level\n"
+        .. C.white .. "/mlz pull" .. C.r .. "   starts a pull timer, for example /mlz pull 10\n"
         .. C.white .. "/mlz minimap" .. C.r .. "   shows the minimap button again\n"
         .. C.white .. "/mlz help" .. C.r .. "   lists the commands in chat")
 
@@ -1854,8 +1869,8 @@ local function MatchTerm(term, field)
     return best
 end
 
--- Field weights: what a row is called counts most, its tooltip least
-local FIELDS = { { "label", 3 }, { "keywords", 2.5 }, { "card", 1.4 }, { "pageTitle", 1.2 }, { "desc", 1 }, { "tip", 0.6 } }
+-- Field weights: what a row is called counts most, its tooltip and card paragraphs least
+local FIELDS = { { "label", 3 }, { "keywords", 2.5 }, { "card", 1.4 }, { "pageTitle", 1.2 }, { "desc", 1 }, { "tip", 0.6 }, { "body", 0.5 } }
 local KIND_BONUS = { row = 0.6, button = 0.4, card = 0.2, page = 0 }
 
 local function Fields(entry)
@@ -2376,7 +2391,13 @@ end
 -- Builds a page without showing it (pages are built the first time they are opened or searched)
 function S:BuildPage(key)
     local entry = self.pages[key]
-    if not entry or entry.page then return end
+    if not entry then return end
+    -- a hidden page whose rows depend on a choice that changed since (search must not see old rows)
+    if entry.page and entry.page.IsStale and entry.page.IsStale() and self.selected ~= key then
+        entry.page.scroll:Hide()
+        entry.page = nil
+    end
+    if entry.page then return end
     entry.page = NewPage(self.frame)
     local ok, err = pcall(entry.def.build, entry.page)
     if not ok then

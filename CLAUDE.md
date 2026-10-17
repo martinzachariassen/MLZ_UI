@@ -34,9 +34,9 @@ These are not up for debate. Breaking one is a bug.
 ## Code style
 
 - 4 spaces, no tabs. Keep lines readable (about 120 characters).
-- File header: `-- MLZ UI: <Area>` followed by 1–4 comment lines on what the file does and where the player finds it.
+- File header: `-- MLZ UI: <Area>` followed by 1-4 comment lines on what the file does and where the player finds it.
 - Section banners with `----` lines for long files.
-- `local` everything. The only globals are `MLZUIDB`, `MLZUI`, named font objects (`MLZUI_Font*`) and `MLZUIScanTooltip` (quest scan on clients without `C_TooltipInfo`), plus the Key Bindings names `BINDING_HEADER_MLZUI` and `BINDING_NAME_MLZUI_*` for `Bindings.xml`. `GetMinimapShape` is defined only while the square minimap is on and no other addon has defined it (minimap button libraries read it).
+- `local` everything. The only globals are `MLZUIDB`, `MLZUI`, named font objects (`MLZUI_Font*`) and `MLZUIScanTooltip` (quest scan on clients without `C_TooltipInfo`), plus the Key Bindings names `BINDING_HEADER_MLZUI` and `BINDING_NAME_MLZUI_*` for `Bindings.xml`, the slash command (`SLASH_MLZUI1`, `SlashCmdList.MLZUI`), the addon compartment callbacks (`MLZUI_OnAddonCompartment*`) and named frames (`MLZUI_*`, plus the older `MLZ_Safe` anchor frame in `Modules/Scale.lua`). Fade.lua sets Blizzard's `CHAT_FRAME_TAB_*_NOMOUSE_ALPHA` and puts them back. `GetMinimapShape` is defined the first time the square minimap is turned on, only if no other addon has defined it (minimap button libraries read it). It returns `"ROUND"` again once square is off.
 - Upvalue hot globals at the top (`local GetTime = GetTime`) only where it matters (OnUpdate, frequent events).
 - Comments in English, short, explaining *why*, not *what*.
 - Module tables are PascalCase (`local Tweaks = ns.RegisterModule(...)`), locals are camelCase, constants are UPPER_CASE.
@@ -48,7 +48,7 @@ The look: **dark, flat, quiet, precise.** Think a modern desktop app, not a fant
 
 **Use the system, don't invent.**
 - Colors only from `W.T` (frames) and `W.C` (text codes) in `UI/Widgets.lua`. No new hex values in feature code.
-- Widgets only from `W.*`: `Line`, `Muted`, `Window`, `Card`, `Button` (`normal`, `primary`, `danger`, `subtle`), `Check`, `Toggle`, `Segmented`, `Stepper`, `Slider`, `Badge`, `ScrollArea`, `Tooltip`. No Blizzard templates (`UIPanelButtonTemplate`, `BasicFrameTemplate`, and so on).
+- Widgets only from `W.*`: `Line`, `Muted`, `Window`, `Card`, `Button` (`normal`, `primary`, `danger`, `subtle`), `Check`, `Toggle`, `Segmented`, `Stepper`, `Slider`, `SearchBox`, `Badge`, `ScrollArea`, `Tooltip`. No Blizzard templates (`UIPanelButtonTemplate`, `BasicFrameTemplate`, and so on).
 - Control center pages are built only with the page builder in `UI/Settings.lua` (`Title`, `Card`, `Row`, `Toggle`, `Choice`, `Step`, `Slider`, `Value`, `Status`, `Buttons`, `Text`).
 
 **Visual rules.**
@@ -84,7 +84,7 @@ Applies to UI text, chat output, tooltips, docs and commit messages.
 - **Debugging:** `/mlz debug` for verbose output, BugGrabber + BugSack for Lua errors, `/mlz probe` to dump client facts (APIs, CVars, Edit Mode, bindings) into `SavedVariables/MLZ_UI.lua`. Verify against the probe instead of guessing what the client has.
 - **Lint:** `luacheck .` must be clean (config in `.luacheckrc`, also runs in CI). When you use a new WoW API global, add it to `read_globals` there.
 - **Before you finish a change:** `/reload` without errors, run the affected wizard step, apply, then `/mlz undo` and check that everything is back. Test once in combat for anything that touches frames or bindings.
-- **Release checklist:** bump the version in all three places (`## Version` in `MLZ_UI.toc`, `ns.version` in `Core.lua`, the badge in `README.md`), update the README if commands, pages or supported addons changed, re-render screenshots if the UI changed, move "Unreleased" in `CHANGELOG.md` under the new version, then tag `vX.Y.Z` and push the tag (the release workflow packages and uploads it).
+- **Release checklist:** bump the version in all three places (`## Version` in `MLZ_UI.toc`, `ns.version` in `Core.lua`, the badge in `README.md`), update the README if commands, pages or supported addons changed, re-render screenshots (the mockups show the version too, so always when it changes), move "Unreleased" in `CHANGELOG.md` under the new version, then tag `vX.Y.Z` and push the tag (the release workflow packages and uploads it).
 - **Commits:** Conventional Commits, matching the history: `feat(nameplates): ...`, `fix(fade): ...`, `refactor: ...`, `docs: ...`. Imperative, lowercase, no period.
 - Don't commit or push unless asked.
 
@@ -104,7 +104,7 @@ The README images in `docs/screenshots/` are currently **mockups**: HTML in `doc
 |---|---|---|
 | `control-center.png` | `/mlz`, Overview page with all status lines | Setup done, no reload pending (so no banner), healer role, hover one line |
 | `nameplates.png` | `/mlz` → Nameplates, Engine, Mode and Options cards | MLZ engine (the default), Auto mode, healer role in a group |
-| `wizard.png` | `/mlz install`, step 4 Keybinds | Moving ESDF → WASD so red conflicts and Alt moves show |
+| `wizard.png` | `/mlz install`, step 4 Keybinds | Moving ESDF → WASD so red conflicts and ALT moves show |
 | `addons.png` | `/mlz install`, step 7 Other addons | Healer role, DBM, Questie, and Details! loaded, so role rows show |
 | `minimap-menu.png` | Minimap button tooltip and right-click menu | Two separate captures composed side by side (they can't be open at once) |
 

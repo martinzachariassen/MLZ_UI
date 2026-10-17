@@ -31,7 +31,7 @@
 --   settings = { [settingName] = value } in the SAME units Edit Mode shows (IconSize = 80 means 80 %).
 --              The module converts to the storage format. On/off: 1 = on, 0 = off.
 --   rawSettings = settings stored directly without conversion (e.g. chat size).
---   override = { [settingName] = key in MLZUIDB.overrides } — the user's own choice (e.g. /mlz map) wins.
+--   override = { [settingName] = key in MLZUIDB.overrides }: the user's own choice (e.g. /mlz map) wins.
 
 local _, ns = ...
 

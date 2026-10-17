@@ -9,7 +9,7 @@ ns.version = "0.8.0"
 ns.modules = {}       -- registered modules, in load order (see MLZ_UI.toc), also indexed by key
 ns.data = {}          -- data tables (Data/*.lua)
 
-local DB_VERSION = 6
+local DB_VERSION = 7
 
 ------------------------------------------------------------------------
 -- Output
@@ -560,6 +560,14 @@ local migrations = {
     [6] = function(db)
         if db.cooking ~= nil and type(db.cooking) ~= "table" then db.cooking = nil end
     end,
+    -- v7: new optional keys, nothing to convert. automate = { ... } (Modules/Automate.lua), group = { ... }
+    -- (Modules/Group.lua), chars[].situationProfiles (Modules/Profile.lua), reminders.raidFood, levelFood
+    -- and ignore (Modules/Reminders.lua). Each module fills in its own defaults.
+    [7] = function(db)
+        for _, key in ipairs({ "automate", "group" }) do
+            if db[key] ~= nil and type(db[key]) ~= "table" then db[key] = nil end
+        end
+    end,
 }
 
 local function Migrate(db)
@@ -672,7 +680,10 @@ end
 
 -- Everything else is controlled from the settings window (/mlz); the other commands still
 -- work but are not listed.
-local LISTED = { install = true, search = true, undo = true, debug = true, probe = true, minimap = true, role = true, np = true, keys = true, tour = true, pull = true }
+local LISTED = {
+    install = true, search = true, undo = true, debug = true, probe = true, minimap = true,
+    role = true, np = true, keys = true, tour = true, pull = true, xp = true,
+}
 
 -- Runs a command from code (used by the settings window)
 function ns.RunCommand(name, arg)
@@ -692,7 +703,7 @@ local function ShowHelp()
     end
 end
 
-ns.AddCommand("debug", "toggles debug output on/off", function()
+ns.AddCommand("debug", "turns debug output on or off", function()
     ns.db.debug = not ns.db.debug
     ns.Print("debug:", ns.db.debug and "on" or "off")
 end)

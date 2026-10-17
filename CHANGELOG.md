@@ -26,9 +26,22 @@
 - Settings for other addons can be limited to the addon versions that have them ("not in your version").
 - Export now covers faded frames, helpers, reminders, and the role and situation profiles of this
   character. Strings start with `MLZ!2!`; `MLZ!1!` strings still import, and undo puts everything back.
-- Lint (luacheck and a Lua 5.1 syntax check) runs on every push and pull request.
+- Lint (luacheck and a Lua 5.1 syntax check) runs on every push to main and every pull request.
 - Tagged versions are packaged and published to GitHub Releases, and to CurseForge and Wago when they are set up.
 - MIT license.
+- The control center search also finds text in cards ("How it works", chat commands).
+
+**Fixes**
+- Reagent reminders: Prayer of Fortitude rank 1 checks Holy Candles and Gift of the Wild rank 1 checks Wild
+  Berries. With rank 2 learned you are only reminded about Sacred Candles or Wild Thornroot.
+- `/mlz undo` after the layout step puts the extra action bars back exactly as they were.
+- Fewer clicks no longer accepts grey quests from quest givers without a gossip window.
+- Pull timer in a raid without lead or assist says why instead of doing nothing.
+- Cooking tooltips keep their colors when the Secondary Skills header is collapsed.
+- An addon with nothing for MLZ UI to set no longer shows "All 0 settings match".
+- Search no longer shows old nameplate rows after the engine was switched from the minimap menu.
+- The "Looks only" tooltip lists every step it uses.
+- `/mlz help` and the About page list the same commands.
 
 ## 0.8.0
 

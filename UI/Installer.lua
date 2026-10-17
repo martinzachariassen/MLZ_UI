@@ -40,7 +40,7 @@ local PAGES = {
     { kind = "module", key = "settings", title = "Game settings",
       text = "Good default settings. Rows marked (already) have the right value. Hover over a row for an explanation." },
     { kind = "module", key = "bindings", title = "Keybinds",
-      text = "The same 12 keys on three layers: no modifier = Bar 1, " .. C.white .. "SHIFT" .. C.r .. " = Bar 2, " .. C.white .. "CTRL" .. C.r .. " = Bar 3. " .. C.red .. "Red" .. C.r .. " = the key does something else today. Panels you lose a key for move to " .. C.white .. "ALT" .. C.r .. "." },
+      text = "The same 12 keys on 3 layers: no modifier = Bar 1, " .. C.white .. "SHIFT" .. C.r .. " = Bar 2, " .. C.white .. "CTRL" .. C.r .. " = Bar 3. " .. C.red .. "Red" .. C.r .. " = the key does something else today. Panels you lose a key for move to " .. C.white .. "ALT" .. C.r .. "." },
     { kind = "module", key = "fade", title = "Minimalism",
       text = "Things you rarely use stay invisible until you hover over them, and things you only need in combat are dimmed otherwise. Rows that are already on are folded away at the bottom: show them to turn one off." },
     { kind = "module", keys = { "actionbuttons", "tweaks" }, title = "Bars & interface",
@@ -151,7 +151,7 @@ function Installer:Build()
     local f = W.Window("MLZUI_Installer", WIDTH, HEIGHT, "MLZ UI: Setup wizard")
     self.frame = f
 
-    -- Progress strip: one segment per numbered step, so it matches "STEP n OF 9". Click to jump.
+    -- Progress strip: one segment per numbered step, so it matches "STEP n OF 8". Click to jump.
     f.progress = {}
     local steps = {}
     for i, page in ipairs(PAGES) do
@@ -284,7 +284,7 @@ function Installer:Build()
     f.quick.tipText = "Takes every suggestion as it is and shows the review. Nothing changes until you press Apply changes there."
     f.looks = W.Button(f, "Looks only", 120, 28, function() self:ApplyPreset("looks") end, "subtle")
     f.looks:SetPoint("RIGHT", f.quick, "LEFT", -8, 0)
-    f.looks.tipText = "Layout, scale, minimalism and nameplates only. Game settings, keybinds and other addons are left alone. Nothing changes until you press Apply changes."
+    f.looks.tipText = "Your character, scale, layout, minimalism, bars and nameplates. Game settings, keybinds and other addons are left alone. Nothing changes until you press Apply changes."
 
     f.reload = W.Button(f, "Reload now", 150, 28, function() ReloadUI() end, "primary")
     f.reload:SetPoint("BOTTOMRIGHT", -PAD, FOOT_Y)
@@ -735,9 +735,9 @@ function Installer:RenderList()
                 ("%d option%s not available on your setup (hover to see which)"):format(#unavailable, #unavailable == 1 and " is" or "s are"),
                 nil,
                 function(tip)
-                    tip:SetText("Not available", 1, 1, 1)
+                    tip:SetText("Not available", unpack(W.T.white, 1, 3))
                     for i, item in ipairs(unavailable) do
-                        if i > 14 then tip:AddLine("...and " .. (#unavailable - 14) .. " more", 0.6, 0.6, 0.6) break end
+                        if i > 14 then tip:AddLine("...and " .. (#unavailable - 14) .. " more", unpack(W.T.muted, 1, 3)) break end
                         local tx, mu = W.T.text, W.T.muted
                         tip:AddDoubleLine(Plain(item.label), Plain(item.new or ""), tx[1], tx[2], tx[3], mu[1], mu[2], mu[3])
                         if item.note then tip:AddLine(item.note, mu[1], mu[2], mu[3], true) end

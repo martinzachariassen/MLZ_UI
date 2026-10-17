@@ -230,8 +230,17 @@ local function BarProxies()
     return next(t) and t or nil
 end
 
+-- Older clients return 1/nil instead of booleans, and SavedVariables drop nil slots, so store
+-- booleans plus the count. Restore then passes back exactly as many values as the client gave.
+local function BarToggles()
+    if not GetActionBarToggles then return nil end
+    local t = { n = select("#", GetActionBarToggles()) }
+    for i = 1, t.n do t[i] = (select(i, GetActionBarToggles())) and true or false end
+    return t
+end
+
 function Layout:Backup()
-    local snap = { barToggles = GetActionBarToggles and { GetActionBarToggles() } or nil, barProxies = BarProxies() }
+    local snap = { barToggles = BarToggles(), barProxies = BarProxies() }
     if not Available() then return snap end
     local raw, _, active = self:GetInfo()
     if not raw then return snap end
@@ -591,7 +600,9 @@ ns.AddCommand("pet", "pet bar position: save (remember where you put it) | reset
 end)
 
 function Layout:Restore(snap)
-    if snap.barToggles and SetActionBarToggles then pcall(SetActionBarToggles, unpack(snap.barToggles)) end
+    if snap.barToggles and SetActionBarToggles then
+        pcall(SetActionBarToggles, unpack(snap.barToggles, 1, snap.barToggles.n or #snap.barToggles))
+    end
     if snap.barProxies and Settings and Settings.SetValue then
         for n, v in pairs(snap.barProxies) do pcall(Settings.SetValue, "PROXY_SHOW_ACTIONBAR_" .. n, v) end
     end

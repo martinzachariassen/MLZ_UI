@@ -140,6 +140,30 @@ local function LowestDurability()
     return low
 end
 
+-- Reagent rows for a class. Rows that share a `group` are ranks of one spell (highest first) with
+-- different reagents: only the highest known rank counts, or the lowest rank while none is known.
+local function ReagentRows(data, class)
+    local out, picked, last = {}, {}, {}
+    for _, r in ipairs(data.reagents or {}) do
+        if r.class == class then
+            if not r.group then
+                out[#out + 1] = r
+            elseif not picked[r.group] then
+                if Knows(r.spell) then
+                    picked[r.group] = true
+                    out[#out + 1] = r
+                else
+                    last[r.group] = r
+                end
+            end
+        end
+    end
+    for group, r in pairs(last) do
+        if not picked[group] then out[#out + 1] = r end
+    end
+    return out
+end
+
 ------------------------------------------------------------------------
 -- What is missing right now
 ------------------------------------------------------------------------
@@ -203,8 +227,8 @@ local function Missing()
 
     if cfg.reagents then
         local seen = {}
-        for _, r in ipairs(data.reagents or {}) do
-            if r.class == class and not seen[r.item] and not ignore["r:" .. tostring(r.item)] and Knows(r.spell) then
+        for _, r in ipairs(ReagentRows(data, class)) do
+            if not seen[r.item] and not ignore["r:" .. tostring(r.item)] and Knows(r.spell) then
                 local count = ItemCount(r.item)
                 if count and count < r.min then
                     seen[r.item] = true
@@ -454,8 +478,8 @@ function R.Entries()
             end
         end
     end
-    for _, r in ipairs(data.reagents or {}) do
-        if r.class == class and not seen[r.item] then
+    for _, r in ipairs(ReagentRows(data, class)) do
+        if not seen[r.item] then
             seen[r.item] = true
             out[#out + 1] = { key = "r:" .. tostring(r.item), name = r.label, kind = "reagent", known = Knows(r.spell), min = r.min }
         end

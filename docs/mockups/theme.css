@@ -27,6 +27,9 @@
     --gold:   #ffd100;                  /* W.C.gold */
     --well:   #0f1216;                  /* 0.06, 0.07, 0.085: inputs, segmented, slider track */
     --well-edge: #525969;               /* inputEdge */
+    --shade:  rgba(255, 255, 255, 0.04); /* soft hover on rows and list items */
+    --press:  rgba(255, 255, 255, 0.08); /* stronger hover on small controls */
+    --white:  #ffffff;                  /* text on accent fills */
 
     /* W.T controls */
     --btn:           #2b303b;           /* 0.170, 0.190, 0.230 */
@@ -206,7 +209,7 @@ html, body {
 /* W.Check */
 .check { width: 16px; height: 16px; flex: none; background: var(--well); border: 1px solid var(--well-edge); position: relative; }
 .check.on::after { content: ""; position: absolute; inset: 3px; background: var(--accent); }
-.check.dis { border-color: #33383f; }
+.check.dis { border-color: var(--border); }
 .check.dis.on::after { background: var(--off); }
 
 /* GameTooltip (Blizzard look, simplified) */

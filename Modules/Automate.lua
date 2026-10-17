@@ -108,6 +108,13 @@ ns.TryOn("GOSSIP_SHOW", function()
     end
 end)
 
+-- Grey quests are skipped, like on the gossip path. Clients differ in which call tells you.
+local function AvailableTrivial(i)
+    if IsAvailableQuestTrivial then return IsAvailableQuestTrivial(i) and true or false end
+    if GetAvailableQuestInfo then return (GetAvailableQuestInfo(i)) and true or false end
+    return false
+end
+
 -- Quest givers with a plain list of quests (no gossip)
 ns.TryOn("QUEST_GREETING", function()
     if not ns.db or IsShiftKeyDown() then return end
@@ -117,9 +124,11 @@ ns.TryOn("QUEST_GREETING", function()
             if done and MayPick("a" .. tostring(title)) then SelectActiveQuest(i) return end
         end
     end
-    if Want("acceptQuests") and GetNumAvailableQuests and SelectAvailableQuest and GetNumAvailableQuests() > 0 then
-        local title = GetAvailableTitle and GetAvailableTitle(1)
-        if MayPick("n" .. tostring(title)) then SelectAvailableQuest(1) end
+    if Want("acceptQuests") and GetNumAvailableQuests and SelectAvailableQuest then
+        for i = 1, GetNumAvailableQuests() do
+            local title = GetAvailableTitle and GetAvailableTitle(i)
+            if not AvailableTrivial(i) and MayPick("n" .. tostring(title)) then SelectAvailableQuest(i) return end
+        end
     end
 end)
 

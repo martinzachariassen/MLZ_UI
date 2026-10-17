@@ -71,7 +71,7 @@ read_globals = {
 
     -- Quests, popups, summons and pets (Modules/Automate.lua, Modules/Reminders.lua)
     "AcceptQuest", "AcceptResurrect", "C_GossipInfo", "C_SummonInfo", "CancelDuel", "CompleteQuest",
-    "ConfirmLootSlot", "ConfirmSummon", "GetActiveTitle", "GetAvailableTitle", "GetQuestMoneyToGet", "GetNumActiveQuests", "GetNumAvailableQuests",
+    "ConfirmLootSlot", "ConfirmSummon", "GetActiveTitle", "GetAvailableQuestInfo", "GetAvailableTitle", "IsAvailableQuestTrivial", "GetQuestMoneyToGet", "GetNumActiveQuests", "GetNumAvailableQuests",
     "GetNumQuestChoices", "GetPetHappiness", "GetQuestReward", "GetSummonConfirmSummoner",
     "GetSummonConfirmTimeLeft", "IsQuestCompletable", "QuestGetAutoAccept", "SelectActiveQuest",
     "SelectAvailableQuest", "StaticPopup_Hide",
