@@ -551,7 +551,7 @@ local function Load()
     end
     local ok, err = ImportProfileString(text)
     if not ok then
-        ns.Print("|cffff4444Import failed:|r", err)
+        ns.Print(ns.Paint("red", "Import failed:"), err)
         return
     end
     db.style, db.threat, db.stash, db.lastKey = false, false, nil, nil
@@ -637,7 +637,7 @@ function NP.Export()
     if CanImport() then ns.ShowCopy("MLZ UI: Platynator profile (CTRL-C to copy)", ProfileString()) end
 end
 
-local function OnOff(v) return v and "|cff44ff44on|r" or "|cff888888off|r" end
+local function OnOff(v) return v and ns.Paint("green", "on") or ns.Paint("grey", "off") end
 
 ns.AddCommand("np", "nameplates: auto | tank | healer | dps | solo | engine mlz/platynator/off | style [off] | threat [off] | pvp [off] | save | load | export", function(arg)
     arg = strlower(strtrim(arg or ""))
@@ -650,7 +650,7 @@ ns.AddCommand("np", "nameplates: auto | tank | healer | dps | solo | engine mlz/
             return
         end
         NP.SetEngine(rest)
-        ns.Print("Nameplate engine:", NP.ENGINE_TEXT[rest] .. ".", NotReady() and ("|cffffb040" .. NotReady() .. ".|r") or "")
+        ns.Print("Nameplate engine:", NP.ENGINE_TEXT[rest] .. ".", NotReady() and ns.Paint("amber", NotReady() .. ".") or "")
     elseif word == "style" then
         NP.SetStyle(not off)
         ns.Print("Clean style:", OnOff(not off))
@@ -683,7 +683,7 @@ ns.AddCommand("np", "nameplates: auto | tank | healer | dps | solo | engine mlz/
         ns.Print(("Nameplates (%s): %s (%s), automatic %s, threat %s, PvP %s"):format(
             NP.ENGINE_TEXT[Engine()], NP.MODE_TEXT[current or ""] or "unknown", currentReason or "-",
             OnOff(NP.Auto()), OnOff(NP.Threat()), OnOff(NP.PvP())))
-        if lastError then ns.Print("|cffff8800Note:|r", lastError) end
+        if lastError then ns.Print(ns.Paint("amber", "Note:"), lastError) end
         ns.Print("Use /mlz np auto, tank, healer, dps, solo, engine, style, threat, pvp, friends (add 'off' to turn off), save, load or export.")
     end
 end)

@@ -23,9 +23,27 @@
     --red:    #ff5c5c;                  /* 1.000, 0.360, 0.360 */
     --off:    #4d525c;                  /* 0.300, 0.320, 0.360 */
     --text:   #edf0f5;                  /* 0.930, 0.940, 0.960 */
-    --muted:  #949ca8;                  /* 0.580, 0.610, 0.660 */
+    --muted:  #949ba8;                  /* 0.580, 0.610, 0.660, same as W.C.grey */
     --gold:   #ffd100;                  /* W.C.gold */
     --well:   #0f1216;                  /* 0.06, 0.07, 0.085: inputs, segmented, slider track */
+    --well-edge: #525969;               /* inputEdge */
+
+    /* W.T controls */
+    --btn:           #2b303b;           /* 0.170, 0.190, 0.230 */
+    --btn-hover:     #38404d;           /* 0.220, 0.250, 0.300 */
+    --primary:       #2173c7;           /* 0.130, 0.450, 0.780 */
+    --primary-hover: #2e8ae6;           /* 0.180, 0.540, 0.900 */
+    --primary-edge:  #4099f2;           /* 0.250, 0.600, 0.950 */
+    --danger:        #6b2424;           /* 0.420, 0.140, 0.140 */
+    --danger-hover:  #8c2e2e;           /* 0.550, 0.180, 0.180 */
+    --danger-edge:   #a64040;           /* 0.650, 0.250, 0.250 */
+    --danger-text:   #ffe6e6;           /* 1.000, 0.900, 0.900 */
+    --knob:          #f2f5fa;           /* 0.950, 0.960, 0.980 */
+    --on-text:       #0d331a;           /* 0.050, 0.200, 0.100 */
+    --off-text:      #b3b8c2;           /* 0.700, 0.720, 0.760 */
+    --edge:          rgba(0, 0, 0, 0.35);
+    --thumb:         rgba(102, 112, 128, 0.9);
+    --close-hover:   rgba(255, 77, 77, 0.15);
 
     --head: "Roboto MLZ", "Roboto", "Helvetica Neue", Arial, sans-serif;
     --body: "Helvetica Neue", Arial, sans-serif;
@@ -122,35 +140,35 @@ html, body {
 /* W.Button */
 .btn {
     display: inline-flex; align-items: center; justify-content: center;
-    height: 26px; padding: 0 14px;
-    background: #2b3038; border: 1px solid var(--border);
+    height: 24px; padding: 0 14px;              /* W.BUTTON_H */
+    background: var(--btn); border: 1px solid var(--border);
     color: var(--text);
     font: 700 12px/1 var(--head); text-shadow: 1px 1px 0 rgba(0,0,0,.7);
     white-space: nowrap;
 }
-.btn.primary { background: #2173c7; border-color: #4099f2; color: #fff; }
-.btn.danger  { background: #6b2424; border-color: #a64040; color: #ffe6e6; }
+.btn.primary { background: var(--primary); border-color: var(--primary-edge); color: #fff; }
+.btn.danger  { background: var(--danger); border-color: var(--danger-edge); color: var(--danger-text); }
 .btn.subtle  { background: transparent; border-color: transparent; color: var(--muted); }
-.btn.lg { height: 28px; }
+.btn.lg { height: 28px; }                       /* W.BUTTON_H_LARGE: footer and banner */
 
-/* W.Toggle: 46x20 */
+/* W.Toggle: 48x20 */
 .toggle {
     position: relative;
-    width: 46px; height: 20px; flex: none;
+    width: 48px; height: 20px; flex: none;
     background: var(--off);
-    border: 1px solid rgba(0, 0, 0, 0.35);
+    border: 1px solid var(--edge);
 }
 .toggle::before {
     content: ""; position: absolute; top: 1px; left: 1px;
-    width: 16px; height: 16px; background: #f2f5fa;
+    width: 16px; height: 16px; background: var(--knob);
 }
 .toggle::after {
     content: "OFF"; position: absolute; right: 4px; top: 3px;
-    font: 700 11px/1 var(--head); color: #b3b8c2;
+    font: 700 11px/1 var(--head); color: var(--off-text);
 }
 .toggle.on { background: var(--green); }
 .toggle.on::before { left: auto; right: 1px; }
-.toggle.on::after { content: "ON"; right: auto; left: 4px; color: #0d331a; }
+.toggle.on::after { content: "ON"; right: auto; left: 4px; color: var(--on-text); }
 
 /* W.Segmented */
 .seg {
@@ -186,7 +204,7 @@ html, body {
 .badge.info { color: var(--accent); }
 
 /* W.Check */
-.check { width: 16px; height: 16px; flex: none; background: var(--well); border: 1px solid #525a69; position: relative; }
+.check { width: 16px; height: 16px; flex: none; background: var(--well); border: 1px solid var(--well-edge); position: relative; }
 .check.on::after { content: ""; position: absolute; inset: 3px; background: var(--accent); }
 .check.dis { border-color: #33383f; }
 .check.dis.on::after { background: var(--off); }

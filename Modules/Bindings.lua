@@ -127,7 +127,7 @@ function Bindings:Preview()
         local current = CurrentAction(d.key)
         local item = {
             id = d.key, key = d.key, command = d.command, group = d.group,
-            label = d.key .. (d.role and ("  |cff888888" .. d.role .. "|r") or ""),
+            label = d.key .. (d.role and ("  " .. ns.Paint("grey", d.role)) or ""),
             old = Pretty(current), new = Pretty(d.command),
             enabled = ns.Enabled("bindings", d.key, true),
             alreadySet = current == d.command,
@@ -151,7 +151,7 @@ function Bindings:Preview()
                     displacedTargets[newKey] = true
                     items[#items + 1] = {
                         id = newKey, key = newKey, command = current, group = "Moved actions",
-                        label = newKey, old = "", new = Pretty(current) .. "  |cff888888(was " .. d.key .. ")|r",
+                        label = newKey, old = "", new = Pretty(current) .. "  " .. ns.Paint("grey", "(was " .. d.key .. ")"),
                         enabled = ns.Enabled("bindings", newKey, true), displaced = true, requires = d.key,
                         note = "Only moved if " .. d.key .. " is changed above.",
                     }

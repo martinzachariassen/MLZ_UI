@@ -320,11 +320,12 @@ end
 ns.AddCommand("addons", "shows which supported addons are loaded and which of their settings differ", function()
     for _, s in ipairs(Addons:Summary()) do
         if not s.loaded then
-            ns.Print(s.title .. ": |cff888888not loaded|r")
+            ns.Print(s.title .. ": " .. ns.Paint("grey", "not loaded"))
         else
-            for _, m in ipairs(s.missing) do ns.Print("  |cffff8800not available:|r " .. m) end
-            ns.Print(("%s: |cff44ff44loaded|r, %d of %d settings differ from MLZ UI"):format(s.title, s.differ, s.total))
+            for _, m in ipairs(s.missing) do ns.Print("  " .. ns.Paint("amber", "not available:") .. " " .. m) end
+            ns.Print(("%s: %s, %d of %d settings differ from MLZ UI"):format(
+                s.title, ns.Paint("green", "loaded"), s.differ, s.total))
         end
     end
-    ns.Print("Open the settings (/mlz) or run |cffffff00/mlz install|r to change them.")
+    ns.Print("Open the settings (" .. ns.Cmd("/mlz") .. ") or run " .. ns.Cmd("/mlz install") .. " to change them.")
 end)

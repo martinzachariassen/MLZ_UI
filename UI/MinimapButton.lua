@@ -130,7 +130,7 @@ local function BuildMenu()
     local function Header(text)
         local fs = W.Text(f, "MLZUI_FontSmallBold", text)
         fs:SetTextColor(unpack(T.muted))
-        fs:SetPoint("TOPLEFT", 12, -(y + 4))
+        fs:SetPoint("TOPLEFT", 14, -(y + 4)) -- lines up with the item marks
         y = y + 22
     end
     local function Divider()
@@ -139,8 +139,9 @@ local function BuildMenu()
         line:SetPoint("TOPRIGHT", -8, -(y + 4))
         y = y + 9
     end
-    -- check() returns true/false for a marked item, nil for a plain action; enabled() may grey it out
-    local function Item(text, fn, check, enabled, close)
+    -- check() returns true/false for a marked item, nil for a plain action; enabled() may grey it out,
+    -- and why() then says why in a tooltip (disabled buttons still get OnEnter)
+    local function Item(text, fn, check, enabled, close, why)
         local b = CreateFrame("Button", nil, f)
         b:SetPoint("TOPLEFT", 4, -y)
         b:SetPoint("TOPRIGHT", -4, -y)
@@ -152,6 +153,18 @@ local function BuildMenu()
         b.text = W.Text(b, "GameFontHighlight", text)
         b.text:SetPoint("LEFT", 26, 0)
         b.check, b.enabled = check, enabled
+        if why then
+            b:SetScript("OnEnter", function(self)
+                if self:IsEnabled() then return end
+                local reason = why()
+                if not reason or reason == "" then return end
+                GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                GameTooltip:SetText(text, 1, 1, 1)
+                GameTooltip:AddLine(reason, T.amber[1], T.amber[2], T.amber[3], true)
+                GameTooltip:Show()
+            end)
+            b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        end
         b:SetScript("OnClick", function()
             if close then f:Hide() end
             fn()
@@ -165,10 +178,11 @@ local function BuildMenu()
     local NP = ns.NP
 
     Header("NAMEPLATES")
-    Item("Auto (follow role)", function() NP.SetAuto(true) end, function() return NP.Auto() end, NP.Ready)
+    Item("Auto (follow role)", function() NP.SetAuto(true) end, function() return NP.Auto() end, NP.Ready,
+        nil, NP.NotReady)
     for _, m in ipairs(NP.MODES) do
         Item(NP.MODE_TEXT[m], function() NP.SetMode(m) end,
-            function() return not NP.Auto() and NP.Mode() == m end, NP.Ready)
+            function() return not NP.Auto() and NP.Mode() == m end, NP.Ready, nil, NP.NotReady)
     end
     Divider()
     Header("MY ROLE")
@@ -186,10 +200,10 @@ local function BuildMenu()
     Item("Open settings", function() ns.Settings:Open() end, nil, nil, true)
     Item("Setup wizard", function() if ns.Installer then ns.Installer:Open() end end, nil, nil, true)
     Item("My keybinds", function() if ns.Keys then ns.Keys.Open() end end, nil, nil, true)
-    Item("Where did things go?", function() if ns.Tour then ns.Tour.Start() end end, nil, nil, true)
+    Item("Show me around", function() if ns.Tour then ns.Tour.Start() end end, nil, nil, true)
     f.reloadItem = Item("Reload UI", function() ReloadUI() end, nil, nil, true)
 
-    f:SetHeight(y + 6)
+    f:SetHeight(y + 8)
     return f
 end
 

@@ -36,7 +36,7 @@ end
 
 function Settings:Preview()
     local items = {}
-    local grey = ns.W and ns.W.C.grey or "|cff8a909a"
+    local grey = ns.Color("grey")
     local groupNotes = ns.data.cvarGroups or {}
     -- The role picked in the wizard's first step counts at once (the saved role only changes on Apply)
     local role = ns.WizardRole and ns.WizardRole() or (ns.Role and ns.Role()) or "DAMAGER"

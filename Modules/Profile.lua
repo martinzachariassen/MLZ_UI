@@ -109,16 +109,16 @@ local function Import(text)
     end
     local data, reason = Decode(text)
     if not data then
-        ns.Print("|cffff4444Import failed:|r", reason)
+        ns.Print(ns.Paint("red", "Import failed:"), reason)
         return
     end
     local clean = Validate(data)
     if next(clean) == nil then
-        ns.Print("|cffff4444Import failed:|r the string has none of the settings MLZ UI knows.")
+        ns.Print(ns.Paint("red", "Import failed:"), "the string has none of the settings MLZ UI knows.")
         return
     end
     if not ns.Backup:Create({ { mod = Profile, items = {} } }, "import") then
-        ns.Print("|cffff4444Import stopped because the backup failed. Nothing was changed.|r")
+        ns.Print(ns.Paint("red", "Import stopped because the backup failed. Nothing was changed."))
         return
     end
     if clean.toggles then ns.db.toggles = clean.toggles end
@@ -136,7 +136,8 @@ local function Import(text)
     end
     if ns.FireRole then ns.FireRole() end
     if ns.NP and ns.NP.Apply then ns.NP.Apply() end -- nameplate options may have changed
-    ns.Print("Imported. Run |cffffff00/mlz install|r to apply the settings, or |cffffff00/mlz undo|r to go back.")
+    ns.Print("Imported. Run " .. ns.Cmd("/mlz install") .. " to apply the settings, or " .. ns.Cmd("/mlz undo")
+        .. " to go back.")
     local S = ns.Settings
     if S and S.frame and S.frame:IsShown() then
         S:Notify("Imported. Run the setup wizard to apply movement and scale, or undo it on Profiles & backup.", "warn")

@@ -12,9 +12,13 @@ ns.Settings = S
 
 local WIDTH, HEIGHT = 860, 580
 local SIDEBAR_W = 180
+local TITLE_H = 36   -- W.Window title bar
 local FOOTER_H = 44
-local PAGE_W = 628
 local PAD = 14
+-- Left and right of the page: PAD plus the scrollbar (6px gap + 5px bar) rounded to 20, the same on both sides
+local PAGE_INSET = 20
+-- Page area runs from the sidebar edge to the window border (1px each)
+local PAGE_W = WIDTH - SIDEBAR_W - 2 - PAGE_INSET * 2
 
 local function M(key) return ns.modules[key] end
 
@@ -385,8 +389,8 @@ Page.__index = Page
 
 local function NewPage(parent)
     local sf = W.ScrollArea(parent)
-    sf:SetPoint("TOPLEFT", parent, "TOPLEFT", SIDEBAR_W + 21, -53)
-    sf:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", -22, FOOTER_H + 9)
+    sf:SetPoint("TOPLEFT", parent, "TOPLEFT", 1 + SIDEBAR_W + PAGE_INSET, -(TITLE_H + 1 + PAD))
+    sf:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", -(1 + PAGE_INSET), FOOTER_H + 1 + PAD)
     sf:Hide()
     return setmetatable({ scroll = sf, content = sf.content, y = 0, refreshers = {} }, Page)
 end
@@ -408,23 +412,23 @@ end
 
 function Page:Title(title, subtitle)
     local t = W.Text(self.content, "MLZUI_FontTitle", title)
-    t:SetPoint("TOPLEFT", 2, -self.y)
+    t:SetPoint("TOPLEFT", 0, -self.y)
     self.y = self.y + 28
     if subtitle then
         local s = W.Text(self.content, "GameFontHighlight", subtitle)
         s:SetTextColor(unpack(T.muted))
-        s:SetPoint("TOPLEFT", 2, -self.y)
-        s:SetWidth(PAGE_W - 4)
+        s:SetPoint("TOPLEFT", 0, -self.y)
+        s:SetWidth(PAGE_W)
         self.y = self.y + s:GetStringHeight() + 4
     end
-    self.y = self.y + 12
+    self.y = self.y + PAD
 end
 
 function Page:EndCard()
     local c = self.card
     if not c then return end
     c:SetHeight(c.cy + 4)
-    self.y = self.y + c.cy + 4 + 12
+    self.y = self.y + c.cy + 4 + PAD
     self.card = nil
 end
 
@@ -498,21 +502,26 @@ function Page:Row(opts, build, refresh)
 
     row.reason = W.Text(row, "GameFontHighlightSmall", "", "RIGHT")
     row.reason:SetTextColor(unpack(T.amber))
-    row.reason:SetPoint("RIGHT", -PAD, 0)
+    row.reason:SetPoint("RIGHT", -(PAD - 1), 0) -- same right edge as the control
     row.reason:SetWidth(math.max(rightW, 170))
     row.reason:Hide()
 
     row:EnableMouse(true)
     local function ShowTip(self)
         self.hl:Show()
+        -- every row explains itself: the tooltip falls back to the description
         local tip = Eval(opts.tip)
-        if tip and tip ~= "" then
-            GameTooltip:SetOwner(self, "ANCHOR_NONE")
-            GameTooltip:SetPoint("BOTTOMLEFT", self, "TOPLEFT", PAD, 2)
-            GameTooltip:SetText(opts.label, 1, 1, 1)
-            GameTooltip:AddLine(tip, nil, nil, nil, true)
-            GameTooltip:Show()
-        end
+        if not tip or tip == "" then tip = Eval(opts.desc) end
+        local full = control and control.text and control.text.IsTruncated and control.text:IsTruncated()
+            and control.text:GetText()
+        if (not tip or tip == "") and not full then return end
+        local tc, mc = T.text, T.muted
+        GameTooltip:SetOwner(self, "ANCHOR_NONE")
+        GameTooltip:SetPoint("BOTTOMLEFT", self, "TOPLEFT", PAD, 2)
+        GameTooltip:SetText(opts.label, tc[1], tc[2], tc[3])
+        if tip and tip ~= "" then GameTooltip:AddLine(tip, mc[1], mc[2], mc[3], true) end
+        if full then GameTooltip:AddLine(full, tc[1], tc[2], tc[3], true) end
+        GameTooltip:Show()
     end
     row:SetScript("OnEnter", ShowTip)
     row:SetScript("OnLeave", function(self)
@@ -605,7 +614,8 @@ function Page:Value(label, desc, fn, opts)
     return self:Row(opts, function(row)
         local h = CreateFrame("Frame", nil, row)
         h:SetSize(opts.width or 240, 20)
-        h.text = W.Text(h, "MLZUI_FontButton", "", "RIGHT")
+        -- body text, not Roboto: values are content, not labels. Cut-off text shows in the row tooltip.
+        h.text = W.Text(h, "GameFontHighlight", "", "RIGHT")
         h.text:SetAllPoints()
         h.text:SetWordWrap(false)
         return h
@@ -636,7 +646,7 @@ function Page:Buttons(list)
     local made, defs = {}, {}
     for _, d in ipairs(list) do
         local w = d.width or 150
-        local b = W.Button(holder, d.text, w, 26, function(self)
+        local b = W.Button(holder, d.text, w, W.BUTTON_H, function(self)
             d.fn(self)
             S:Refresh()
         end, d.style)
@@ -648,9 +658,10 @@ function Page:Buttons(list)
     end
     local reason = W.Text(holder, "GameFontHighlightSmall", "", "RIGHT")
     reason:SetTextColor(unpack(T.amber))
-    reason:SetPoint("RIGHT", -PAD, 0)
+    reason:SetPoint("RIGHT", -(PAD - 1), 0)
     reason:SetWidth(math.max(60, PAGE_W - x - PAD * 2))
     reason:SetWordWrap(false)
+    -- the reason can be cut off: the full text is in each disabled button's tooltip
     self:OnRefresh(function()
         local first
         for i, b in ipairs(made) do
@@ -780,17 +791,20 @@ local function Banner(parent, y)
     f.bar:SetPoint("TOPLEFT", 1, -1)
     f.bar:SetPoint("BOTTOMLEFT", 1, 1)
     f.bar:SetWidth(3)
+    local BTN_W = 160
     f.text = W.Text(f, "GameFontHighlight", "")
-    f.text:SetPoint("LEFT", 16, 0)
-    f.text:SetWidth(PAGE_W - 200)
-    f.button = W.Button(f, "", 160, 28, function(self) if self.action then self.action() end end, "primary")
-    f.button:SetPoint("RIGHT", -11, 0)
+    f.text:SetPoint("LEFT", PAD, 0)
+    f.text:SetWidth(PAGE_W - PAD * 3 - BTN_W)
+    f.button = W.Button(f, "", BTN_W, W.BUTTON_H_LARGE, function(self) if self.action then self.action() end end, "primary")
+    f.button:SetPoint("RIGHT", -PAD, 0)
     function f:Set(color, text, buttonText, action)
         self.bar:SetColorTexture(unpack(color))
         self.text:SetText(text)
         self.button:SetShown(buttonText ~= nil)
         self.button:SetText(buttonText or "")
         self.button.action = action
+        -- grow with the text (a long reload reason wraps), never shorter than the button plus PAD
+        self:SetHeight(math.max(W.BUTTON_H_LARGE, self.text:GetStringHeight()) + PAD * 2)
     end
     return f
 end
@@ -848,8 +862,8 @@ PAGES[#PAGES + 1] = { key = "overview", title = "Overview", icon = "Interface\\I
         end
         row.text = W.Text(row, "GameFontHighlight", "")
         row.text:SetPoint("LEFT", PAD, 0)
-        row.text:SetWidth(PAGE_W - 2 * PAD - 170)
-        row.button = W.Button(row, "", 150, 24, function(self) if self.fn then self.fn() end end)
+        row.text:SetWidth(PAGE_W - 3 * PAD - 150)
+        row.button = W.Button(row, "", 150, W.BUTTON_H, function(self) if self.fn then self.fn() end end)
         row.button:SetPoint("RIGHT", -PAD, 0)
         stepRows[i] = row
     end
@@ -870,7 +884,7 @@ PAGES[#PAGES + 1] = { key = "overview", title = "Overview", icon = "Interface\\I
     head:SetPoint("TOPLEFT", PAD, -10)
     tip.text = W.Text(tip, "GameFontHighlight", "")
     tip.text:SetPoint("TOPLEFT", head, "BOTTOMLEFT", 0, -4)
-    tip.text:SetWidth(PAGE_W - 2 * PAD - 280)
+    tip.text:SetWidth(PAGE_W - 3 * PAD - (150 + 8 + 90)) -- room for both buttons
     tip.text:SetWordWrap(true)
     -- The tip is remembered by its text, so the list changing under you does not swap it
     local tipKey, tipList, tipIdx
@@ -899,6 +913,8 @@ PAGES[#PAGES + 1] = { key = "overview", title = "Overview", icon = "Interface\\I
         tip.action:SetText(t.button or "")
         tip.action.fn = t.fn
         tip.nextBtn:SetShown(#list > 1)
+        -- heading at 10, 4px gap, the text, then PAD: a long tip grows the card instead of spilling out
+        tip:SetHeight(math.max(TIP_H, 10 + head:GetStringHeight() + 4 + tip.text:GetStringHeight() + PAD))
     end
 
     p:OnRefresh(function()
@@ -914,7 +930,8 @@ PAGES[#PAGES + 1] = { key = "overview", title = "Overview", icon = "Interface\\I
         end
         banner:SetShown(action)
         list:ClearAllPoints()
-        list:SetPoint("TOPLEFT", 0, -(action and (top + 50 + PAD) or top))
+        local bannerH = action and (banner:GetHeight() + PAD) or 0
+        list:SetPoint("TOPLEFT", 0, -(top + bannerH))
 
         local sum = S.Summary()
         for i, line in ipairs(lines) do
@@ -944,8 +961,8 @@ PAGES[#PAGES + 1] = { key = "overview", title = "Overview", icon = "Interface\\I
         else
             tip:SetPoint("TOPLEFT", list, "BOTTOMLEFT", 0, -PAD)
         end
-        local total = list:GetHeight() + (action and (50 + PAD) or 0)
-            + (#todo > 0 and (PAD + steps:GetHeight()) or 0) + (tip:IsShown() and (PAD + TIP_H) or 0)
+        local total = list:GetHeight() + bannerH
+            + (#todo > 0 and (PAD + steps:GetHeight()) or 0) + (tip:IsShown() and (PAD + tip:GetHeight()) or 0)
         p.content:SetHeight(top + total + 4)
         if p.scroll.UpdateScroll then p.scroll.UpdateScroll() end
     end)
@@ -969,7 +986,7 @@ PAGES[#PAGES + 1] = { key = "layout", title = "Layout & scale", icon = "Interfac
     p:OnRefresh(Labels)
     p:Step("Scale mode", "Lower number = smaller UI and more of the world. Applies at once (waits for combat to end).",
         modes, 280, function() return sc:Mode() end, function(v) sc:SetMode(v) end)
-    p:Value("Right now", nil, function()
+    p:Value("Right now", "The scale the game uses at this moment.", function()
         local w, h = GetPhysicalScreenSize()
         return ("%.3f on a %dx%d screen%s"):format(UIParent:GetScale(), w or 0, h or 0, sc:IsApplied() and "" or C.grey .. " (Blizzard's own scale)" .. C.r)
     end, { width = 320 })
@@ -1008,14 +1025,14 @@ PAGES[#PAGES + 1] = { key = "layout", title = "Layout & scale", icon = "Interfac
         { avail = function() if not EditModeAvailable() then return "Needs Edit Mode" end end })
     p:Buttons({
         { text = "Reset to " .. tw.MAP_DEFAULT .. "%", width = 140, fn = function() SaveMap(tw.MAP_DEFAULT, "Minimap size reset to") end,
-          avail = NoEditMode },
+          avail = NoEditMode, tip = "Puts the minimap back to the size MLZ UI uses and saves it in the layout." },
     })
 
     -- Hunters and warlocks only: other classes have no pet bar to place
     local class = ns.data.classes and ns.data.classes[ns.PlayerClass() or ""]
     if class and class.pet then
         p:Card("Pet bar", "Move the pet bar in Edit Mode and save, then press Remember. Applying the layout later puts it back there.")
-        p:Value("Saved position", nil, function()
+        p:Value("Saved position", "Where the pet bar goes when the layout is applied.", function()
             local saved = lay:PetSaved()
             return saved and lay.AnchorText(saved) or (C.grey .. "Default (from MLZ UI)" .. C.r)
         end)
@@ -1023,11 +1040,11 @@ PAGES[#PAGES + 1] = { key = "layout", title = "Layout & scale", icon = "Interfac
             { text = "Remember position", width = 160, fn = function()
                 local ok, text = lay:PetSave()
                 S:Notify(ok and ("Pet bar position saved: " .. text) or ("Could not save the pet bar: " .. tostring(text)), ok and "good" or "bad")
-            end },
+            end, tip = "Saves where the pet bar is now in Edit Mode. Save Edit Mode first." },
             { text = "Use default", width = 120, style = "subtle", fn = function()
                 lay:PetReset()
                 S:Notify("The pet bar goes back to the default position next time the layout is applied.", "info")
-            end },
+            end, tip = "Forgets your saved position. The next time the layout is applied, the pet bar goes back to the MLZ UI spot." },
         })
     end
 end }
@@ -1060,13 +1077,13 @@ PAGES[#PAGES + 1] = { key = "nameplates", title = "Nameplates", icon = "Interfac
         return MODE_TEXT[m] .. ((NP.PvP() and NP.InPvP()) and "  + PvP" or "")
     end, { avail = NPNotReady, width = 180, descLines = 2 })
 
-    p:Card("Mode", "Auto: Tank while you tank (Defensive Stance / Bear Form with tank talents, or the group's tank). "
+    p:Card("Mode", "Auto: Tank while you tank (Defensive Stance or Bear Form with tank talents, or the group's tank). "
         .. "Healer or DPS in a group, depending on your role. Solo when you are not in a group.")
     p:Choice("Mode", "Picking a mode turns Auto off.", NP_OPTIONS, GetNPChoice, SetNPChoice, 62, { avail = NPNotReady })
-    p:Text(C.blue .. "Tank" .. C.r .. ": every mob fully visible, your target a bit bigger.\n"
-        .. C.blue .. "Healer" .. C.r .. ": enemies dimmed to 60% so your eyes stay on the raid frames.\n"
-        .. C.blue .. "DPS" .. C.r .. ": mobs you don't target are faded a little.\n"
-        .. C.blue .. "Solo" .. C.r .. ": calm, every mob readable (you often fight several).", 4)
+    p:Text(C.white .. "Tank" .. C.r .. ": every mob fully visible, your target a bit bigger.\n"
+        .. C.white .. "Healer" .. C.r .. ": enemies dimmed to 60% so your eyes stay on the raid frames.\n"
+        .. C.white .. "DPS" .. C.r .. ": mobs you don't target are faded a little.\n"
+        .. C.white .. "Solo" .. C.r .. ": calm, every mob readable (you often fight several).", 4)
 
     p:Card("Options")
     p:Toggle("Friendly names for healers", "In Healer mode friendly players get a name above their head, but it can't be clicked, so it never steals a click.",
@@ -1078,25 +1095,44 @@ PAGES[#PAGES + 1] = { key = "nameplates", title = "Nameplates", icon = "Interfac
     p:Toggle("PvP tweak", "In battlegrounds and arenas: every enemy fully visible, no threat colors.",
         NP.PvP, NP.SetPvP, { avail = NPNotReady })
 
-    p:Card("What MLZ nameplates show", "Kept calm on purpose: extra details only show when they matter.")
-    local function ShowToggle(key, label, desc, tip)
-        p:Toggle(label, desc, function() return NP.Show(key) end, function(on) NP.SetShow(key, on) end,
-            { avail = MLZOnly, tip = tip })
+    -- The engine decides which of the next two cards has rows. The other one is a single amber line,
+    -- and the page is rebuilt when the engine changes (here, from the minimap menu or a Platynator load).
+    local builtEngine = NP.Engine()
+    p:OnRefresh(function()
+        if NP.Engine() ~= builtEngine then S:RebuildPage("nameplates") end
+    end)
+    local function Unused(text)
+        p:Text(C.amber .. text .. C.r)
     end
-    ShowToggle("healthText", "Health percent", "Inside the bar, on your target and on mobs that are hurt.")
-    ShowToggle("castBar", "Cast bar", "Under the health bar. Blue can be interrupted, grey can't.")
-    ShowToggle("quest", "Quest marker", "A yellow ! next to mobs you still need for a quest.",
-        "Read from the mob's tooltip and remembered per mob, so it costs nothing in a fight.")
-    ShowToggle("debuffs", "Your debuffs", "Only your own, with time left. On your target, or on every mob in Tank mode.")
-    ShowToggle("level", "Level", "Only when it is 3 or more levels from yours, or ??. Elite and rare marks always show.")
-    p:Step("Size", "Width and text size of the plates. Your target is a bit bigger on top of this.", SIZE_OPTIONS, 140,
-        NP.Size, NP.SetSize, { avail = MLZOnly })
+
+    p:Card("What MLZ nameplates show", "Kept calm on purpose: extra details only show when they matter.")
+    if builtEngine ~= "mlz" then
+        Unused("Only used when MLZ draws the nameplates. Pick MLZ under Engine to change these.")
+    else
+        local function ShowToggle(key, label, desc, tip)
+            p:Toggle(label, desc, function() return NP.Show(key) end, function(on) NP.SetShow(key, on) end,
+                { avail = MLZOnly, tip = tip })
+        end
+        ShowToggle("healthText", "Health percent", "Inside the bar, on your target and on mobs that are hurt.")
+        ShowToggle("castBar", "Cast bar", "Under the health bar. Blue can be interrupted, grey can't.")
+        ShowToggle("quest", "Quest marker", "A yellow ! next to mobs you still need for a quest.",
+            "Read from the mob's tooltip and remembered per mob, so it costs nothing in a fight.")
+        ShowToggle("debuffs", "Your debuffs", "Only your own, with time left. On your target, or on every mob in Tank mode.")
+        ShowToggle("level", "Level", "Only when it is 3 or more levels from yours, or ??. Elite and rare marks always show.")
+        p:Step("Size", "Width and text size of the plates. Your target is a bit bigger on top of this.", SIZE_OPTIONS, 140,
+            NP.Size, NP.SetSize, { avail = MLZOnly })
+    end
 
     p:Card("Platynator", "MLZ UI saves a copy of your Platynator profile before it changes anything. Restore puts that copy back.")
-    p:Toggle("Clean nameplate style", "Minimal enemy nameplates: name and percent in the bar, cast bar, crowd control and only your own debuffs.",
-        NP.Style, NP.SetStyle, { avail = PlatyOnly,
-        tip = "Built from your own enemy design, so your font and colors stay. Everything it removes is remembered: turning it off puts it back." })
-    p:Value("Saved copy", nil, function() return NP.HasSnapshot() and "Yes" or (C.grey .. "None yet" .. C.r) end)
+    if builtEngine ~= "platynator" then
+        Unused("The clean style is only used when Platynator draws the nameplates. Your saved copy can still be restored.")
+    else
+        p:Toggle("Clean nameplate style", "Minimal enemy nameplates: name and percent in the bar, cast bar, crowd control and only your own debuffs.",
+            NP.Style, NP.SetStyle, { avail = PlatyOnly,
+            tip = "Built from your own enemy design, so your font and colors stay. Everything it removes is remembered: turning it off puts it back." })
+    end
+    p:Value("Saved copy", "A copy of your Platynator profile from before MLZ UI changed it.",
+        function() return NP.HasSnapshot() and "Yes" or (C.grey .. "None yet" .. C.r) end)
     local function NoPlaty() if not NP.PlatyReady() then return "Platynator is not loaded" end end
     p:Buttons({
         { text = "Save profile", fn = NP.Save, width = 130, avail = NoPlaty,
@@ -1129,7 +1165,7 @@ PAGES[#PAGES + 1] = { key = "healer", title = "Your role", icon = "Interface\\Ic
     end, { width = 260 })
 
     p:Card("Role layouts", "One layout for healing in dungeons, one for raids, and one without melee swing timers for casters and hunters. They switch only while an MLZ UI layout is active, and never in combat.")
-    p:Status("Counts as healer", nil, function()
+    p:Status("Counts as healer", "Yes when your role above is Healer. Healers get the group frames in the middle.", function()
         if H.IsHealer() then return "on", "Yes" end
         return "info", "No"
     end)
@@ -1141,8 +1177,10 @@ PAGES[#PAGES + 1] = { key = "healer", title = "Your role", icon = "Interface\\Ic
         end
         return built == #names and "on" or "warn", built .. " of " .. #names
     end)
-    p:Value("Layout now", nil, function() return lay:ActiveName() or (C.grey .. "unknown" .. C.r) end, { width = 260 })
-    p:Value("Layout for your role", nil, function() return H.Wanted() or (C.grey .. "unknown" .. C.r) end, { width = 260 })
+    p:Value("Layout now", "The Edit Mode layout the game uses at this moment.",
+        function() return lay:ActiveName() or (C.grey .. "unknown" .. C.r) end, { width = 260 })
+    p:Value("Layout for your role", "The layout MLZ UI switches to for your role and group size.",
+        function() return H.Wanted() or (C.grey .. "unknown" .. C.r) end, { width = 260 })
     local REBUILD = "Rebuild role layouts"
     p:Buttons({
         { text = REBUILD, width = 190, fn = Confirm(REBUILD, function()
@@ -1165,7 +1203,7 @@ PAGES[#PAGES + 1] = { key = "fade", title = "Minimalism", icon = "Interface\\Ico
     p:Title("Minimalism", "Hide what you rarely need. Faded frames come back on mouseover, and everything shows while Edit Mode is open.")
 
     p:Card("Pause")
-    p:Toggle("Pause all fading", "Shows everything again until you turn this off or reload. Handy for a quick look.",
+    p:Toggle("Pause all fading", "Shows everything again until you turn this off or reload.",
         function() return ns.fadePaused end, function(on) fade:SetPaused(on) end)
     p:Buttons({
         { text = "Show me around", width = 150, fn = function()
@@ -1186,7 +1224,7 @@ PAGES[#PAGES + 1] = { key = "fade", title = "Minimalism", icon = "Interface\\Ico
         if fade:Exists(row) then
             local how = FadeModeText(row.mode)
             if row.alpha then how = how .. " (" .. math.floor(row.alpha * 100) .. "%)" end
-            p:Toggle(row.label, C.blue .. how .. C.r .. "  " .. (row.desc or ""),
+            p:Toggle(row.label, how .. ". " .. (row.desc or ""),
                 function() return fade:IsOn(row.id) end, function(on) fade:SetRow(row.id, on) end)
         else
             missing[#missing + 1] = row.label
@@ -1249,7 +1287,7 @@ PAGES[#PAGES + 1] = { key = "qol", title = "Helpers", icon = "Interface\\Icons\\
         { text = "Reset position", width = 140, style = "subtle", fn = function()
             MT.ResetPosition()
             S:Notify("The tick bar is back under your player frame.", "info")
-        end, avail = NoTick },
+        end, avail = NoTick, tip = "Puts the tick bar back under your player frame." },
     })
 
     local CK = ns.Cooking
@@ -1325,7 +1363,7 @@ PAGES[#PAGES + 1] = { key = "qol", title = "Helpers", icon = "Interface\\Icons\\
             X.Reset()
             ns.FireState()
             S:Notify("XP per hour counts from now.", "info")
-        end },
+        end, tip = "Clears the XP counted so far, for example after a break." },
     })
     end
 end }
@@ -1440,8 +1478,10 @@ PAGES[#PAGES + 1] = { key = "profiles", title = "Profiles & backup", icon = "Int
 
     p:Card("Share your setup", "Export gives a string with your MLZ UI choices. Import it on another character or computer.")
     p:Buttons({
-        { text = "Export", width = 120, fn = function() ns.RunCommand("export") end },
-        { text = "Import...", width = 120, fn = function() ns.RunCommand("import") end },
+        { text = "Export", width = 120, fn = function() ns.RunCommand("export") end,
+          tip = "Shows a text string with your MLZ UI choices that you can copy to another character or share." },
+        { text = "Import...", width = 120, fn = function() ns.RunCommand("import") end,
+          tip = "Paste a string from Export. A backup is taken first, so undo can put things back." },
     })
 
     p:Card("Backups", "A backup is taken every time the setup wizard applies changes. 5 are kept, and the oldest one (from before MLZ UI changed anything) is never thrown away.")
@@ -1499,7 +1539,7 @@ PAGES[#PAGES + 1] = { key = "about", title = "About & help", icon = "Interface\\
     end, { width = 260 })
 
     p:Card("How it works")
-    p:Text("The " .. C.gold .. "setup wizard" .. C.r .. " is for the first install and for re-applying the whole setup with a backup. "
+    p:Text("The " .. C.white .. "setup wizard" .. C.r .. " is for the first install and for re-applying the whole setup with a backup. "
         .. "This window is for everyday changes. Everything here applies at once, and hovering a setting tells you more.")
 
     p:Card("Minimap button")
@@ -1512,16 +1552,16 @@ PAGES[#PAGES + 1] = { key = "about", title = "About & help", icon = "Interface\\
         end)
 
     p:Card("Chat commands")
-    p:Text(C.gold .. "/mlz" .. C.r .. "   opens or closes this window\n"
-        .. C.gold .. "/mlz install" .. C.r .. "   opens the setup wizard\n"
-        .. C.gold .. "/mlz undo" .. C.r .. "   undoes the last setup wizard run or import\n"
-        .. C.gold .. "/mlz role" .. C.r .. "   shows your role, or sets it: tank, healer, dps, auto\n"
-        .. C.gold .. "/mlz np" .. C.r .. "   nameplate mode and options\n"
-        .. C.gold .. "/mlz keys" .. C.r .. "   a map of your keybinds\n"
-        .. C.gold .. "/mlz tour" .. C.r .. "   shows where the hidden bars and buttons are\n"
-        .. C.gold .. "/mlz xp" .. C.r .. "   XP per hour and time to your next level\n"
-        .. C.gold .. "/mlz minimap" .. C.r .. "   shows the minimap button again\n"
-        .. C.gold .. "/mlz help" .. C.r .. "   lists the commands in chat")
+    p:Text(C.white .. "/mlz" .. C.r .. "   opens or closes this window\n"
+        .. C.white .. "/mlz install" .. C.r .. "   opens the setup wizard\n"
+        .. C.white .. "/mlz undo" .. C.r .. "   undoes the last setup wizard run or import\n"
+        .. C.white .. "/mlz role" .. C.r .. "   shows your role, or sets it: tank, healer, dps, auto\n"
+        .. C.white .. "/mlz np" .. C.r .. "   nameplate mode and options\n"
+        .. C.white .. "/mlz keys" .. C.r .. "   a map of your keybinds\n"
+        .. C.white .. "/mlz tour" .. C.r .. "   shows where the hidden bars and buttons are\n"
+        .. C.white .. "/mlz xp" .. C.r .. "   XP per hour and time to your next level\n"
+        .. C.white .. "/mlz minimap" .. C.r .. "   shows the minimap button again\n"
+        .. C.white .. "/mlz help" .. C.r .. "   lists the commands in chat")
 
     p:Card("Troubleshooting")
     p:Toggle("Debug output", "Extra messages in chat. Only useful when something is wrong.",
@@ -1552,11 +1592,12 @@ local function SidebarButton(parent, page, y)
     b.bar:Hide()
     b.icon = b:CreateTexture(nil, "ARTWORK")
     b.icon:SetSize(18, 18)
-    b.icon:SetPoint("LEFT", 14, 0)
+    b.icon:SetPoint("LEFT", PAD, 0)
     b.icon:SetTexture(page.icon)
     b.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
     b.text = W.Text(b, "MLZUI_FontButton", page.title)
     b.text:SetPoint("LEFT", b.icon, "RIGHT", 10, 0)
+    b.text:SetPoint("RIGHT", -PAD, 0) -- a long title is cut off inside the sidebar, not under its edge
     b.text:SetWordWrap(false)
     function b:SetSelected(on)
         self.sel:SetShown(on)
@@ -1593,8 +1634,8 @@ function S:Build()
             local line = side:CreateTexture(nil, "ARTWORK")
             line:SetColorTexture(unpack(T.border))
             line:SetHeight(1)
-            line:SetPoint("TOPLEFT", 14, -(y + 6))
-            line:SetPoint("TOPRIGHT", -14, -(y + 6))
+            line:SetPoint("TOPLEFT", PAD, -(y + 6))
+            line:SetPoint("TOPRIGHT", -PAD, -(y + 6))
             y = y + 13
         end
         local b = SidebarButton(side, page, y)
@@ -1616,16 +1657,27 @@ function S:Build()
     top:SetPoint("TOPRIGHT")
     foot.dot = foot:CreateTexture(nil, "ARTWORK")
     foot.dot:SetSize(8, 8)
-    foot.dot:SetPoint("LEFT", 16, 0)
+    foot.dot:SetPoint("LEFT", PAD - 1, 0)
     foot.text = W.Text(foot, "GameFontHighlight", "")
     foot.text:SetPoint("LEFT", foot.dot, "RIGHT", 10, 0)
-    foot.text:SetWidth(WIDTH - 330)
+    -- dot and gap on the left, both buttons and PAD gaps on the right
+    foot.text:SetWidth(WIDTH - 2 - PAD * 3 - 18 - (110 + 8 + 130))
     foot.text:SetWordWrap(false)
-    foot.reload = W.Button(foot, "Reload UI", 110, 28, function() ReloadUI() end)
-    foot.reload:SetPoint("RIGHT", -10, 0)
-    foot.wizard = W.Button(foot, "Setup wizard", 130, 28, function() OpenWizard() end)
+    foot.reload = W.Button(foot, "Reload UI", 110, W.BUTTON_H_LARGE, function() ReloadUI() end)
+    foot.reload:SetPoint("RIGHT", -(PAD - 1), 0)
+    foot.reload.tipText = "Reloads the interface so waiting changes take effect."
+    foot.wizard = W.Button(foot, "Setup wizard", 130, W.BUTTON_H_LARGE, function() OpenWizard() end)
     foot.wizard:SetPoint("RIGHT", foot.reload, "LEFT", -8, 0)
     foot.wizard.tipText = "Re-apply the whole setup step by step. A backup is taken first."
+    -- a long message is cut off: hover the footer to read all of it
+    foot:EnableMouse(true)
+    foot:SetScript("OnEnter", function(self)
+        if not self.text:IsTruncated() then return end
+        GameTooltip:SetOwner(self, "ANCHOR_TOP")
+        GameTooltip:SetText(self.text:GetText(), T.text[1], T.text[2], T.text[3], 1, true)
+        GameTooltip:Show()
+    end)
+    foot:SetScript("OnLeave", function(self) if GameTooltip:IsOwned(self) then GameTooltip:Hide() end end)
     self.footer = foot
 
     -- Redraw while open: on show, when a module reports a change, on group and layout events,
@@ -1708,6 +1760,24 @@ function S:Select(key)
     self.selected = key
     entry.page.scroll:SetVerticalScroll(0)
     self:Refresh(true)
+end
+
+-- Throws a built page away and builds it again, for pages whose rows depend on a choice
+-- (the nameplate engine). Deferred one frame: the click that caused it may come from the old page.
+function S:RebuildPage(key)
+    C_Timer.After(0, function()
+        local entry = self.pages and self.pages[key]
+        if not (entry and entry.page) then return end
+        local scroll = entry.page.scroll
+        local offset = scroll:GetVerticalScroll()
+        scroll:Hide()
+        entry.page = nil
+        if self.selected == key and self.frame and self.frame:IsShown() then
+            self:Select(key)
+            local page = self.pages[key].page
+            if page then page.scroll:SetVerticalScroll(offset) end
+        end
+    end)
 end
 
 -- A control's setter usually fires ns.FireState (which refreshes) and the control refreshes again

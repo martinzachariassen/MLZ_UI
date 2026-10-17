@@ -18,6 +18,14 @@ local UnitHealth, UnitHealthMax = UnitHealth, UnitHealthMax
 local pairs, ipairs, math = pairs, ipairs, math
 
 local TEX = "Interface\\Buttons\\WHITE8X8"
+-- Plate colors: a dark 1px edge so bars read on any background, the rest comes from the theme (W.T)
+local EDGE = { 0, 0, 0, 0.9 }
+local BG_ALPHA = 0.85
+
+local function Theme(key, fallback)
+    local T = ns.W and ns.W.T
+    return T and T[key] or fallback
+end
 
 local function D() return ns.data.nameplates.plates end
 local function C() return ns.data.nameplates.plates.colors end
@@ -106,11 +114,12 @@ local function MakeBar(parent, height)
     bar.edge:SetTexture(TEX)
     bar.edge:SetPoint("TOPLEFT", -1, 1)
     bar.edge:SetPoint("BOTTOMRIGHT", 1, -1)
-    bar.edge:SetVertexColor(0, 0, 0, 0.9)
+    bar.edge:SetVertexColor(unpack(EDGE))
     bar.bg = bar:CreateTexture(nil, "BACKGROUND", nil, -1)
     bar.bg:SetTexture(TEX)
     bar.bg:SetAllPoints()
-    bar.bg:SetVertexColor(0.06, 0.07, 0.085, 0.85)
+    local bg = Theme("input", { 0.06, 0.07, 0.085 })
+    bar.bg:SetVertexColor(bg[1], bg[2], bg[3], BG_ALPHA)
     return bar
 end
 
@@ -122,7 +131,7 @@ local function MakeAura(parent)
     a.edge:SetTexture(TEX)
     a.edge:SetPoint("TOPLEFT", -1, 1)
     a.edge:SetPoint("BOTTOMRIGHT", 1, -1)
-    a.edge:SetVertexColor(0, 0, 0, 0.9)
+    a.edge:SetVertexColor(unpack(EDGE))
     a.icon = a:CreateTexture(nil, "ARTWORK")
     a.icon:SetAllPoints()
     a.icon:SetTexCoord(0.08, 0.92, 0.2, 0.8)
@@ -272,14 +281,14 @@ local function LevelText(unit)
     if cfg.show.level then
         local mine = UnitLevel("player")
         if level == nil or level < 0 then
-            text = "|cffff4444??|r"
+            text = ns.Paint("red", "??")
         elseif math.abs(level - mine) >= D().levelDiff then
             local c = (GetCreatureDifficultyColor or GetQuestDifficultyColor)
             c = c and c(level)
             text = c and ("|cff%02x%02x%02x%d|r"):format(c.r * 255, c.g * 255, c.b * 255, level) or tostring(level)
         end
     end
-    if mark then text = (text or "") .. "|cffffb040" .. mark .. "|r" end
+    if mark then text = (text or "") .. ns.Paint("amber", mark) end
     return text
 end
 
@@ -351,7 +360,8 @@ local function UpdateName(f)
     end
     local level = LevelText(unit)
     f.name:SetText(level and (level .. " " .. name) or name)
-    f.name:SetTextColor(0.93, 0.94, 0.96)
+    local tc = Theme("text", { 0.93, 0.94, 0.96 })
+    f.name:SetTextColor(tc[1], tc[2], tc[3])
 end
 
 local function UpdateHealth(f)
@@ -383,7 +393,7 @@ local function UpdateTarget(f)
     if isTarget then
         f.health.edge:SetVertexColor(a[1], a[2], a[3], 1)
     else
-        f.health.edge:SetVertexColor(0, 0, 0, 0.9)
+        f.health.edge:SetVertexColor(unpack(EDGE))
     end
     local nonTarget = cfg.pvp and D().pvp.nonTarget or m.nonTarget
     f:SetAlpha((UnitExists("target") and not isTarget) and nonTarget or 1)

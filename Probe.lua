@@ -370,7 +370,7 @@ function ns.RunProbe(silent)
             ns.Print("No nameplates were visible. Stand near a few mobs with nameplates on (V) and run it again.")
         end
     end
-    ns.Print("Probe saved. Type |cffffff00/reload|r to write it to SavedVariables/MLZ_UI.lua.")
+    ns.Print("Probe saved. Type " .. ns.Cmd("/reload") .. " to write it to SavedVariables/MLZ_UI.lua.")
 end
 
 ns.AddCommand("probe", "collects client info for verification (saved in SavedVariables)", function()

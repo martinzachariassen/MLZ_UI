@@ -67,7 +67,7 @@ function Scale:ApplyScale(mode)
     applying = true
     local ok, err = pcall(DoApply, self, mode)
     applying = false -- always reset, even if something above failed
-    if not ok then ns.Print("|cffff4444Scaling failed:|r", err) end
+    if not ok then ns.Print(ns.Paint("red", "Could not change the UI scale:"), err) end
 end
 
 -- Accepts the listed modes and plain numbers between 0.4 and 1.15

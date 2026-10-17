@@ -28,7 +28,7 @@ local MOUSE = {
 }
 
 local LAYERS = {
-    { value = "", text = "Base" }, { value = "SHIFT-", text = "SHIFT" },
+    { value = "", text = "No modifier" }, { value = "SHIFT-", text = "SHIFT" },
     { value = "CTRL-", text = "CTRL" }, { value = "ALT-", text = "ALT" },
 }
 
@@ -134,7 +134,14 @@ local function Cell(parent, entry, x, y)
     c.text:SetPoint("BOTTOMLEFT", 4, 4)
     c.text:SetPoint("BOTTOMRIGHT", -3, 4)
     c.text:SetWordWrap(false)
-    c.key, c.dead = key, entry.dead
+    -- movement keys: a 3px accent strip on the left, the same way selection is shown everywhere else
+    c.strip = c:CreateTexture(nil, "ARTWORK")
+    c.strip:SetColorTexture(unpack(T.accent))
+    c.strip:SetPoint("TOPLEFT", 1, -1)
+    c.strip:SetPoint("BOTTOMLEFT", 1, 1)
+    c.strip:SetWidth(3)
+    c.strip:Hide()
+    c.key, c.label, c.dead = key, label or key, entry.dead
     if c.dead then
         c.bg:SetColorTexture(unpack(T.panel))
         return c
@@ -142,7 +149,7 @@ local function Cell(parent, entry, x, y)
     c:EnableMouse(true)
     c:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:SetText(layer .. self.key, 1, 1, 1)
+        GameTooltip:SetText(layer .. self.label, T.text[1], T.text[2], T.text[3]) -- "SHIFT-Caps", as on the key
         local d = self.d
         if d then
             GameTooltip:AddLine(d.name, T.text[1], T.text[2], T.text[3], true)
@@ -170,33 +177,52 @@ local function Fill()
             free = free + 1
             c.text:SetText("")
             c.bg:SetColorTexture(unpack(T.input))
-            c.border:SetColor(T.border)
+            c.strip:Hide()
         else
             c.text:SetText(d.empty and (C.grey .. "empty" .. C.r) or d.short)
             c.bg:SetColorTexture(unpack(T.card))
-            c.border:SetColor(MOVEMENT[d.cmd] and T.accent or T.border)
+            c.strip:SetShown(MOVEMENT[d.cmd] and true or false)
         end
     end
-    frame.foot:SetText(("%d of these keys are free on this layer. Blue edge = movement. Hover a key for details.")
+    frame.foot:SetText(("%d of these keys are free on this layer. Blue strip = movement. Hover a key for details.")
         :format(free))
+end
+
+-- Width of a key that is n keys wide, and of a whole row (keys plus the gaps between them)
+local function KeyW(n) return n * U + (n - 1) * GAP end
+local function RowW(row)
+    local w = 0
+    for _, entry in ipairs(row) do w = w + KeyW(entry[2] or 1) end
+    return w + (#row - 1) * GAP
 end
 
 local function Build()
     if frame then return end
-    local kbW = 7.75 * U + 7 * GAP + 2 * GAP -- widest row (caps lock row)
-    local mouseW = 1.75 * U + GAP
+    local kbW = 0
+    for _, row in ipairs(ROWS) do kbW = math.max(kbW, RowW(row)) end
+    local mouseW = 0
+    for _, entry in ipairs(MOUSE) do mouseW = math.max(mouseW, KeyW(entry[2] or 1)) end
+    local keysH = math.max(#ROWS, #MOUSE) * (KEY_H + GAP) - GAP
     local width = PAD + kbW + PAD + mouseW + PAD
-    local height = 36 + PAD + 22 + PAD + #ROWS * (KEY_H + GAP) + PAD + 16 + PAD
+    local height = 36 + PAD + 22 + PAD + keysH + PAD + 16 + PAD
     frame = W.Window("MLZUI_Keys", width, height, "My keybinds")
 
     local seg = W.Segmented(frame, LAYERS, function(v)
         layer = v
         Fill()
-    end, 70)
+    end, 86)
     seg:SetPoint("TOPLEFT", PAD, -(36 + PAD))
     seg:SetValue(layer)
-    local hint = W.Muted(frame, "GameFontDisableSmall", "Change keys in the setup wizard (Keybinds step) or in Blizzard's key bindings.")
-    hint:SetPoint("LEFT", seg, "RIGHT", PAD, 0)
+    local change = W.Button(frame, "Change keys", 120, 22, function()
+        if InCombatLockdown() then
+            frame.foot:SetText(C.amber .. "Keys can't be changed in combat. Try again after combat." .. C.r)
+            return
+        end
+        frame:Hide()
+        if ns.Installer then ns.Installer:Open("bindings") end
+    end, "subtle")
+    change:SetPoint("TOPRIGHT", -PAD, -(36 + PAD))
+    change.tipText = "Opens the Keybinds step of the setup wizard. You can also use Blizzard's key bindings."
 
     local top = 36 + PAD + 22 + PAD
     for r, row in ipairs(ROWS) do

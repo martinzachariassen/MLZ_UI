@@ -39,17 +39,17 @@ local PAGES = {
     { kind = "module", key = "settings", title = "Game settings",
       text = "Good default settings. Rows marked (already) have the right value. Hover over a row for an explanation." },
     { kind = "module", key = "bindings", title = "Keybinds",
-      text = "The same 12 keys on three layers: no modifier = Bar 1, " .. C.gold .. "SHIFT" .. C.r .. " = Bar 2, " .. C.gold .. "CTRL" .. C.r .. " = Bar 3. " .. C.red .. "Red" .. C.r .. " = the key does something else today. Panels you lose a key for move to " .. C.gold .. "ALT" .. C.r .. "." },
+      text = "The same 12 keys on three layers: no modifier = Bar 1, " .. C.white .. "SHIFT" .. C.r .. " = Bar 2, " .. C.white .. "CTRL" .. C.r .. " = Bar 3. " .. C.red .. "Red" .. C.r .. " = the key does something else today. Panels you lose a key for move to " .. C.white .. "ALT" .. C.r .. "." },
     { kind = "module", key = "fade", title = "Minimalism",
-      text = "Things you rarely use stay invisible until you hover over them, and things you only need in combat are dimmed otherwise. Untick a row that is on to turn it off. You can change all of this later in the settings window (" .. C.gold .. "/mlz" .. C.r .. ")." },
+      text = "Things you rarely use stay invisible until you hover over them, and things you only need in combat are dimmed otherwise. Untick a row that is on to turn it off." },
     { kind = "module", key = "actionbuttons", title = "Action buttons",
-      text = "See at a glance why a button isn't working: " .. C.red .. "red" .. C.r .. " = out of range, " .. C.blue .. "blue" .. C.r .. " = low mana, dark grey = can't be used right now. Short hotkeys and no macro names make for cleaner bars. Change it later in the settings window (" .. C.gold .. "/mlz" .. C.r .. ")." },
+      text = "See at a glance why a button isn't working: " .. C.red .. "red" .. C.r .. " = out of range, " .. C.blue .. "blue" .. C.r .. " = low mana, dark grey = can't be used right now. Short hotkeys and no macro names make for cleaner bars." },
     { kind = "module", key = "tweaks", title = "Interface tweaks",
-      text = "Smaller things that declutter the screen. The minimap size and everything else here can be changed later in the settings window (" .. C.gold .. "/mlz" .. C.r .. ")." },
+      text = "Smaller things that declutter the screen: the minimap, chat, tooltips and the quest tracker." },
     { kind = "module", key = "addons", title = "Other addons",
       text = "Settings for supported addons that are installed and loaded; the rest are skipped. Some addons only pick up the changes after a reload; the last page tells you if that is the case." },
     { kind = "module", key = "nameplates", title = "Nameplates",
-      text = "Flat, calm nameplates that follow your role: tank, healer, DPS or solo. If Platynator is loaded, MLZ UI drives it instead. What the plates show and how big they are is in the settings window (" .. C.gold .. "/mlz" .. C.r .. ")." },
+      text = "Flat, calm nameplates that follow your role: tank, healer, DPS or solo. If Platynator is loaded, MLZ UI drives it instead. What the plates show and how big they are is on the Nameplates page." },
     { kind = "summary", title = "Review" },
     { kind = "done", title = "All set" },
 }
@@ -73,7 +73,7 @@ local PAGE_TEXT = {
         local class = UnitClass("player") or "your class"
         local arch, source = ns.Archetype(true)
         return ("MLZ UI adapts to how you play. For your %s it sees %s%s%s (%s). Tank, healer and DPS get different nameplates, role layouts and a few game settings. Change the role below if that is wrong."):format(
-            class, C.gold, ns.ArchetypeText(arch), C.r, ns.SOURCE_TEXT[source] or tostring(source))
+            class, C.white, ns.ArchetypeText(arch), C.r, ns.SOURCE_TEXT[source] or tostring(source))
     end,
     layout = function(base)
         local want = ns.Healer and ns.Healer.Wanted and ns.Healer.Wanted()
@@ -116,16 +116,20 @@ local function Intro()
     end
     return "MLZ UI sets up your interface in " .. NUM_STEPS .. " short steps. Each one shows what you have now and what it will become.\n\n"
         .. C.grey .. table.concat(names, "  ·  ") .. C.r .. "\n\n"
-        .. "Nothing changes until you press " .. C.gold .. "Apply changes" .. C.r .. ", and a backup is taken first. "
-        .. C.gold .. "/mlz undo" .. C.r .. " puts everything back.\n\n"
-        .. "Not sure? " .. C.gold .. "Use recommended" .. C.r .. " takes every suggestion and jumps to the review. "
-        .. C.gold .. "Looks only" .. C.r .. " skips everything that changes how the game plays."
+        .. "Nothing changes until you press " .. C.white .. "Apply changes" .. C.r .. ", and a backup is taken first. "
+        .. C.white .. "/mlz undo" .. C.r .. " puts everything back. You can change each choice later in the settings window ("
+        .. C.white .. "/mlz" .. C.r .. ").\n\n"
+        .. "Not sure? " .. C.white .. "Use recommended" .. C.r .. " takes every suggestion and jumps to the review. "
+        .. C.white .. "Looks only" .. C.r .. " skips everything that changes how the game plays."
         .. ClientNote()
 end
 
 local WIDTH, HEIGHT = 760, 620
-local CONTENT_W = WIDTH - 40
-local COL = { check = 4, label = 32, old = 270, arrow = 450, new = 468 }
+local PAD = 14
+local FOOTER_H = 44 -- same footer as the control center
+local CONTENT_W = WIDTH - 2 * PAD
+-- Row columns inside the list (about 706 wide): label about 230, then "now" and "will become" share the rest
+local COL = { check = 4, label = 32, old = 270, arrow = 480, new = 498 }
 local ROW_H = 22
 local GROUP_H = 30
 
@@ -144,14 +148,14 @@ function Installer:Build()
         if page.number then steps[#steps + 1] = i end
     end
     local segs, gap = #steps, 4
-    local segW = (WIDTH - 32 - gap * (segs - 1)) / segs
+    local segW = (CONTENT_W - gap * (segs - 1)) / segs
     for n = 1, segs do
         local i = steps[n]
         local page = PAGES[i]
         local b = CreateFrame("Button", nil, f)
         b.pageIndex = i
         b:SetSize(segW, 14)
-        b:SetPoint("TOPLEFT", 16 + (n - 1) * (segW + gap), -46)
+        b:SetPoint("TOPLEFT", PAD + (n - 1) * (segW + gap), -46)
         b.bar = b:CreateTexture(nil, "ARTWORK")
         b.bar:SetPoint("LEFT")
         b.bar:SetPoint("RIGHT")
@@ -167,11 +171,11 @@ function Installer:Build()
     end
 
     f.title = W.Text(f, "MLZUI_FontTitle")
-    f.title:SetPoint("TOPLEFT", 20, -72)
+    f.title:SetPoint("TOPLEFT", PAD, -72)
 
     f.step = W.Text(f, "MLZUI_FontSmallBold", nil, "RIGHT")
     f.step:SetTextColor(unpack(W.T.muted))
-    f.step:SetPoint("TOPRIGHT", -20, -78)
+    f.step:SetPoint("TOPRIGHT", -PAD, -78)
 
     f.desc = W.Text(f, "GameFontHighlight")
     f.desc:SetPoint("TOPLEFT", f.title, "BOTTOMLEFT", 0, -10)
@@ -196,10 +200,11 @@ function Installer:Build()
     -- The list sits on a darker panel, with column headers at the top
     f.panel = CreateFrame("Frame", nil, f)
     f.panel:SetPoint("TOPLEFT", f.stepCheck, "BOTTOMLEFT", 0, -10)
-    f.panel:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -16, 76)
+    -- the legend line sits between the panel and the footer
+    f.panel:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -PAD, FOOTER_H + 1 + PAD + 18)
 
     f.legend = W.Muted(f, "GameFontHighlightSmall", LEGEND)
-    f.legend:SetPoint("TOPLEFT", f.panel, "BOTTOMLEFT", 2, -6)
+    f.legend:SetPoint("TOPLEFT", f.panel, "BOTTOMLEFT", 0, -6)
     W.Fill(f.panel, W.T.panel)
     W.Border(f.panel, W.T.border)
 
@@ -223,16 +228,42 @@ function Installer:Build()
     f.scroll:SetPoint("TOPLEFT", f.header, "BOTTOMLEFT", 0, -2)
     f.scroll:SetPoint("BOTTOMRIGHT", f.panel, "BOTTOMRIGHT", -18, 6)
 
-    f.big = W.Text(f, "GameFontHighlight")
-    f.big:SetPoint("TOPLEFT", f.title, "BOTTOMLEFT", 0, -16)
-    f.big:SetWidth(CONTENT_W)
+    -- Welcome and All set: one long text that scrolls, so a long result never runs under the buttons
+    f.bigScroll = W.ScrollArea(f)
+    f.bigScroll:SetPoint("TOPLEFT", f.title, "BOTTOMLEFT", 0, -16)
+    f.bigScroll:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -(PAD + 11), FOOTER_H + 1 + PAD + W.BUTTON_H_LARGE + PAD)
+    f.big = W.Text(f.bigScroll.content, "GameFontHighlight")
+    f.big:SetPoint("TOPLEFT")
+    f.big:SetWidth(CONTENT_W - 11)
     f.big:SetSpacing(4)
+    function f:SetBig(text)
+        self.big:SetText(text)
+        self.bigScroll.content:SetHeight(math.max(1, self.big:GetStringHeight()))
+        self.bigScroll:SetVerticalScroll(0)
+        if self.bigScroll.UpdateScroll then self.bigScroll.UpdateScroll() end
+    end
+
+    -- Footer: the same 44px strip as the control center, buttons PAD from the edges
+    local foot = CreateFrame("Frame", nil, f)
+    foot:SetPoint("BOTTOMLEFT", 1, 1)
+    foot:SetPoint("BOTTOMRIGHT", -1, 1)
+    foot:SetHeight(FOOTER_H)
+    foot:SetFrameLevel(f:GetFrameLevel()) -- under the buttons, which are children of the window
+    W.Fill(foot, W.T.panel)
+    local footLine = foot:CreateTexture(nil, "BORDER")
+    footLine:SetColorTexture(unpack(W.T.border))
+    footLine:SetHeight(1)
+    footLine:SetPoint("TOPLEFT")
+    footLine:SetPoint("TOPRIGHT")
+    local FOOT_Y = 1 + (FOOTER_H - W.BUTTON_H_LARGE) / 2
+    -- the row above the footer on the last page (tour, keybinds, undo)
+    local ROW_Y = FOOTER_H + 1 + PAD
 
     -- Navigation
     f.back = W.Button(f, "Back", 110, 28, function() self:Go(self.page - 1) end)
-    f.back:SetPoint("BOTTOMLEFT", 16, 14)
+    f.back:SetPoint("BOTTOMLEFT", PAD, FOOT_Y)
     f.next = W.Button(f, "Next", 150, 28, function() self:Next() end, "primary")
-    f.next:SetPoint("BOTTOMRIGHT", -16, 14)
+    f.next:SetPoint("BOTTOMRIGHT", -PAD, FOOT_Y)
     f.skip = W.Button(f, "Skip this step", 130, 28, function()
         local page = PAGES[self.page]
         if page.key then
@@ -251,21 +282,23 @@ function Installer:Build()
     f.looks.tipText = "Layout, scale, minimalism and nameplates only. Game settings, keybinds and other addons are left alone. Nothing changes until you press Apply changes."
 
     f.reload = W.Button(f, "Reload now", 150, 28, function() ReloadUI() end, "primary")
-    f.reload:SetPoint("BOTTOMRIGHT", -16, 14)
+    f.reload:SetPoint("BOTTOMRIGHT", -PAD, FOOT_Y)
     f.close = W.Button(f, "Close", 110, 28, function() f:Hide() end)
+    f.footY = FOOT_Y
+    f.rowY = ROW_Y
     f.settings = W.Button(f, "Open settings", 130, 28, function()
         f:Hide()
         if ns.Settings then ns.Settings:Open() end
     end)
-    f.settings:SetPoint("BOTTOMLEFT", 16, 14)
+    f.settings:SetPoint("BOTTOMLEFT", PAD, FOOT_Y)
     -- After a run: point at the frames that are now hidden, so nobody wonders where they went
     f.tour = W.Button(f, "Show me around", 140, 28, function()
         f:Hide()
         if ns.Tour then ns.Tour.Start() end
     end)
-    f.tour:SetPoint("BOTTOMLEFT", 16, 50)
+    f.tour:SetPoint("BOTTOMLEFT", PAD, ROW_Y)
     f.tour.tipText = "A short tour of the bars and buttons that now stay hidden until you need them."
-    f.keys = W.Button(f, "Show my keybinds", 150, 28, function()
+    f.keys = W.Button(f, "My keybinds", 140, 28, function()
         f:Hide()
         if ns.Keys then ns.Keys.Open() end
     end)
@@ -290,7 +323,8 @@ function Installer:Build()
         b:SetText(UNDO_LABEL)
         self:UndoLast()
     end, "danger")
-    f.undo:SetPoint("LEFT", f.keys, "RIGHT", 8, 0)
+    -- on its own, at the right: a destructive button never sits next to the harmless ones
+    f.undo:SetPoint("BOTTOMRIGHT", -PAD, ROW_Y)
     f.undo.tipText = "Puts everything back the way it was before this run. Click twice to confirm."
 
     self.rows = {}
@@ -346,17 +380,17 @@ local function RowTooltip(r)
         return
     end
     GameTooltip:SetOwner(r, "ANCHOR_CURSOR")
-    local text, muted, bad = W.T.text, W.T.muted, W.T.red
+    local text, muted, warn = W.T.text, W.T.muted, W.T.amber
     GameTooltip:SetText(Plain(item.label), text[1], text[2], text[3])
     if r.blocker then
-        GameTooltip:AddLine("Requires: " .. Plain(r.blocker.label), bad[1], bad[2], bad[3], true)
+        GameTooltip:AddLine("Needs: " .. Plain(r.blocker.label), warn[1], warn[2], warn[3], true)
     end
     if item.note then GameTooltip:AddLine(item.note, nil, nil, nil, true) end
     if truncOld then
-        GameTooltip:AddDoubleLine("Current", Plain(r.old:GetText()), muted[1], muted[2], muted[3], text[1], text[2], text[3])
+        GameTooltip:AddDoubleLine("Now", Plain(r.old:GetText()), muted[1], muted[2], muted[3], text[1], text[2], text[3])
     end
     if truncNew then
-        GameTooltip:AddDoubleLine("New", Plain(r.newText:GetText()), muted[1], muted[2], muted[3], text[1], text[2], text[3])
+        GameTooltip:AddDoubleLine("Will become", Plain(r.newText:GetText()), muted[1], muted[2], muted[3], text[1], text[2], text[3])
     end
     GameTooltip:Show()
 end
@@ -396,11 +430,11 @@ local function CreateRow(parent)
     -- Group heading: a bit of air above, a thin line below
     r.groupText = W.Text(r, "MLZUI_FontHead")
     r.groupText:SetTextColor(unpack(W.T.accent))
-    r.groupText:SetPoint("BOTTOMLEFT", 4, 5)
+    r.groupText:SetPoint("BOTTOMLEFT", COL.check + 2, 5) -- same left edge as the checkboxes
     r.divider = r:CreateTexture(nil, "ARTWORK")
     r.divider:SetColorTexture(unpack(W.T.border))
     r.divider:SetHeight(1)
-    r.divider:SetPoint("BOTTOMLEFT", 4, 0)
+    r.divider:SetPoint("BOTTOMLEFT", COL.check + 2, 0)
     r.divider:SetPoint("BOTTOMRIGHT", -4, 0)
 
     -- Clicking anywhere on the row toggles its checkbox
@@ -718,8 +752,6 @@ function Installer:Go(index)
         elseif i < index then c = W.T.green
         else c = W.T.off end
         seg.bar:SetColorTexture(unpack(c))
-        seg:SetHeight(i == index and 18 or 14)
-        seg.bar:SetHeight(i == index and 6 or 4)
     end
 
     local isList = page.kind == "module" or page.kind == "summary"
@@ -729,7 +761,7 @@ function Installer:Go(index)
     f.stepCheck:SetShown(page.kind == "module")
     f.selAll:SetShown(page.kind == "module")
     f.selNone:SetShown(page.kind == "module")
-    f.big:SetShown(page.kind == "intro" or page.kind == "done")
+    f.bigScroll:SetShown(page.kind == "intro" or page.kind == "done")
 
     local nothing = false
     if page.kind == "module" then
@@ -739,19 +771,19 @@ function Installer:Go(index)
         local t = self:Totals()
         nothing = t.changes == 0
         local text = nothing
-            and ("Nothing will be changed. Go back to pick something, or press " .. C.gold .. "Finish" .. C.r .. ".")
+            and ("Nothing will be changed. Go back to pick something, or press " .. C.white .. "Finish" .. C.r .. ".")
             or ("%d change%s in %d step%s%s. They are made when you press %sApply changes%s. A backup is taken first."):format(
                 t.changes, t.changes == 1 and "" or "s", t.steps, t.steps == 1 and "" or "s",
-                t.already > 0 and (", " .. t.already .. " already right") or "", C.gold, C.r)
+                t.already > 0 and (", " .. t.already .. " already right") or "", C.white, C.r)
         if t.attention > 0 then
             text = text .. "\n" .. C.amber .. t.attention .. " key" .. (t.attention == 1 and "" or "s")
                 .. " will lose their action. See the amber rows." .. C.r
         end
         f.desc:SetText(text)
     elseif page.kind == "intro" then
-        f.big:SetText(Intro())
+        f:SetBig(Intro())
     elseif page.kind == "done" then
-        f.big:SetText(self.doneText or "")
+        f:SetBig(self.doneText or "")
     end
 
     local done = page.kind == "done"
@@ -766,7 +798,7 @@ function Installer:Go(index)
     if f.tour:IsShown() then
         f.keys:SetPoint("LEFT", f.tour, "RIGHT", 8, 0)
     else
-        f.keys:SetPoint("BOTTOMLEFT", 16, 50)
+        f.keys:SetPoint("BOTTOMLEFT", PAD, f.rowY)
     end
     f.next:SetShown(not done)
     f.skip:SetShown(page.kind == "module")
@@ -780,7 +812,7 @@ function Installer:Go(index)
     if wantReload then
         f.close:SetPoint("RIGHT", f.reload, "LEFT", -8, 0)
     else
-        f.close:SetPoint("BOTTOMRIGHT", -16, 14)
+        f.close:SetPoint("BOTTOMRIGHT", -PAD, f.footY)
     end
     f.back:SetEnabled(index > 1)
     if page.kind == "summary" then
@@ -869,7 +901,7 @@ function Installer:ApplyAll()
     if #sels == 0 then
         -- Nothing was applied, so the wizard is not "done": it can still offer itself on the next login
         self.frame:Hide()
-        ns.Print("Nothing was changed. " .. C.gold .. "/mlz install" .. C.r .. " opens the wizard again.")
+        ns.Print("Nothing was changed. " .. C.white .. "/mlz install" .. C.r .. " opens the wizard again.")
         return
     end
 
@@ -919,15 +951,15 @@ function Installer:ApplyAll()
     end
     if ns.needsReload then
         local why = ns.reloadReasons and #ns.reloadReasons > 0 and (" (" .. table.concat(ns.reloadReasons, ", ") .. ")") or ""
-        text = text .. "Some addon settings need a reload" .. why .. ". Press " .. C.gold .. "Reload now" .. C.r .. " when it suits you.\n\n"
+        text = text .. "Some addon settings need a reload" .. why .. ". Press " .. C.white .. "Reload now" .. C.r .. " when it suits you.\n\n"
     else
         text = text .. "Everything is already in effect. No reload needed.\n\n"
     end
     if ns.editModeStale then
         text = text .. C.amber .. "Reload before you open Edit Mode, or it may show the old layout." .. C.r .. "\n\n"
     end
-    self.doneText = text .. "Settings: " .. C.gold .. "/mlz" .. C.r .. "     Undo: " .. C.gold .. "/mlz undo" .. C.r
-        .. "     Run again: " .. C.gold .. "/mlz install" .. C.r
+    self.doneText = text .. "Settings: " .. C.white .. "/mlz" .. C.r .. "     Undo: " .. C.white .. "/mlz undo" .. C.r
+        .. "     Run again: " .. C.white .. "/mlz install" .. C.r
     self:Go(#PAGES)
 end
 
@@ -945,8 +977,8 @@ function Installer:UndoLast()
         self.doneText = "You are in combat. The undo runs when combat ends."
     else
         self.doneText = "Undone. Everything is back the way it was before this run."
-            .. (ns.needsReload and (" Some addon settings need a reload to finish: " .. C.gold .. "/reload" .. C.r .. ".") or "")
-            .. "\n\nRun the wizard again any time with " .. C.gold .. "/mlz install" .. C.r .. "."
+            .. (ns.needsReload and (" Some addon settings need a reload to finish: " .. C.white .. "/reload" .. C.r .. ".") or "")
+            .. "\n\nRun the wizard again any time with " .. C.white .. "/mlz install" .. C.r .. "."
     end
     self:Go(#PAGES)
 end

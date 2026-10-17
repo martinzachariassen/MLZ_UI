@@ -16,7 +16,7 @@ local OPTIONS = {
     { id = "trackerHide", label = "Hide the entire quest tracker", default = false,
       desc = "No tracked quests on screen. The quest log and the quest markers on the map work as before." },
     { id = "fps", label = "FPS counter in the bottom-right corner", group = "Info",
-      desc = "Small FPS and ping text in the bottom-right corner. Clicks pass through it." },
+      desc = "Small text with frame rate and ping. Green is smooth, amber and red are slow. Clicks pass through it." },
     { id = "cleanCombatFont", label = "Clean combat text font", group = "Combat text",
       desc = "Uses Roboto Bold for floating damage and healing numbers." },
     { id = "tooltipClass", label = "Class colors in unit tooltips", group = "Tooltips",
@@ -176,18 +176,19 @@ end
 -- FPS counter (bottom-right corner, below the bag buttons)
 ------------------------------------------------------------------------
 local fpsFrame
+-- green = smooth, amber = playable, red = choppy
 local function FpsColor(fps)
-    if fps >= 60 then return "|cff55ff55" elseif fps >= 30 then return "|cffffd100" end
-    return "|cffff5555"
+    if fps >= 60 then return "green" elseif fps >= 30 then return "amber" end
+    return "red"
 end
 
 local function UpdateFps()
     local fps = math.floor(GetFramerate() + 0.5)
-    local text = FpsColor(fps) .. fps .. "|r |cff999999fps|r"
+    local text = ns.Paint(FpsColor(fps), fps) .. " " .. ns.Paint("grey", "fps")
     if GetNetStats then
         local _, _, home, world = GetNetStats()
         local ms = math.max(home or 0, world or 0)
-        if ms > 0 then text = text .. "   " .. ms .. " |cff999999ms|r" end
+        if ms > 0 then text = text .. "   " .. ms .. " " .. ns.Paint("grey", "ms") end
     end
     fpsFrame.text:SetText(text)
 end

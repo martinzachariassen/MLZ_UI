@@ -1,4 +1,4 @@
--- MLZ UI: "Where did things go?" tour
+-- MLZ UI: "Show me around" tour (/mlz tour)
 -- A few steps that draw a box around each frame Minimalism hides and say how to bring it back.
 -- Offered on the last page of the setup wizard, in the minimap quick menu and on the overview.
 -- Only reads frame positions and draws its own frames on top. Fading is paused while it runs.
@@ -28,7 +28,8 @@ local function Rect(frames)
     local l, b, r, t
     for _, f in ipairs(frames) do
         local fl, fb, fw, fh = f:GetRect()
-        if fl and fw and fw > 0 and fh > 0 and f:IsShown() then
+        -- IsVisible, not IsShown: a frame inside a hidden parent has a size but is not on screen
+        if fl and fw and fw > 0 and fh > 0 and f:IsVisible() then
             local s = f:GetEffectiveScale() / ui
             local x1, y1, x2, y2 = fl * s, fb * s, (fl + fw) * s, (fb + fh) * s
             l, b = l and math.min(l, x1) or x1, b and math.min(b, y1) or y1
@@ -59,9 +60,9 @@ local function Steps()
         steps[#steps + 1] = { title = "MLZ UI button", frames = { mb },
             text = "Left-click for the settings, right-click for the quick menu. Pause fading there if you lose track of something." }
     end
-    steps[#steps + 1] = { title = "That is all",
-        text = "Turn any of this off in " .. C.gold .. "/mlz" .. C.r .. " > Minimalism. "
-            .. C.gold .. "/mlz keys" .. C.r .. " shows your keybinds." }
+    steps[#steps + 1] = { title = "That's it",
+        text = "Turn any of this off in " .. C.white .. "/mlz" .. C.r .. " > Minimalism. "
+            .. C.white .. "/mlz keys" .. C.r .. " shows your keybinds." }
     return steps
 end
 
@@ -144,8 +145,16 @@ function Tour.Go(i)
     box:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", l - 4, b - 4)
     box:SetSize(r - l + 8, t - b + 8)
     box:Show()
-    -- the panel goes on the side of the box with the most room
-    if (b + t) / 2 < UIParent:GetHeight() / 2 then
+    -- the panel goes on the side of the box with the most room. A tall box (side bars, raid frames)
+    -- leaves no room above or below, so the panel goes left or right of it instead.
+    local uiW, uiH = UIParent:GetWidth(), UIParent:GetHeight()
+    if t - b > uiH * 0.4 then
+        if (l + r) / 2 > uiW / 2 then
+            panel:SetPoint("RIGHT", box, "LEFT", -12, 0)
+        else
+            panel:SetPoint("LEFT", box, "RIGHT", 12, 0)
+        end
+    elseif (b + t) / 2 < uiH / 2 then
         panel:SetPoint("BOTTOM", box, "TOP", 0, 12)
     else
         panel:SetPoint("TOP", box, "BOTTOM", 0, -12)

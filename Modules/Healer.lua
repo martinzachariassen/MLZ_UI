@@ -168,7 +168,7 @@ ns.AddCommand("heal","healer layouts: (status) | on | off | auto | build", funct
         ns.Print("Healer layouts follow your spec.")
     elseif arg == "build" then
         local ok, msg = Healer.Rebuild()
-        ns.Print(ok and "Role layouts rebuilt:" or "|cffff4444Failed:|r", msg)
+        ns.Print(ok and "Role layouts rebuilt:" or ns.Paint("red", "Could not rebuild the role layouts:"), msg)
     else
         local role, source = ns.Role()
         ns.Print("Role:", tostring(role), "(" .. tostring(source) .. ") | healer:", IsHealer() and "yes" or "no",

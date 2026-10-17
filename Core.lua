@@ -14,16 +14,28 @@ local DB_VERSION = 6
 ------------------------------------------------------------------------
 -- Output
 ------------------------------------------------------------------------
-local PREFIX = "|cff33ccffMLZ UI|r: "
+-- Text color code from the theme (W.C in UI/Widgets.lua). Widgets loads after Core and the modules,
+-- so this is looked up when the text is made. Before that it is just uncolored.
+function ns.Color(name)
+    local c = ns.W and ns.W.C[name]
+    return c or ""
+end
+local function Col(name) return ns.Color(name) end
+local function R() return ns.W and "|r" or "" end
+
+-- A slash command or key name inside a sentence: white, so it stands out from the grey-white text
+function ns.Cmd(text) return Col("white") .. text .. R() end
+-- A piece of text in a theme color: ns.Paint("red", "Import failed:")
+function ns.Paint(name, text) return Col(name) .. text .. R() end
 
 function ns.Print(...)
     local parts = {}
     for i = 1, select("#", ...) do parts[#parts + 1] = tostring((select(i, ...))) end
-    DEFAULT_CHAT_FRAME:AddMessage(PREFIX .. table.concat(parts, " "))
+    DEFAULT_CHAT_FRAME:AddMessage(Col("blue") .. "MLZ UI" .. R() .. ": " .. table.concat(parts, " "))
 end
 
 function ns.Debug(...)
-    if ns.db and ns.db.debug then ns.Print("|cff888888[debug]|r", ...) end
+    if ns.db and ns.db.debug then ns.Print(Col("grey") .. "[debug]" .. R(), ...) end
 end
 
 -- Errors print once per session per message, so a broken handler on a busy event can't flood chat.
@@ -31,9 +43,9 @@ end
 local seenErrors = {}
 function ns.Error(where, err)
     local msg = tostring(where) .. ": " .. tostring(err)
-    if seenErrors[msg] then return ns.Debug("|cffff4444Error|r", msg) end
+    if seenErrors[msg] then return ns.Debug(Col("red") .. "Error" .. R(), msg) end
     seenErrors[msg] = true
-    ns.Print("|cffff4444Error in " .. tostring(where) .. ":|r", tostring(err))
+    ns.Print(Col("red") .. "Error in " .. tostring(where) .. ":" .. R(), tostring(err))
 end
 
 ------------------------------------------------------------------------
@@ -555,7 +567,7 @@ local function Migrate(db)
         local step = migrations[v]
         if step then
             local ok, err = pcall(step, db)
-            if not ok then ns.Print("|cffff4444Migration to v" .. v .. " failed:|r", err) end
+            if not ok then ns.Print(ns.Paint("red", "Migration to v" .. v .. " failed:"), err) end
         end
     end
     db.dbVersion = DB_VERSION
@@ -595,7 +607,7 @@ ns.On("PLAYER_LOGIN", function()
     local c = ns.CharDB()
     if not c.setupReminded then
         c.setupReminded = true
-        ns.Print("Not set up yet. Click the minimap button or type |cffffff00/mlz install|r to start.")
+        ns.Print("Not set up yet. Click the minimap button or type " .. ns.Cmd("/mlz install") .. " to start.")
     end
 end)
 
@@ -669,14 +681,14 @@ function ns.RunCommand(name, arg)
 end
 
 local function ShowHelp()
-    ns.Print("Type |cffffff00/mlz|r to open the settings window. Commands:")
+    ns.Print("Type " .. ns.Cmd("/mlz") .. " to open the settings window. Commands:")
     local names = {}
     for name in pairs(commands) do
         if LISTED[name] then names[#names + 1] = name end
     end
     table.sort(names)
     for _, name in ipairs(names) do
-        DEFAULT_CHAT_FRAME:AddMessage("  |cffffff00/mlz " .. name .. "|r  " .. commands[name].help)
+        DEFAULT_CHAT_FRAME:AddMessage("  " .. ns.Cmd("/mlz " .. name) .. "  " .. commands[name].help)
     end
 end
 

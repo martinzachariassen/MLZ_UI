@@ -111,7 +111,7 @@ local function Report(repairCost, guildPaid)
     if repairCost and repairCost > 0 then
         parts[#parts + 1] = "Repaired for " .. Money(repairCost) .. (guildPaid and " (guild bank)" or "")
     elseif repairCost and repairCost < 0 then
-        parts[#parts + 1] = "|cffff8800Not enough money to repair|r (" .. Money(-repairCost) .. ")"
+        parts[#parts + 1] = ns.Paint("amber", "Not enough money to repair") .. " (" .. Money(-repairCost) .. ")"
     end
     if soldCount > 0 then
         parts[#parts + 1] = ("sold %d grey item%s for %s"):format(soldCount, soldCount == 1 and "" or "s", Money(soldValue))

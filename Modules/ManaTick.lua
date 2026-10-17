@@ -19,6 +19,8 @@ local COLORS = {
     five   = { 1.00, 0.55, 0.10 },
     mana   = { 0.30, 0.55, 1.00 },
     energy = { 1.00, 0.85, 0.20 },
+    bg     = { 0, 0, 0, 0.55 },
+    spark  = { 1, 1, 1, 0.9 },
 }
 
 -- In combat the client can hand back "secret" numbers. Addon code may not compare or calculate with them,
@@ -71,9 +73,9 @@ local function Build()
     bar:SetFrameStrata("MEDIUM")
     local bg = bar:CreateTexture(nil, "BACKGROUND")
     bg:SetAllPoints()
-    bg:SetColorTexture(0, 0, 0, 0.55)
+    bg:SetColorTexture(unpack(COLORS.bg))
     bar.spark = bar:CreateTexture(nil, "OVERLAY")
-    bar.spark:SetColorTexture(1, 1, 1, 0.9)
+    bar.spark:SetColorTexture(unpack(COLORS.spark))
     bar.spark:SetSize(2, 9)
     -- Mana in numbers under the bar, only while a druid is in Bear Form (the bar itself is too thin for text)
     bar.text = bar:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
