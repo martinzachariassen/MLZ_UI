@@ -1,0 +1,61 @@
+## Interface: 16001
+## Title: MLZ UI
+## Notes: Sets up scaling, layout, keybinds and settings via an installation wizard. Built for WoW Forever, all classes. /mlz
+## Author: Martin
+## Version: 0.8.0
+## SavedVariables: MLZUIDB
+## IconTexture: Interface\Icons\INV_Misc_Gear_01
+## AddonCompartmentFunc: MLZUI_OnAddonCompartmentClick
+## AddonCompartmentFuncOnEnter: MLZUI_OnAddonCompartmentEnter
+## AddonCompartmentFuncOnLeave: MLZUI_OnAddonCompartmentLeave
+## X-License: MIT
+## X-Website: https://github.com/martinzachariassen/MLZ_UI
+# Fill in and remove the leading "# " to publish to CurseForge and Wago (see .github/workflows/release.yml)
+# ## X-Curse-Project-ID: 000000
+# ## X-Wago-ID: xxxxxxxx
+
+Core.lua
+Probe.lua
+
+Data\CVars.lua
+Data\Bindings.lua
+Data\Classes.lua
+Data\Layout.lua
+Data\Fade.lua
+Data\Nameplates.lua
+Data\Addons.lua
+Data\Reminders.lua
+Data\Tips.lua
+Data\Cooking.lua
+Data\Search.lua
+
+Modules\Backup.lua
+Modules\Role.lua
+Modules\Scale.lua
+Modules\Settings.lua
+Modules\Bindings.lua
+Modules\Layout.lua
+Modules\Healer.lua
+Modules\Fade.lua
+Modules\ActionButtons.lua
+Modules\Tweaks.lua
+Modules\Plates.lua
+Modules\Nameplates.lua
+Modules\Addons.lua
+Modules\Health.lua
+Modules\Vendor.lua
+Modules\Automate.lua
+Modules\Group.lua
+Modules\ManaTick.lua
+Modules\Interrupt.lua
+Modules\Reminders.lua
+Modules\XPRate.lua
+Modules\Cooking.lua
+Modules\Profile.lua
+
+UI\Widgets.lua
+UI\Installer.lua
+UI\Settings.lua
+UI\MinimapButton.lua
+UI\Keys.lua
+UI\Tour.lua

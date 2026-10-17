@@ -1,0 +1,113 @@
+<!doctype html>
+<!-- Mockup of the control center, Nameplates page (UI/Settings.lua). Render: see CLAUDE.md > Screenshots -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>MLZ UI - Nameplates</title>
+<link rel="stylesheet" href="theme.css">
+<link rel="stylesheet" href="control-center.css">
+<script src="icons.js"></script>
+<style>
+    html, body { width: 1100px; height: 720px; }
+    .stage { width: 1100px; height: 720px; }
+    .np-legend { padding: 4px 14px 14px; line-height: 1.6; }
+</style>
+</head>
+<body>
+<div class="stage">
+<div class="window cc">
+    <div class="titlebar">
+        <div class="gear" data-gear></div>
+        <span class="f-head">MLZ UI</span><span class="ver">v0.8.0</span>
+        <div class="close f-head">X</div>
+    </div>
+
+    <div class="cc-body">
+        <nav class="sidebar">
+            <div class="side-search">Search settings</div>
+            <div class="side-btn"><span data-icon="overview"></span>Overview</div>
+            <div class="side-btn"><span data-icon="healer"></span>Your role</div>
+            <div class="side-btn"><span data-icon="layout"></span>Layout &amp; scale</div>
+            <div class="side-btn sel"><span data-icon="nameplates"></span>Nameplates</div>
+            <div class="side-btn"><span data-icon="fade"></span>Minimalism</div>
+            <div class="side-btn"><span data-icon="buttons"></span>Bars &amp; interface</div>
+            <div class="side-btn"><span data-icon="qol"></span>Helpers</div>
+            <div class="side-btn"><span data-icon="reminders"></span>Reminders</div>
+            <div class="side-btn"><span data-icon="addons"></span>Other addons</div>
+            <div class="side-gap"></div>
+            <div class="side-btn"><span data-icon="profiles"></span>Profiles &amp; backup</div>
+            <div class="side-btn"><span data-icon="about"></span>About &amp; help</div>
+        </nav>
+
+        <main class="page">
+            <div class="page-inner">
+                <div class="f-title page-title">Nameplates</div>
+                <div class="f-body muted page-sub">Nameplates that follow your role. Changes show at once.</div>
+
+                <div class="card pcard">
+                    <div class="pcard-head">
+                        <div class="f-head">Engine</div>
+                        <div class="f-small muted">Who draws your nameplates. Modes, threat colors and the PvP tweak work with both MLZ and Platynator.</div>
+                    </div>
+                    <div class="row div">
+                        <div class="lbl"><div class="f-body">Nameplates drawn by</div><div class="f-small">Switching applies at once, no reload.</div></div>
+                        <div class="seg"><span class="sel" style="width:80px">MLZ</span><span style="width:80px">Platynator</span><span style="width:80px">Off</span></div>
+                    </div>
+                    <div class="row">
+                        <div class="lbl"><div class="f-body">Right now</div><div class="f-small">MLZ UI draws the plates. Blizzard's own plate is only made invisible.</div></div>
+                        <span class="badge on"><i></i>Working</span>
+                    </div>
+                </div>
+
+                <div class="card pcard">
+                    <div class="pcard-head">
+                        <div class="f-head">Mode</div>
+                        <div class="f-small muted">Auto: Tank while you tank (Defensive Stance or Bear Form with tank talents, or the group's tank). Healer or DPS in a group, depending on your role. Solo when you are not in a group.</div>
+                    </div>
+                    <div class="row div">
+                        <div class="lbl"><div class="f-body">Mode</div><div class="f-small">Picking a mode turns Auto off.</div></div>
+                        <div class="seg"><span class="sel" style="width:62px">Auto</span><span style="width:62px">Tank</span><span style="width:62px">Healer</span><span style="width:62px">DPS</span><span style="width:62px">Solo</span></div>
+                    </div>
+                    <div class="row">
+                        <div class="lbl"><div class="f-body">Active mode</div><div class="f-small">Picked automatically: you heal in a group.</div></div>
+                        <span class="f-button">Healer</span>
+                    </div>
+                    <div class="f-small muted np-legend">
+                        <span class="white">Tank</span>: every mob fully visible, your target a bit bigger.<br>
+                        <span class="white">Healer</span>: enemies dimmed to 60% so your eyes stay on the raid frames.<br>
+                        <span class="white">DPS</span>: mobs you don't target are faded a little.<br>
+                        <span class="white">Solo</span>: calm, every mob readable (you often fight several).
+                    </div>
+                </div>
+
+                <div class="card pcard">
+                    <div class="pcard-head"><div class="f-head">Options</div></div>
+                    <div class="row div">
+                        <div class="lbl"><div class="f-body">Friendly names for healers</div><div class="f-small">In Healer mode friendly players get a name above their head, but it can't be clicked, so it never steals a click.</div></div>
+                        <div class="toggle on"></div>
+                    </div>
+                    <div class="row">
+                        <div class="lbl"><div class="f-body">Threat colors per role</div><div class="f-small">Tank: red = a mob is not on you. DPS: red = a mob is on you. Off for healers and when solo.</div></div>
+                        <div class="toggle"></div>
+                    </div>
+                    <div class="row">
+                        <div class="lbl"><div class="f-body">PvP tweak</div><div class="f-small">In battlegrounds and arenas: every enemy fully visible, no threat colors.</div></div>
+                        <div class="toggle on"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="scrollbar"><i style="top:30%"></i></div>
+
+        </main>
+    </div>
+
+    <div class="footer">
+        <span class="dot"></span>
+        <span class="f-body msg">All changes are applied.</span>
+        <span class="btn" style="width:130px">Setup wizard</span>
+        <span class="btn" style="width:110px">Reload UI</span>
+    </div>
+</div>
+</div>
+</body>
+</html>

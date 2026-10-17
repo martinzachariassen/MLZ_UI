@@ -1,0 +1,17 @@
+package-as: MLZ_UI
+
+manual-changelog:
+  filename: CHANGELOG.md
+  markup-type: markdown
+
+ignore:
+  - docs
+  - CLAUDE.md
+  - CHANGELOG.md
+  - CONTRIBUTING.md
+  - CODE_OF_CONDUCT.md
+  - SECURITY.md
+  - .github
+  - .luacheckrc
+  - .storecode
+  - .pkgmeta

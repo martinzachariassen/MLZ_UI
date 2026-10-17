@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security problem
+    url: https://github.com/martinzachariassen/MLZ_UI/security/advisories/new
+    about: Report it privately, not as a public issue.
+  - name: How MLZ UI works
+    url: https://github.com/martinzachariassen/MLZ_UI#readme
+    about: Commands, supported addons and the full feature list.
