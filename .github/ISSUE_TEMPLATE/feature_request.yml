@@ -1,0 +1,25 @@
+name: Feature idea
+description: An idea for the wizard, the control center, a layout or keybinds.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        MLZ UI sets up the Blizzard UI you already have. It doesn't replace unit frames or action bars.
+  - type: textarea
+    id: idea
+    attributes:
+      label: What should the player see
+      description: Describe it from the player's side. What changes on screen, and when?
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why
+      description: What is hard or annoying today?
+  - type: input
+    id: character
+    attributes:
+      label: Class and role it fits
+      placeholder: "Every class, or e.g. hunter, ranged DPS"

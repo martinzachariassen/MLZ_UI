@@ -9,6 +9,7 @@
 ## AddonCompartmentFuncOnEnter: MLZUI_OnAddonCompartmentEnter
 ## AddonCompartmentFuncOnLeave: MLZUI_OnAddonCompartmentLeave
 ## X-License: MIT
+## X-Website: https://github.com/martinzachariassen/MLZ_UI
 # Fill in and remove the leading "# " to publish to CurseForge and Wago (see .github/workflows/release.yml)
 # ## X-Curse-Project-ID: 000000
 # ## X-Wago-ID: xxxxxxxx

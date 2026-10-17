@@ -87,6 +87,7 @@ Applies to UI text, chat output, tooltips, docs and commit messages.
 - **Release checklist:** bump the version in all three places (`## Version` in `MLZ_UI.toc`, `ns.version` in `Core.lua`, the badge in `README.md`), update the README if commands, pages or supported addons changed, re-render screenshots (the mockups show the version too, so always when it changes), move "Unreleased" in `CHANGELOG.md` under the new version, then tag `vX.Y.Z` and push the tag (the release workflow packages and uploads it).
 - **Commits:** Conventional Commits, matching the history: `feat(nameplates): ...`, `fix(fade): ...`, `refactor: ...`, `docs: ...`. Imperative, lowercase, no period.
 - Don't commit or push unless asked.
+- **Contributor docs:** `CONTRIBUTING.md` is the short, human version of this file. If you change a hard rule, the workflow or the writing style here, update it there too.
 
 ## Screenshots
 

@@ -5,6 +5,8 @@
 **A clean, minimal World of Warcraft UI in one guided setup, built for WoW Forever and every class. Every change previewed, every change undoable.**
 
 ![Version](https://img.shields.io/badge/version-0.8.0-33a0ff?style=flat-square)
+[![Lint](https://img.shields.io/github/actions/workflow/status/martinzachariassen/MLZ_UI/lint.yml?branch=main&label=lint&style=flat-square)](https://github.com/martinzachariassen/MLZ_UI/actions/workflows/lint.yml)
+[![License](https://img.shields.io/badge/license-MIT-20242b?style=flat-square)](LICENSE)
 ![Client](https://img.shields.io/badge/client-WoW%20Forever-33a0ff?style=flat-square)
 ![Interface](https://img.shields.io/badge/interface-16001-20242b?style=flat-square)
 ![Lua](https://img.shields.io/badge/lua-5.1-000080?style=flat-square&logo=lua)
@@ -140,13 +142,20 @@ If the guess is wrong, set your role by hand with `/mlz role`, on the Your role 
 
 ## Quick start
 
-1. Download or clone the repo into your AddOns folder:
-   ```sh
-   cd "/Applications/World of Warcraft/_<flavor>_/Interface/AddOns"   # Windows: C:\Program Files (x86)\World of Warcraft\_<flavor>_\Interface\AddOns
-   git clone git@github.com:martinzachariassen/MLZ_UI.git
-   ```
+1. Download the `MLZ_UI` zip from the [latest release](https://github.com/martinzachariassen/MLZ_UI/releases/latest)
+   and unzip it into your AddOns folder, so you get `Interface/AddOns/MLZ_UI/MLZ_UI.toc`:
+   - macOS: `/Applications/World of Warcraft/_<flavor>_/Interface/AddOns`
+   - Windows: `C:\Program Files (x86)\World of Warcraft\_<flavor>_\Interface\AddOns`
 2. Start the game or `/reload`. The setup wizard opens on first login.
 3. Open the control center at any time with `/mlz` or the minimap button.
+
+To follow development instead, clone the repo into the AddOns folder (the folder must be called `MLZ_UI`):
+
+```sh
+git clone https://github.com/martinzachariassen/MLZ_UI.git
+```
+
+If you use "Download ZIP" on GitHub, rename the unzipped `MLZ_UI-main` folder to `MLZ_UI`.
 
 > [!NOTE]
 > MLZ UI targets WoW Forever (`## Interface: 16001`). If your client marks it as out of date, enable *Load out of date AddOns* or update the number in [`MLZ_UI.toc`](MLZ_UI.toc).
@@ -286,10 +295,12 @@ Everything the wizard offers is defined in `Data/`:
 
 Issues and pull requests are welcome, especially settings for more addons (start in [`Data/Addons.lua`](Data/Addons.lua)), bug reports with `/mlz probe` output and the Lua error text, and layout or keybind ideas.
 
+- [Open an issue](https://github.com/martinzachariassen/MLZ_UI/issues/new/choose): bug report, addon settings request or feature idea
+- How to set up, test and send a change: [`CONTRIBUTING.md`](CONTRIBUTING.md)
 - How the code fits together: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
-- Conventions, design language and workflow: [`CLAUDE.md`](CLAUDE.md)
+- The full conventions and design language: [`CLAUDE.md`](CLAUDE.md)
 
-For development, symlink the folder into AddOns, turn on `/mlz debug` and install [BugGrabber + BugSack](https://www.curseforge.com/wow/addons/bugsack).
+Please follow the [code of conduct](CODE_OF_CONDUCT.md). Security problems go through [private reporting](SECURITY.md), not public issues.
 
 ## License
 

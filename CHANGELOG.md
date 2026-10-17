@@ -29,6 +29,7 @@
 - Lint (luacheck and a Lua 5.1 syntax check) runs on every push to main and every pull request.
 - Tagged versions are packaged and published to GitHub Releases, and to CurseForge and Wago when they are set up.
 - MIT license.
+- A contributing guide, a code of conduct, a security policy, and issue and pull request templates.
 - The control center search also finds text in cards ("How it works", chat commands).
 
 **Fixes**
