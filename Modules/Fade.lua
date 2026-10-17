@@ -15,19 +15,30 @@ local MODE_TEXT = { -- also used by the control center (UI/Settings.lua)
 }
 Fade.MODE_TEXT = MODE_TEXT
 
+-- Frame lists are cached per row. A row with no frames yet (made later by the client or an addon)
+-- is looked up again at most every 5 seconds.
+local cache, missedAt = {}, {}
+local GetTime = GetTime
+
 local function Frames(row)
-    local list = {}
+    local list = cache[row.id]
+    if list and (#list > 0 or GetTime() - (missedAt[row.id] or 0) < 5) then return list end
+    list = {}
     for _, name in ipairs(row.frames) do
         local f = _G[name]
         if f and f.SetAlpha then list[#list + 1] = f end
     end
+    cache[row.id] = list
+    if #list == 0 then missedAt[row.id] = GetTime() end
     return list
 end
 
 ------------------------------------------------------------------------
 -- Update loop
 ------------------------------------------------------------------------
-local touched = {} -- frames whose alpha we changed, so we can reset them
+local touched = {} -- frame -> its alpha before we changed it, so we can put it back
+local hidden = ns.hiddenFrames or {} -- frames another module keeps at alpha 0 (Tweaks: hidden tracker)
+ns.hiddenFrames = hidden
 
 local function TargetAlpha(row, hovered, inCombat, hasTarget)
     if row.mode == "group" then
@@ -42,9 +53,15 @@ local function TargetAlpha(row, hovered, inCombat, hasTarget)
     return 1
 end
 
+local ticker
+
 local function Update()
     local db = ns.db and ns.db.fade
-    if not db or ns.fadePaused then return end
+    if not db or ns.fadePaused or not next(db) then
+        -- nothing to fade: stop polling until a row is turned on again (Fade:Start)
+        if ticker then ticker:Cancel() ticker = nil end
+        return
+    end
     local editMode = EditModeManagerFrame and EditModeManagerFrame:IsShown()
     local inCombat = InCombatLockdown()
     local hasTarget = UnitExists("target")
@@ -57,28 +74,34 @@ local function Update()
             end
             local target = editMode and 1 or TargetAlpha(row, hovered, inCombat, hasTarget)
             for _, f in ipairs(frames) do
+                local want = (hidden[f] and not editMode) and 0 or target
                 local cur = f:GetAlpha()
-                if math.abs(cur - target) > 0.01 then
+                if math.abs(cur - want) > 0.01 then
+                    if touched[f] == nil then touched[f] = cur end
                     -- smooth transition: takes a few tenths of a second
-                    local step = (target > cur) and 0.34 or 0.2
-                    local new = cur + math.max(-step, math.min(step, target - cur))
-                    f:SetAlpha(new)
-                    touched[f] = true
+                    local step = (want > cur) and 0.34 or 0.2
+                    f:SetAlpha(cur + math.max(-step, math.min(step, want - cur)))
                 end
             end
         end
     end
 end
 
-local ticker
 function Fade:Start()
     if not ticker then ticker = C_Timer.NewTicker(0.1, Update) end
 end
 
+-- Puts every frame back to the alpha it had before we faded it
 function Fade:ResetAlpha()
-    for f in pairs(touched) do f:SetAlpha(1) end
+    for f, alpha in pairs(touched) do
+        if not hidden[f] then f:SetAlpha(alpha) end
+    end
     wipe(touched)
 end
+
+-- Edit Mode can swap frames (layout change); look them up again
+local function Invalidate() wipe(cache) wipe(missedAt) end
+ns.TryOn("EDIT_MODE_LAYOUTS_UPDATED", Invalidate)
 
 ------------------------------------------------------------------------
 -- Chat
@@ -106,19 +129,29 @@ function Fade:ApplyChat()
     end
 end
 
--- Undo ApplyChat. `alphas` = window alpha per chat frame (from a backup); without it Blizzard's default is used.
-function Fade:ResetChat(alphas)
+-- Undo ApplyChat. `alphas` and `times` = window alpha and fade time per chat frame (from a backup);
+-- without them Blizzard's defaults are used.
+function Fade:ResetChat(alphas, times)
     if defaultTabAlpha then
         CHAT_FRAME_TAB_NORMAL_NOMOUSE_ALPHA, CHAT_FRAME_TAB_SELECTED_NOMOUSE_ALPHA = defaultTabAlpha[1], defaultTabAlpha[2]
     end
     for i = 1, (NUM_CHAT_WINDOWS or 10) do
         local cf = _G["ChatFrame" .. i]
         if cf then
-            if cf.SetTimeVisible then cf:SetTimeVisible(120) end
+            if cf.SetTimeVisible then cf:SetTimeVisible((times and times[i]) or 120) end
             local alpha = alphas and alphas[i] or (not alphas and (DEFAULT_CHATFRAME_ALPHA or 0.25))
             if alpha and FCF_SetWindowAlpha then pcall(FCF_SetWindowAlpha, cf, alpha) end
         end
     end
+end
+
+local function ChatTimes()
+    local t = {}
+    for i = 1, (NUM_CHAT_WINDOWS or 10) do
+        local cf = _G["ChatFrame" .. i]
+        if cf and cf.GetTimeVisible then t[i] = cf:GetTimeVisible() end
+    end
+    return t
 end
 
 local function ChatWindowAlphas()
@@ -170,6 +203,7 @@ function Fade:Backup()
         fade = ns.CopyTable(ns.db.fade or {}),
         chatTweaks = ns.db.chatTweaks,
         chatAlpha = ChatWindowAlphas(),
+        chatTime = ChatTimes(),
     }
 end
 
@@ -194,7 +228,7 @@ function Fade:Restore(snap)
     ns.db.fade = snap.fade or {}
     ns.db.chatTweaks = snap.chatTweaks
     self:ResetAlpha()
-    if snap.chatTweaks then self:ApplyChat() else self:ResetChat(snap.chatAlpha or {}) end
+    if snap.chatTweaks then self:ApplyChat() else self:ResetChat(snap.chatAlpha or {}, snap.chatTime) end
 end
 
 ------------------------------------------------------------------------

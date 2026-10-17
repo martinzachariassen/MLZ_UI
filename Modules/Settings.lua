@@ -97,6 +97,8 @@ end
 function Settings:Backup(items)
     local snap = {}
     for _, item in ipairs(items) do snap[item.id] = GetCVar(item.id) end
+    -- the spell queue value is also kept in our saved variables (re-applied on login)
+    snap.__spellQueueWindow = ns.db.spellQueueWindow or false
     return snap
 end
 
@@ -120,6 +122,7 @@ end
 
 function Settings:Restore(snap)
     for name, value in pairs(snap) do
-        pcall(SetCVar, name, value)
+        if name ~= "__spellQueueWindow" then pcall(SetCVar, name, value) end
     end
+    if snap.__spellQueueWindow ~= nil then ns.db.spellQueueWindow = snap.__spellQueueWindow or nil end
 end

@@ -20,7 +20,7 @@ IA.CHANNELS = {
 local function Channel() return ns.db and ns.db.interrupt or "off" end
 
 local function GroupChannel()
-    if IsInGroup(LE_PARTY_CATEGORY_INSTANCE) then return "INSTANCE_CHAT" end
+    if LE_PARTY_CATEGORY_INSTANCE and IsInGroup(LE_PARTY_CATEGORY_INSTANCE) then return "INSTANCE_CHAT" end
     if IsInRaid() then return "RAID" end
     if IsInGroup() then return "PARTY" end
 end

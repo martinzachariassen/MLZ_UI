@@ -55,8 +55,8 @@ ns.data.cvars = {
       desc = "Writes 12,345 instead of 12345." },
     { name = "showTargetOfTarget", value = "1", label = "Target of target", enabled = true, group = "Unit frames",
       desc = "Shows who your target is targeting. On an enemy, that is who it is attacking." },
-    { name = "showTargetCastbar", value = "0", label = "Target cast bar", enabled = true, group = "Unit frames",
-      desc = "Hides the cast bar under the target frame. The nameplate already shows what the enemy casts." },
+    { name = "showTargetCastbar", value = "0", label = "Target cast bar", enabled = false, group = "Unit frames",
+      desc = "Hides the cast bar under the target frame. Only tick this when your nameplates show enemy casts." },
     { name = "showVKeyCastbar", value = "1", label = "Cast bar above the target", enabled = true, group = "Unit frames",
       desc = "Shows your target's cast bar above its head as well." },
     { name = "buffDurations", value = "1", label = "Buff durations", enabled = true, group = "Unit frames",
@@ -126,7 +126,7 @@ ns.data.cvars = {
       desc = "Shows your threat as a percent on the target frame." },
 
     -- Screen effects
-    { name = "doNotFlashLowHealthWarning", value = "1", label = "Disable low health flash", enabled = true, group = "Screen effects",
+    { name = "doNotFlashLowHealthWarning", value = "1", label = "Disable low health flash", enabled = false, group = "Screen effects",
       text = { ["0"] = "flashing", ["1"] = "no flash" },
       desc = "Turns off the pulsing red screen edge when your health is low." },
     { name = "ffxGlow", value = "0", label = "Disable full screen glow", enabled = false, group = "Screen effects",
@@ -138,8 +138,8 @@ ns.data.cvars = {
     -- Quality of life
     { name = "autoLootRate", value = "0", label = "Instant auto loot", enabled = true, group = "Quality of life", numeric = true,
       desc = "Removes the delay between auto-looted items." },
-    { name = "displayFreeBagSlots", value = "1", label = "Free bag slots on bag icon", enabled = true, group = "Quality of life",
-      desc = "Shows the number of free bag slots on the backpack icon." },
+    { name = "displayFreeBagSlots", value = "1", label = "Free bag slots on bag icon", enabled = false, group = "Quality of life",
+      desc = "Shows the number of free bag slots on the backpack icon. Off by default, since Minimalism hides the bags." },
     { name = "UnitNameFriendlyPlayerName", value = "1", label = "Friendly player names", enabled = false, group = "Quality of life",
       desc = "Shows names above friendly players." },
     { name = "SoftTargetEnemy", value = "2", label = "Soft target enemies", enabled = false, group = "Quality of life",

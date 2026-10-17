@@ -103,51 +103,73 @@ end
 
 ------------------------------------------------------------------------
 -- Entire quest tracker
--- The tracker may have protected quest item buttons, so Hide() only runs out of combat.
--- If it is shown in combat, it is made invisible via alpha until combat ends.
+-- The tracker is an Edit Mode system, so it is never hidden or moved: it gets alpha 0 and stops
+-- catching the mouse. Protected children (quest item buttons) are left alone. Fade reads
+-- ns.hiddenFrames so it doesn't fade the tracker back in.
 ------------------------------------------------------------------------
 local TRACKERS = { "ObjectiveTrackerFrame", "QuestWatchFrame" }
 local trackerHooked = {}
-local hiddenByUs = {} -- only frames we hid get shown again (Blizzard hides an empty tracker on purpose)
+local mouseOff = {} -- frames whose mouse we turned off, so we can turn it back on
+ns.hiddenFrames = ns.hiddenFrames or {}
+
+local function MouseOff(frame, depth)
+    if not frame or (frame.IsProtected and frame:IsProtected()) then return end
+    if frame.IsMouseEnabled and frame:IsMouseEnabled() then
+        frame:EnableMouse(false)
+        mouseOff[frame] = true
+    end
+    if depth < 4 and frame.GetChildren then
+        for _, child in ipairs({ frame:GetChildren() }) do MouseOff(child, depth + 1) end
+    end
+end
+
+local function MouseBack()
+    for f in pairs(mouseOff) do
+        if not (f.IsProtected and f:IsProtected()) then f:EnableMouse(true) end
+    end
+    wipe(mouseOff)
+end
 
 local function HideTracker(frame)
     local c = Cfg()
     if not (c and c.trackerHide) then return end
-    hiddenByUs[frame] = true
-    if InCombatLockdown() then
-        frame:SetAlpha(0)
-        ns.RunOutOfCombat(function()
-            local c2 = Cfg()
-            if c2 and c2.trackerHide then frame:Hide() end
-        end, "hiding quest tracker " .. (frame:GetName() or ""), true)
-    else
-        frame:Hide()
-    end
+    ns.hiddenFrames[frame] = true
+    frame:SetAlpha(0)
+    -- New quest lines are built with the mouse on; catch them out of combat
+    ns.RunOutOfCombat(function()
+        local c2 = Cfg()
+        if c2 and c2.trackerHide then MouseOff(frame, 0) end
+    end, "hiding quest tracker " .. (frame:GetName() or ""), true)
+end
+
+local function ShowTracker(frame)
+    ns.hiddenFrames[frame] = nil
+    frame:SetAlpha(1)
 end
 
 local function TrackerVisibility()
     local c = Cfg()
     local hide = c and c.trackerHide
+    local wasHidden = false
     for _, name in ipairs(TRACKERS) do
         local frame = _G[name]
         if frame then
             if not trackerHooked[frame] then
                 trackerHooked[frame] = true
                 frame:HookScript("OnShow", HideTracker)
+                if type(frame.Update) == "function" then
+                    hooksecurefunc(frame, "Update", function(self) HideTracker(self) end)
+                end
             end
             if hide then
                 HideTracker(frame)
-            elseif hiddenByUs[frame] then
-                ns.RunOutOfCombat(function()
-                    hiddenByUs[frame] = nil
-                    frame:SetAlpha(1)
-                    frame:Show()
-                    -- Let Blizzard rebuild the contents
-                    if frame.Update then pcall(frame.Update, frame) end
-                end, "showing quest tracker " .. name)
+            elseif ns.hiddenFrames[frame] then
+                wasHidden = true
+                ShowTracker(frame)
             end
         end
     end
+    if wasHidden then ns.RunOutOfCombat(MouseBack, "showing quest tracker", true) end
 end
 
 ------------------------------------------------------------------------
@@ -605,6 +627,11 @@ ns.On("PLAYER_ENTERING_WORLD", function()
         Tweaks:Refresh()
         C_Timer.After(2, function() Tweaks:Refresh() end) -- the tracker is built a bit later
     end
+    -- The saved size is part of our layout; with the player's own layout active, leave the minimap alone
     local ov = ns.db.overrides
-    if ov and ov.minimapSize then PreviewMap(ov.minimapSize) end
+    local layout = ns.modules.layout
+    if ov and ov.minimapSize and layout then
+        local _, ours = layout:ActiveName()
+        if ours then PreviewMap(ov.minimapSize) end
+    end
 end)

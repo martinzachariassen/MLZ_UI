@@ -12,7 +12,8 @@ local MAX_BACKUPS = 5
 -- Order the wizard applies modules in (UI/Installer.lua); undo goes the other way
 Backup.APPLY_ORDER = { "role", "scale", "settings", "layout", "bindings", "fade", "actionbuttons", "tweaks", "addons", "nameplates" }
 
--- selections = { { mod = <module>, items = {...} }, ... }; kind = "import" for profile imports
+-- selections = { { mod = <module>, items = {...} }, ... }; kind = "import" for profile imports.
+-- Returns the entry, or nil plus the title of the module that failed (the caller tells the player).
 function Backup:Create(selections, kind)
     local entry = { time = date("%Y-%m-%d %H:%M:%S"), data = {}, kind = kind }
     for _, sel in ipairs(selections) do
@@ -21,8 +22,8 @@ function Backup:Create(selections, kind)
             if ok then
                 entry.data[sel.mod.key] = snap
             else
-                ns.Print("|cffff4444Backup failed for|r", sel.mod.title, snap)
-                return nil
+                ns.Debug("Backup failed for", sel.mod.title, snap)
+                return nil, sel.mod.title
             end
         end
     end
@@ -47,12 +48,14 @@ local function RestoreOrder()
     return list
 end
 
-function Backup:Undo()
+-- quiet = the caller shows its own feedback (wizard page, control center footer), so print nothing
+function Backup:Undo(quiet)
     local list = ns.db.backups
     if not list or #list == 0 then
-        ns.Print("No backup to restore.")
+        if not quiet then ns.Print("No backup to restore.") end
         return
     end
+    local function Say(text) if not quiet then ns.Print(text) end end
     -- Returns true when it ran now, false when it waits for combat to end, "partial" when a part could not be restored
     local partial = false
     local ran = ns.RunOutOfCombat(function()
@@ -63,7 +66,7 @@ function Backup:Undo()
             if snap and mod.Restore then
                 local ok, err = pcall(mod.Restore, mod, snap)
                 if not ok then
-                    ns.Print("|cffff4444Restore failed for|r", mod.title, err)
+                    ns.Debug("Restore failed for", mod.title, err)
                     failed = failed or {}
                     failed[mod.key] = snap
                 end
@@ -72,7 +75,7 @@ function Backup:Undo()
         if failed then
             -- Keep what could not be restored, so another /mlz undo can try again
             table.insert(list, { time = entry.time, data = failed, kind = entry.kind })
-            ns.Print("Some parts could not be undone. Run |cffffff00/mlz undo|r again to retry.")
+            Say("Some parts could not be undone. Run /mlz undo again to retry (/mlz debug shows why).")
             partial = true
             ns.FireState()
             return
@@ -80,7 +83,7 @@ function Backup:Undo()
         -- Undoing an import only gives back your old choices; the setup itself is still in place
         if #list == 0 and entry.kind ~= "import" then ns.db.installed = false end
         -- Modules that can't restore live (some addon settings) have called ns.MarkReload themselves
-        ns.Print("Undone: back to how things were on " .. entry.time .. "."
+        Say("Undone: back to how things were on " .. entry.time .. "."
             .. (ns.needsReload and " Reload to finish." or ""))
         ns.FireState()
     end, "undo")

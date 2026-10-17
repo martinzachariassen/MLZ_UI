@@ -83,7 +83,8 @@ local PAGE_TEXT = {
     bindings = function(base)
         local c = ns.data.classes and ns.data.classes[ns.PlayerClass() or ""] or {}
         local parts = {}
-        local extra = ns.modules.bindings.ExtraKeyCount()
+        local b = ns.modules.bindings
+        local extra = (b and b.ExtraKeyCount and b.ExtraKeyCount()) or 0
         if extra > 0 then
             parts[#parts + 1] = extra .. " extra key" .. (extra == 1 and "" or "s") .. " on bar 5 for your stances or forms"
         end
@@ -156,9 +157,12 @@ function Installer:Build()
         b.bar:SetPoint("RIGHT")
         b.bar:SetHeight(4)
         b:SetScript("OnClick", function()
-            if self.page ~= #PAGES then self:Go(b.pageIndex) end
+            -- opened for one step: the other steps are off, so jumping to them makes no sense
+            if self.page ~= #PAGES and not self.singleStep then self:Go(b.pageIndex) end
         end)
-        W.Tooltip(b, page.number .. ". " .. page.title, "Click to go to this step.")
+        W.Tooltip(b, page.number .. ". " .. page.title, function()
+            return not self.singleStep and "Click to go to this step." or nil
+        end)
         f.progress[n] = b
     end
 
@@ -308,6 +312,13 @@ function Installer:Blocker(modKey, item)
     local parent = FindItem(self.items[modKey], item.requires)
     if not parent or parent.alreadySet or (parent.enabled and not parent.unavailable) then return nil end
     return parent
+end
+
+-- Does the row this one depends on actually change? (A key is only lost when its move is applied.)
+function Installer:ParentChanges(modKey, item)
+    if not item.requires then return true end
+    local parent = FindItem(self.items[modKey], item.requires)
+    return parent ~= nil and self:WillChange(modKey, parent)
 end
 
 -- Will this row change something on Apply?
@@ -554,7 +565,8 @@ function Installer:CycleChoice(modKey, item)
     end
     local mod = ns.modules[modKey]
     if mod.OnChoice and mod:OnChoice(item) then
-        self.items[modKey] = mod:Preview()
+        -- pcall and keep the other picks in this step
+        self:Repreview(modKey)
     end
     self:RefreshDependents(modKey)
     self:RenderList()
@@ -760,7 +772,8 @@ function Installer:Go(index)
     f.skip:SetShown(page.kind == "module")
     f.quick:SetShown(page.kind == "intro")
     f.looks:SetShown(page.kind == "intro")
-    local wantReload = done and self.appliedAny and ns.needsReload and true or false
+    -- also after an undo (appliedAny is false then), since some addon settings only restore on reload
+    local wantReload = done and ns.needsReload and true or false
     f.reload:SetShown(wantReload)
     f.close:SetShown(done)
     f.close:ClearAllPoints()
@@ -834,7 +847,7 @@ function Installer:Totals()
         if self.items[key] then
             if self.stepOn[key] then
                 for _, item in ipairs(self.items[key]) do
-                    if item.attention and not self:Blocker(key, item) then t.attention = t.attention + 1 end
+                    if item.attention and self:ParentChanges(key, item) then t.attention = t.attention + 1 end
                     if item.alreadySet and not item.toggle and not item.fixed and not item.keepVisible then
                         t.already = t.already + 1
                     end
@@ -860,9 +873,10 @@ function Installer:ApplyAll()
         return
     end
 
-    local backup = ns.Backup:Create(sels)
+    local backup, failedTitle = ns.Backup:Create(sels)
     if not backup then
-        ns.Print(C.red .. "Aborted because the backup failed. Nothing was changed." .. C.r)
+        ns.Print(C.red .. "Nothing was changed: the backup of " .. tostring(failedTitle)
+            .. " failed. /mlz debug shows why." .. C.r)
         return
     end
 
@@ -881,6 +895,17 @@ function Installer:ApplyAll()
         else
             lines[#lines + 1] = C.green .. "OK" .. C.r .. "  " .. title
         end
+    end
+    -- A preset only becomes your saved choice once it is applied
+    if self.presetPending then
+        for key, items in pairs(self.items) do
+            if self.stepOn[key] then
+                for _, item in ipairs(items) do
+                    if not item.unavailable and not item.fixed then ns.SetEnabled(key, item.id, item.enabled) end
+                end
+            end
+        end
+        self.presetPending = nil
     end
     ns.db.installed = true
     self.appliedAny = true
@@ -908,7 +933,7 @@ end
 
 -- The undo button on the last page
 function Installer:UndoLast()
-    local ran = ns.Backup:Undo()
+    local ran = ns.Backup:Undo(true)
     if ran == "partial" then
         -- keep the button: pressing it again retries what failed
         self.doneText = (self.doneText or "") .. "\n\n" .. C.amber .. "Some parts could not be undone. Press the undo button again to retry." .. C.r
@@ -932,6 +957,7 @@ end
 -- Builds the preview of every step. stepKey = opened for one step only: the others are off.
 function Installer:Preview(stepKey)
     self.items, self.stepOn = {}, {}
+    local broken = {}
     for _, page in ipairs(PAGES) do
         if page.key then
             local mod = ns.modules[page.key]
@@ -940,7 +966,10 @@ function Installer:Preview(stepKey)
             if ok then
                 self.items[page.key] = items
             else
-                if mod then ns.Print(C.red .. "Could not create preview for " .. mod.title .. ":" .. C.r, items) end
+                if mod then
+                    broken[#broken + 1] = mod.title
+                    ns.Debug("Preview failed for", mod.title, items)
+                end
                 self.items[page.key] = {}
             end
             -- Opened for one step (e.g. "Re-apply layout"): only that step is on
@@ -948,13 +977,20 @@ function Installer:Preview(stepKey)
         end
     end
     self.singleStep = stepKey ~= nil
+    self.presetPending = nil
+    if #broken > 0 then
+        ns.Print(C.amber .. "Could not read the current state of: " .. table.concat(broken, ", ")
+            .. ". Those steps are empty. /mlz debug shows why." .. C.r)
+    end
 end
 
 function Installer:Open(stepKey)
     if InCombatLockdown() then
-        ns.Print("Cannot open the wizard in combat.")
+        ns.Print("The wizard can't open in combat. Try again after combat.")
         return
     end
+    -- Setup paused by combat: carry on where you left off instead of starting over
+    if not stepKey and self:Resume() then return end
     self:Build()
     self.hiddenByCombat = nil
     self.appliedAny, self.showAlready = false, {}
@@ -979,8 +1015,14 @@ local LOOKS_ONLY = { role = true, scale = true, layout = true, fade = true, acti
 -- "recommended" = every step with the suggested rows. "looks" = only the steps in LOOKS_ONLY.
 -- Both start from the suggestions, not from rows you unticked in an earlier run.
 function Installer:ApplyPreset(name)
+    -- Preview against empty toggles to get the suggestions, then put your saved choices back.
+    -- They are only replaced when you press Apply (see ApplyAll), so closing the wizard keeps them.
+    local saved = ns.db.toggles
     ns.db.toggles = {}
-    self:Preview()
+    local ok, err = pcall(self.Preview, self)
+    ns.db.toggles = saved
+    if not ok then ns.Debug("Preset preview failed:", err) end
+    self.presetPending = true
     for key in pairs(self.stepOn) do
         self.stepOn[key] = (name == "recommended") or LOOKS_ONLY[key] or false
     end

@@ -294,17 +294,18 @@ end
 ------------------------------------------------------------------------
 -- Worn gear: one chat line when it drops to the limit, again only after a repair
 ------------------------------------------------------------------------
-local warned = false
+-- "Warned" is kept per character, so a /reload or relog with worn gear does not repeat the line
 local function CheckDurability()
     if not (ns.db and Cfg().durability) then return end
     local low, limit = LowestDurability(), (ns.data.reminders or {}).durability or 25
     if not low then return end
-    if low <= limit and not warned then
-        warned = true
+    local char = ns.CharDB()
+    if low <= limit and not char.wornWarned then
+        char.wornWarned = true
         ns.Print(("Your gear is worn (%d%%). Repair at a merchant before your next fight."):format(low))
         ns.FireState()
-    elseif low > limit and warned then
-        warned = false
+    elseif low > limit and char.wornWarned then
+        char.wornWarned = nil
         ns.FireState()
     end
 end

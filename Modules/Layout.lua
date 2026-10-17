@@ -200,8 +200,19 @@ function Layout:Preview()
     return items
 end
 
+-- Clients with the new Settings panel keep "show bar n" as a proxy setting as well
+local function BarProxies()
+    if not (Settings and Settings.GetValue) then return nil end
+    local t = {}
+    for n = 2, 8 do
+        local ok, v = pcall(Settings.GetValue, "PROXY_SHOW_ACTIONBAR_" .. n)
+        if ok and v ~= nil then t[n] = v and true or false end
+    end
+    return next(t) and t or nil
+end
+
 function Layout:Backup()
-    local snap = { barToggles = GetActionBarToggles and { GetActionBarToggles() } or nil }
+    local snap = { barToggles = GetActionBarToggles and { GetActionBarToggles() } or nil, barProxies = BarProxies() }
     if not Available() then return snap end
     local raw, _, active = self:GetInfo()
     if not raw then return snap end
@@ -562,6 +573,9 @@ end)
 
 function Layout:Restore(snap)
     if snap.barToggles and SetActionBarToggles then pcall(SetActionBarToggles, unpack(snap.barToggles)) end
+    if snap.barProxies and Settings and Settings.SetValue then
+        for n, v in pairs(snap.barProxies) do pcall(Settings.SetValue, "PROXY_SHOW_ACTIONBAR_" .. n, v) end
+    end
     if not snap.activeLayout or not Available() then return end
     local raw = self:GetInfo()
     if not raw then return end

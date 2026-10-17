@@ -521,15 +521,23 @@ function Page:Row(opts, build, refresh)
         self.hl:Hide()
         if GameTooltip:GetOwner() == self then GameTooltip:Hide() end
     end)
-    -- leaving the row through its control: the control's OnLeave runs, the row's doesn't
-    if control and control.HookScript then
-        control:HookScript("OnLeave", function()
-            if not row:IsMouseOver() then
-                row.hl:Hide()
-                if GameTooltip:GetOwner() == row then GameTooltip:Hide() end
-            end
-        end)
+    -- Leaving the row through its control: the control's OnLeave runs, the row's doesn't.
+    -- Segmented, stepper and slider take the mouse in their children, so hook those as well.
+    local function LeaveCheck()
+        if not row:IsMouseOver() then
+            row.hl:Hide()
+            if GameTooltip:GetOwner() == row then GameTooltip:Hide() end
+        end
     end
+    local function HookLeave(frame, depth)
+        if frame.HookScript and frame.IsMouseEnabled and frame:IsMouseEnabled() then
+            frame:HookScript("OnLeave", LeaveCheck)
+        end
+        if depth > 0 and frame.GetChildren then
+            for _, child in ipairs({ frame:GetChildren() }) do HookLeave(child, depth - 1) end
+        end
+    end
+    if control then HookLeave(control, 2) end
 
     self:OnRefresh(function()
         local why = opts.avail and opts.avail()
@@ -647,6 +655,8 @@ function Page:Buttons(list)
         local first
         for i, b in ipairs(made) do
             local d = defs[i]
+            -- start enabled every time; a custom refresh may still disable it, and avail always can
+            b:SetEnabled(true)
             if d.refresh then d.refresh(b) end
             local why = d.avail and d.avail()
             if why then
@@ -654,8 +664,6 @@ function Page:Buttons(list)
                 b.tipText = why .. (d.tip and ("\n" .. d.tip) or "")
                 first = first or why
             else
-                -- a custom refresh decides the enabled state itself; otherwise the button is simply usable again
-                if d.avail and not d.refresh then b:SetEnabled(true) end
                 b.tipText = d.tip
             end
         end
@@ -672,6 +680,7 @@ local function Confirm(label, fn)
             -- each click gets its own token, so an old timer can't disarm a newer click
             local token = {}
             b.armed = token
+            b.tipTitle = b.tipTitle or label -- the tooltip keeps the real name while the button asks to confirm
             b:SetText("Click again to confirm")
             C_Timer.After(4, function()
                 if b.armed == token then
@@ -1112,7 +1121,8 @@ PAGES[#PAGES + 1] = { key = "healer", title = "Your role", icon = "Interface\\Ic
     p:Value("Adapted for you", "Key hints and reminders are for your class. Extra keys on bar 5 (for your forms or stances) and pet keys are added when your class has them.", function()
         local c = ns.data.classes and ns.data.classes[ns.PlayerClass() or ""]
         local parts = { "key hints", "reminders" }
-        local extra = ns.modules.bindings.ExtraKeyCount()
+        local b = ns.modules.bindings
+        local extra = (b and b.ExtraKeyCount and b.ExtraKeyCount()) or 0
         if extra > 0 then parts[#parts + 1] = extra .. " extra key" .. (extra == 1 and "" or "s") .. " for forms" end
         if c and c.pet then parts[#parts + 1] = "pet keys" end
         return table.concat(parts, ", ")
@@ -1243,6 +1253,7 @@ PAGES[#PAGES + 1] = { key = "qol", title = "Helpers", icon = "Interface\\Icons\\
     })
 
     local CK = ns.Cooking
+    if CK then
     p:Card("Cooking", "Keep the meat and fish you can cook. The number is the Cooking skill the recipe needs.")
     p:Toggle("Show cooking uses in tooltips", "Meat, fish, eggs and spices show which dishes they make, colored by your Cooking skill.",
         CK.Get, CK.Set,
@@ -1254,12 +1265,14 @@ PAGES[#PAGES + 1] = { key = "qol", title = "Helpers", icon = "Interface\\Icons\\
             .. C.grey .. "Grey|r: no more skill points.\n"
             .. C.red .. "Red|r: your Cooking skill is too low.\n\n"
             .. "White means you haven't learned Cooking yet. Learn it from any Cooking trainer." })
+    end
 
     p:Card("Interrupts")
     p:Choice("Announce my interrupts", "\"Interrupted <mob>'s <spell>\" when you or your pet interrupt a cast. Say and Group only post while you are in a group.",
         IA.CHANNELS, IA.Get, IA.Set, 62)
 
     local R, X = ns.Reminders, ns.XPRate
+    if R then
     p:Card("Reminders", "Small icons below the middle of the screen, out of combat only. They go away once it is fixed.")
     p:Toggle("Missing self buffs", "Inner Fire, Arcane Intellect, aspects, poisons, weapon imbues and similar. "
         .. "Not shown in cities and inns.",
@@ -1301,7 +1314,9 @@ PAGES[#PAGES + 1] = { key = "qol", title = "Helpers", icon = "Interface\\Icons\\
                 end })
         end
     end
+    end
 
+    if X then
     p:Card("Leveling", "Counted since you logged in or reloaded. Also on the overview and with /mlz xp.")
     p:Value("XP per hour", function() return X.Text() or "You are at max level." end,
         function() return X.Badge() or (C.grey .. (X.Stats() and "counting" or "max level") .. C.r) end, { width = 120, descLines = 2 })
@@ -1312,6 +1327,7 @@ PAGES[#PAGES + 1] = { key = "qol", title = "Helpers", icon = "Interface\\Icons\\
             S:Notify("XP per hour counts from now.", "info")
         end },
     })
+    end
 end }
 
 PAGES[#PAGES + 1] = { key = "addons", title = "Other addons", icon = "Interface\\Icons\\INV_Misc_Bag_08", build = function(p)
@@ -1450,10 +1466,13 @@ PAGES[#PAGES + 1] = { key = "profiles", title = "Profiles & backup", icon = "Int
     local LABEL = "Undo last change"
     p:Buttons({
         { text = LABEL, width = 170, style = "danger", fn = Confirm(LABEL, function()
-            local queued = InCombatLockdown()
-            ns.Backup:Undo()
-            if queued then
-                S:Notify("In combat: parts of the undo are queued until combat ends.", "warn")
+            local ran = ns.Backup:Undo(true)
+            if ran == nil then
+                S:Notify("No backup to restore.", "warn")
+            elseif ran == false then
+                S:Notify("In combat: the undo runs when combat ends.", "warn")
+            elseif ran == "partial" then
+                S:Notify("Some parts could not be undone. Click again to retry.", "bad")
             elseif ns.needsReload then
                 S:Notify("Backup restored. Reload to finish.", "warn")
             else
@@ -1669,6 +1688,7 @@ function S:RefreshFooter()
 end
 
 function S:Select(key)
+    self:Build()
     if not self.pages[key] then key = "overview" end
     for k, entry in pairs(self.pages) do
         entry.button:SetSelected(k == key)

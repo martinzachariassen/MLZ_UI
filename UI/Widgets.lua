@@ -27,12 +27,29 @@ W.T = {
     inputEdge = { 0.320, 0.350, 0.410, 1 },   -- border of an enabled checkbox
     shade     = { 1, 1, 1, 0.04 },             -- soft hover on rows and list items
     press     = { 1, 1, 1, 0.08 },             -- stronger hover on small controls
+    -- Controls
+    btn          = { 0.170, 0.190, 0.230, 1 },  -- normal button
+    btnHover     = { 0.220, 0.250, 0.300, 1 },
+    primary      = { 0.130, 0.450, 0.780, 1 },  -- primary button (accent, darkened so white text reads)
+    primaryHover = { 0.180, 0.540, 0.900, 1 },
+    primaryEdge  = { 0.250, 0.600, 0.950, 1 },
+    danger       = { 0.420, 0.140, 0.140, 1 },
+    dangerHover  = { 0.550, 0.180, 0.180, 1 },
+    dangerEdge   = { 0.650, 0.250, 0.250, 1 },
+    dangerText   = { 1.000, 0.900, 0.900, 1 },
+    white        = { 1, 1, 1, 1 },              -- text on accent fills (primary, selected segment)
+    knob         = { 0.950, 0.960, 0.980, 1 },  -- toggle knob, slider thumb
+    onText       = { 0.050, 0.200, 0.100, 1 },  -- "ON" on the green toggle
+    offText      = { 0.700, 0.720, 0.760, 1 },  -- "OFF" on the grey toggle
+    edge         = { 0, 0, 0, 0.35 },           -- soft edge around the toggle
+    thumb        = { 0.400, 0.440, 0.500, 0.9 }, -- scrollbar thumb
+    closeHover   = { 1.000, 0.300, 0.300, 0.15 },
 }
 local T = W.T
 
 -- Color codes for text
 W.C = {
-    gold = "|cffffd100", grey = "|cff8a909a", red = "|cffff5c5c", green = "|cff4ad173",
+    gold = "|cffffd100", grey = "|cff949ba8", red = "|cffff5c5c", green = "|cff4ad173",
     blue = "|cff33a0ff", white = "|cffffffff", amber = "|cffffb040", r = "|r",
 }
 
@@ -160,7 +177,7 @@ function W.Window(name, width, height, title)
 
     local icon = bar:CreateTexture(nil, "ARTWORK")
     icon:SetSize(20, 20)
-    icon:SetPoint("LEFT", 10, 0)
+    icon:SetPoint("LEFT", 14, 0) -- on the 14px rhythm, like the page content
     icon:SetTexture("Interface\\Icons\\INV_Misc_Gear_01")
     icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 
@@ -174,7 +191,7 @@ function W.Window(name, width, height, title)
     local close = CreateFrame("Button", nil, bar)
     close:SetSize(36, 36)
     close:SetPoint("RIGHT", 0, 0)
-    close.hl = W.Fill(close, { 1, 0.3, 0.3, 0.15 }, "HIGHLIGHT")
+    close.hl = W.Fill(close, T.closeHover, "HIGHLIGHT")
     close.x = W.Text(close, "MLZUI_FontHead", "X", "CENTER")
     close.x:SetPoint("CENTER")
     close.x:SetTextColor(unpack(T.muted))
@@ -199,12 +216,15 @@ end
 ------------------------------------------------------------------------
 -- Button: flat, with styles "normal" | "primary" | "danger" | "subtle"
 ------------------------------------------------------------------------
+local CLEAR = { 0, 0, 0, 0 }
 local BUTTON_STYLES = {
-    normal  = { bg = { 0.17, 0.19, 0.23, 1 }, hover = { 0.22, 0.25, 0.30, 1 }, border = T.border, text = T.text },
-    primary = { bg = { 0.13, 0.45, 0.78, 1 }, hover = { 0.18, 0.54, 0.90, 1 }, border = { 0.25, 0.60, 0.95, 1 }, text = { 1, 1, 1, 1 } },
-    danger  = { bg = { 0.42, 0.14, 0.14, 1 }, hover = { 0.55, 0.18, 0.18, 1 }, border = { 0.65, 0.25, 0.25, 1 }, text = { 1, 0.9, 0.9, 1 } },
-    subtle  = { bg = { 0, 0, 0, 0 }, hover = { 1, 1, 1, 0.06 }, border = { 0, 0, 0, 0 }, text = T.muted },
+    normal  = { bg = T.btn, hover = T.btnHover, border = T.border, text = T.text },
+    primary = { bg = T.primary, hover = T.primaryHover, border = T.primaryEdge, text = T.white },
+    danger  = { bg = T.danger, hover = T.dangerHover, border = T.dangerEdge, text = T.dangerText },
+    subtle  = { bg = CLEAR, hover = T.shade, border = CLEAR, text = T.muted },
 }
+W.BUTTON_H = 24       -- buttons inside cards and lists
+W.BUTTON_H_LARGE = 28 -- footer, banner and wizard navigation
 
 function W.Button(parent, text, width, height, onClick, style)
     local b = CreateFrame("Button", nil, parent)
@@ -284,12 +304,12 @@ end
 ------------------------------------------------------------------------
 function W.Toggle(parent, onChange, label)
     local t = CreateFrame("Button", nil, parent)
-    t:SetSize(46, 20) -- room for "OFF" next to the knob
+    t:SetSize(48, 20) -- room for "OFF" next to the knob, with a gap
     t.bg = W.Fill(t, T.off)
-    t.border = W.Border(t, { 0, 0, 0, 0.35 })
+    t.border = W.Border(t, T.edge)
     t.knob = t:CreateTexture(nil, "ARTWORK")
     t.knob:SetSize(16, 16)
-    t.knob:SetColorTexture(0.95, 0.96, 0.98, 1)
+    t.knob:SetColorTexture(unpack(T.knob))
     t.state = W.Text(t, "MLZUI_FontSmallBold", "", "CENTER")
 
     function t:SetOn(on)
@@ -301,13 +321,13 @@ function W.Toggle(parent, onChange, label)
             self.knob:SetPoint("RIGHT", -2, 0)
             self.state:SetPoint("LEFT", 5, 0)
             self.state:SetText("ON")
-            self.state:SetTextColor(0.05, 0.2, 0.1)
+            self.state:SetTextColor(unpack(T.onText))
         else
             self.bg:SetColorTexture(unpack(T.off))
             self.knob:SetPoint("LEFT", 2, 0)
-            self.state:SetPoint("RIGHT", -5, 0)
+            self.state:SetPoint("RIGHT", -4, 0)
             self.state:SetText("OFF")
-            self.state:SetTextColor(0.7, 0.72, 0.76)
+            self.state:SetTextColor(unpack(T.offText))
         end
     end
     t.SetChecked = t.SetOn
@@ -318,7 +338,7 @@ function W.Toggle(parent, onChange, label)
         if onChange then onChange(self, self.on) end
     end)
     t:SetScript("OnEnter", function(self) self.border:SetColor(T.accent) end)
-    t:SetScript("OnLeave", function(self) self.border:SetColor({ 0, 0, 0, 0.35 }) end)
+    t:SetScript("OnLeave", function(self) self.border:SetColor(T.edge) end)
     t:SetScript("OnDisable", function(self) self:SetAlpha(0.35) end)
     t:SetScript("OnEnable", function(self) self:SetAlpha(1) end)
 
@@ -337,14 +357,15 @@ end
 function W.Segmented(parent, options, onSelect, segWidth)
     local s = CreateFrame("Frame", nil, parent)
     segWidth = segWidth or 70
-    s:SetSize(segWidth * #options, 22)
+    -- Each segment is segWidth wide including one 1px line (outer border or divider), plus the closing border
+    s:SetSize(segWidth * #options + 1, 22)
     W.Fill(s, T.input)
     W.Border(s, T.border)
     s.buttons = {}
     for i, o in ipairs(options) do
         local b = CreateFrame("Button", nil, s)
-        b:SetSize(segWidth - 2, 18)
-        b:SetPoint("LEFT", 1 + (i - 1) * segWidth + (i > 1 and 1 or 0), 0)
+        b:SetSize(segWidth - 1, 20)
+        b:SetPoint("LEFT", (i - 1) * segWidth + 1, 0)
         b.sel = W.Fill(b, T.accent)
         b.sel:Hide()
         b.hl = W.Fill(b, T.press, "HIGHLIGHT")
@@ -369,7 +390,7 @@ function W.Segmented(parent, options, onSelect, segWidth)
         for _, b in ipairs(self.buttons) do
             local on = b.value == v
             b.sel:SetShown(on)
-            b.text:SetTextColor(unpack(on and { 1, 1, 1, 1 } or T.muted))
+            b.text:SetTextColor(unpack(on and T.white or T.muted))
         end
     end
     return s
@@ -442,7 +463,7 @@ function W.Slider(parent, width, minV, maxV, step, fmt, onChange, onCommit)
     fill:SetPoint("LEFT", track, "LEFT")
     fill:SetHeight(6)
     local thumb = s:CreateTexture(nil, "OVERLAY")
-    thumb:SetColorTexture(0.95, 0.96, 0.98, 1)
+    thumb:SetColorTexture(unpack(T.knob))
     thumb:SetSize(10, 16)
     s:SetThumbTexture(thumb)
     holder.value = W.Text(holder, "MLZUI_FontButton", "", "RIGHT")
@@ -527,7 +548,7 @@ function W.ScrollArea(parent)
     bar:EnableMouse(true)
     W.Fill(bar, T.shade)
     local thumb = bar:CreateTexture(nil, "OVERLAY")
-    thumb:SetColorTexture(0.40, 0.44, 0.50, 0.9)
+    thumb:SetColorTexture(unpack(T.thumb))
     thumb:SetSize(5, 40)
     bar:SetThumbTexture(thumb)
     bar:Hide()

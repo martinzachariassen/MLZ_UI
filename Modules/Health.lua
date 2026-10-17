@@ -80,9 +80,12 @@ local function Report()
     for _, p in ipairs(list) do
         if p.installed then off[#off + 1] = p.title else missing[#missing + 1] = p.title end
     end
-    if #off > 0 then ns.Print("Switched off in the addon list: " .. table.concat(off, ", ") .. ".") end
-    if #missing > 0 then ns.Print("Not installed: " .. table.concat(missing, ", ") .. ".") end
-    if #worth > 0 then ns.Print("Worth a look: " .. table.concat(worth, ", ") .. ".") end
+    -- one line, however many groups there are
+    local parts = {}
+    if #off > 0 then parts[#parts + 1] = "Switched off in the addon list: " .. table.concat(off, ", ") .. "." end
+    if #missing > 0 then parts[#parts + 1] = "Not installed: " .. table.concat(missing, ", ") .. "." end
+    if #worth > 0 then parts[#parts + 1] = "Worth a look: " .. table.concat(worth, ", ") .. "." end
+    ns.Print(table.concat(parts, " "))
 end
 
 ns.AddCommand("health", "lists supported addons that are switched off or not installed", Report)

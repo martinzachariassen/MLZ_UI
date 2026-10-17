@@ -118,7 +118,7 @@ local function Import(text)
         return
     end
     if not ns.Backup:Create({ { mod = Profile, items = {} } }, "import") then
-        ns.Print("|cffff4444Aborted because the backup failed. Nothing was changed.|r")
+        ns.Print("|cffff4444Import stopped because the backup failed. Nothing was changed.|r")
         return
     end
     if clean.toggles then ns.db.toggles = clean.toggles end

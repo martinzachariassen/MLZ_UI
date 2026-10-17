@@ -43,9 +43,9 @@ ns.On("PLAYER_XP_UPDATE", function(_, unit)
     ns.FireState()
 end)
 
--- 12345 -> "12.3k", 950 -> "950"
+-- 123456 -> "123k", 12345 -> "12.3k", 950 -> "950"
 local function Short(n)
-    if n >= 10000 then return ("%.0fk"):format(n / 1000) end
+    if n >= 100000 then return ("%.0fk"):format(n / 1000) end
     if n >= 1000 then return ("%.1fk"):format(n / 1000) end
     return tostring(math.floor(n + 0.5))
 end

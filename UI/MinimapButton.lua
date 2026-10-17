@@ -23,8 +23,8 @@ end
 -- Position on the minimap edge
 ------------------------------------------------------------------------
 local function Position()
-    if not button then return end
     local mm = _G.Minimap
+    if not (button and mm) then return end
     local angle = math.rad(Cfg().angle or 200)
     local x, y = math.cos(angle), math.sin(angle)
     local r = mm:GetWidth() / 2 + 5
@@ -58,15 +58,15 @@ local function ShowTooltip(owner)
     if not owner then return end
     tipOwner = owner
     GameTooltip:SetOwner(owner, owner == button and "ANCHOR_LEFT" or "ANCHOR_RIGHT")
-    GameTooltip:SetText("MLZ UI  " .. C.grey .. "v" .. ns.version .. C.r, 1, 1, 1)
+    GameTooltip:SetText("MLZ UI  " .. C.grey .. "v" .. (ns.version or "") .. C.r, 1, 1, 1)
     if not ns.db.installed then
-        GameTooltip:AddLine("Not set up yet. Left-click to get started.", T.amber[1], T.amber[2], T.amber[3], true)
+        GameTooltip:AddLine("Not set up yet. Left-click to start the setup wizard.", T.amber[1], T.amber[2], T.amber[3], true)
     end
     if ns.Settings and ns.Settings.Summary then
         for _, s in ipairs(ns.Settings.Summary()) do
             local b = W.BADGE[s.state] or W.BADGE.info
             local col = b[1]
-            GameTooltip:AddDoubleLine(s.title, s.badge or b[2], 0.85, 0.86, 0.88, col[1], col[2], col[3])
+            GameTooltip:AddDoubleLine(s.title, s.badge or b[2], T.text[1], T.text[2], T.text[3], col[1], col[2], col[3])
         end
     end
     local paused = ns.Installer and ns.Installer.hiddenByCombat
@@ -74,7 +74,7 @@ local function ShowTooltip(owner)
         GameTooltip:AddLine(" ")
         GameTooltip:AddLine("Setup is paused. Left-click to continue.", T.amber[1], T.amber[2], T.amber[3], true)
     end
-    if ns.needsReload then
+    if ns.needsReload and ns.Settings and ns.Settings.ReloadText then
         GameTooltip:AddLine(" ")
         GameTooltip:AddLine(ns.Settings.ReloadText(), T.amber[1], T.amber[2], T.amber[3], true)
     elseif ns.editModeStale then
@@ -82,10 +82,14 @@ local function ShowTooltip(owner)
         GameTooltip:AddLine("Reload before you open Edit Mode.", T.muted[1], T.muted[2], T.muted[3], true)
     end
     GameTooltip:AddLine(" ")
-    GameTooltip:AddLine(C.gold .. "Left-click" .. C.r .. (paused and " continue setup   " or " settings   ")
-        .. C.gold .. "Right-click" .. C.r .. " quick menu", 0.8, 0.8, 0.8)
-    GameTooltip:AddLine((ns.needsReload and (C.gold .. "SHIFT-click" .. C.r .. " reload UI   ") or "")
-        .. C.gold .. "Drag" .. C.r .. " move", 0.8, 0.8, 0.8)
+    local m, t = T.muted, T.text
+    local left = paused and "Continue setup" or (not ns.db.installed and "Setup wizard") or "Settings"
+    GameTooltip:AddDoubleLine("Left-click", left, m[1], m[2], m[3], t[1], t[2], t[3])
+    GameTooltip:AddDoubleLine("Right-click", "Quick menu", m[1], m[2], m[3], t[1], t[2], t[3])
+    if ns.needsReload then
+        GameTooltip:AddDoubleLine("SHIFT-click", "Reload UI", m[1], m[2], m[3], t[1], t[2], t[3])
+    end
+    if owner == button then GameTooltip:AddDoubleLine("Drag", "Move", m[1], m[2], m[3], t[1], t[2], t[3]) end
     GameTooltip:Show()
 end
 
@@ -113,8 +117,9 @@ local function BuildMenu()
     -- A click anywhere else closes the menu. GLOBAL_MOUSE_DOWN only listens; it doesn't eat the
     -- click, so camera turning and targeting keep working while the menu is open.
     -- Clicks on the button that opened the menu are left to that button (it toggles the menu).
-    f:SetScript("OnShow", function(self) self:RegisterEvent("GLOBAL_MOUSE_DOWN") end)
-    f:SetScript("OnHide", function(self) self:UnregisterEvent("GLOBAL_MOUSE_DOWN") end)
+    -- Not every client has the event: pcall, and the menu still closes with ESC or its own items.
+    f:SetScript("OnShow", function(self) pcall(self.RegisterEvent, self, "GLOBAL_MOUSE_DOWN") end)
+    f:SetScript("OnHide", function(self) pcall(self.UnregisterEvent, self, "GLOBAL_MOUSE_DOWN") end)
     f:SetScript("OnEvent", function(self)
         if self:IsMouseOver() then return end
         if self.owner and self.owner.IsMouseOver and self.owner:IsVisible() and self.owner:IsMouseOver() then return end
@@ -271,11 +276,8 @@ local function Create()
         elseif IsShiftKeyDown() then
             -- only when something is waiting for a reload, so a stray SHIFT-click costs nothing
             if ns.needsReload then ReloadUI() end
-        elseif ns.Installer and ns.Installer.Resume and ns.Installer:Resume() then
-            if menu then menu:Hide() end -- setup was paused for combat: pick it up again
-        elseif ns.Settings then
-            if menu then menu:Hide() end
-            ns.Settings:Toggle()
+        else
+            MB:LeftClick()
         end
     end)
     b:SetScript("OnDragStart", function(self)
@@ -303,6 +305,19 @@ function MB:SetHidden(hide)
 end
 
 function MB:IsHidden() return Cfg().hide and true or false end
+
+-- Left-click on the button and in the addon compartment: continue a paused setup, start the
+-- wizard if MLZ UI isn't set up yet, otherwise open or close the control center.
+function MB:LeftClick()
+    if menu then menu:Hide() end
+    local inst = ns.Installer
+    if inst and inst.Resume and inst:Resume() then return end
+    if not ns.db.installed and inst and inst.Open and not InCombatLockdown() then
+        inst:Open()
+    elseif ns.Settings then
+        ns.Settings:Toggle()
+    end
+end
 
 -- Called when the minimap shape changes (square minimap in Tweaks)
 MB.Position = Position
@@ -337,8 +352,8 @@ function MLZUI_OnAddonCompartmentClick(_, mouseButton, menuButtonFrame)
     if type(mouseButton) == "table" then mouseButton = mouseButton.buttonName end
     if mouseButton == "RightButton" then
         MB:ToggleMenu(nil)
-    elseif ns.Settings then
-        ns.Settings:Toggle()
+    else
+        MB:LeftClick()
     end
 end
 
