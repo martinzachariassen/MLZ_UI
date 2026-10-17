@@ -186,20 +186,28 @@ local function Capture()
     return snap
 end
 
+-- Fading: only the rows that differ. Returns true when something changed.
+local function LoadFade(saved)
+    local fade = ns.modules.fade
+    if not (fade and saved) then return false end
+    local changed = false
+    for _, row in ipairs(ns.data.fade or {}) do
+        local want = saved[row.id] and true or false
+        if fade:IsOn(row.id) ~= want then
+            fade:SetRow(row.id, want)
+            changed = true
+        end
+    end
+    return changed
+end
+
 local function Load(snap)
     -- nameplates: set the options, then apply them in one go
     ns.db.nameplates = ns.db.nameplates or {}
     for _, k in ipairs(NP_KEYS) do ns.db.nameplates[k] = snap.nameplates and snap.nameplates[k] end
     if ns.db.nameplates.auto == nil then ns.db.nameplates.auto = true end
     if ns.NP and ns.NP.Apply then ns.NP.Apply() end
-    -- fading: only the rows that differ
-    local fade = ns.modules.fade
-    if fade and snap.fade then
-        for _, row in ipairs(ns.data.fade or {}) do
-            local want = snap.fade[row.id] and true or false
-            if fade:IsOn(row.id) ~= want then fade:SetRow(row.id, want) end
-        end
-    end
+    LoadFade(snap.fade)
     if ns.ManaTick and snap.manaTick ~= nil and ns.ManaTick.IsOn() ~= snap.manaTick then ns.ManaTick.SetOn(snap.manaTick) end
     if ns.Interrupt and snap.interrupt then ns.Interrupt.Set(snap.interrupt) end
     ns.FireState()
@@ -243,8 +251,130 @@ ns.OnRoleChanged(function(role)
     if not (previous and role and role ~= previous and ns.db and ns.db.installed and RP.Auto()) then return end
     -- the first event after login only tells us the role we already had
     if not RP.started then return end
-    if RP.Has(role) then RP.Load(role) end
+    if RP.Has(role) then
+        RP.Load(role)
+        -- the situation profile sits on top of the role profile
+        if ns.SituationProfiles then ns.SituationProfiles.Reapply() end
+    end
 end)
 ns.On("PLAYER_ENTERING_WORLD", function()
     C_Timer.After(3, function() RP.started = true end)
 end)
+
+------------------------------------------------------------------------
+-- Situation profiles (per character)
+-- Save what fades, the quest tracker and threat colors once for solo, dungeon, raid and
+-- battleground. With switching on, the saved one is loaded when you enter that kind of place,
+-- on top of your role profile. Stored in MLZUIDB.chars["Name - Realm"].situationProfiles.
+------------------------------------------------------------------------
+local SP = {}
+ns.SituationProfiles = SP
+
+SP.ORDER = { "solo", "party", "raid", "pvp" }
+SP.TEXT = { solo = "Solo", party = "Dungeon", raid = "Raid", pvp = "Battleground" }
+
+local TRACKER_KEYS = { "trackerHide", "trackerHeader" }
+
+local function SStore()
+    local c = ns.CharDB()
+    c.situationProfiles = c.situationProfiles or {}
+    return c.situationProfiles
+end
+
+-- Where you are now: solo (open world, cities), party, raid or pvp (battlegrounds and arenas)
+function SP.Current()
+    if not IsInInstance then return "solo" end
+    local _, kind = IsInInstance()
+    if kind == "party" or kind == "raid" then return kind end
+    if kind == "pvp" or kind == "arena" then return "pvp" end
+    return "solo"
+end
+
+local function CaptureSituation()
+    local tw = ns.modules.tweaks
+    local snap = { fade = ns.CopyTable(ns.db.fade or {}), tracker = {}, time = date("%Y-%m-%d %H:%M") }
+    for _, k in ipairs(TRACKER_KEYS) do snap.tracker[k] = tw and tw:IsOn(k) or false end
+    snap.threat = (ns.db.nameplates or {}).threat and true or false
+    return snap
+end
+
+-- Returns true when something changed
+local function LoadSituation(snap)
+    local changed = LoadFade(snap.fade)
+    local tw = ns.modules.tweaks
+    if tw and snap.tracker then
+        for _, k in ipairs(TRACKER_KEYS) do
+            local want = snap.tracker[k] and true or false
+            if tw:IsOn(k) ~= want then
+                tw:Set(k, want)
+                changed = true
+            end
+        end
+    end
+    ns.db.nameplates = ns.db.nameplates or {}
+    if snap.threat ~= nil and (ns.db.nameplates.threat and true or false) ~= snap.threat then
+        ns.db.nameplates.threat = snap.threat
+        if ns.NP and ns.NP.Apply then ns.NP.Apply() end
+        changed = true
+    end
+    if changed then ns.FireState() end
+    return changed
+end
+
+function SP.Has(kind) return SStore()[kind] ~= nil end
+function SP.Time(kind) return SStore()[kind] and SStore()[kind].time end
+function SP.Auto() return SStore().auto and true or false end
+function SP.SetAuto(on)
+    SStore().auto = on and true or false
+    SP.lastKind = nil -- load for the place you are in now
+    if on then SP.Reapply() end
+    ns.FireState()
+end
+
+function SP.Save(kind)
+    if not SP.TEXT[kind] then return end
+    SStore()[kind] = CaptureSituation()
+    SP.lastKind = kind
+    ns.FireState()
+end
+
+function SP.Delete(kind)
+    SStore()[kind] = nil
+    ns.FireState()
+end
+
+-- Loads one saved situation by hand. Returns ok (a profile exists), ran (false = waits for combat to end).
+function SP.Load(kind)
+    local snap = SStore()[kind]
+    if not snap then return false end
+    SP.lastKind = kind
+    return true, ns.RunOutOfCombat(function() LoadSituation(snap) end, "situation profile", true)
+end
+
+-- Loads the profile for where you are now. quiet = no chat line.
+function SP.Reapply(quiet)
+    if not (ns.db and ns.db.installed and SP.Auto()) then return end
+    local kind = SP.Current()
+    local snap = SStore()[kind]
+    SP.lastKind = kind
+    if not snap then return end
+    ns.RunOutOfCombat(function()
+        if LoadSituation(snap) and not quiet then
+            ns.Print(SP.TEXT[kind] .. " setup loaded.")
+        end
+    end, "situation profile", true)
+end
+
+-- Entering a new zone fires several events: look once, a moment later, and only act on a new kind of place
+local pendingZone = false
+local function OnZone()
+    if pendingZone then return end
+    pendingZone = true
+    C_Timer.After(1, function()
+        pendingZone = false
+        if not (ns.db and SP.Auto()) then return end
+        if SP.Current() ~= SP.lastKind then SP.Reapply() end
+    end)
+end
+ns.On("PLAYER_ENTERING_WORLD", OnZone)
+ns.TryOn("ZONE_CHANGED_NEW_AREA", OnZone)

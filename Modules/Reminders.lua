@@ -10,7 +10,7 @@ local _, ns = ...
 local R = {}
 ns.Reminders = R
 
-local DEFAULTS = { buffs = false, reagents = false, durability = true }
+local DEFAULTS = { buffs = false, reagents = false, durability = true, raidFood = false }
 local ICON, GAP, MAX_ICONS = 28, 10, 8
 local REPAIR_ICON = "Interface\\Icons\\Trade_BlackSmithing"
 
@@ -105,6 +105,14 @@ local function ItemIcon(item)
     return GetItemIcon and GetItemIcon(item)
 end
 
+local FOOD_ICON = "Interface\\Icons\\INV_Misc_Food_14"
+
+local function InRaidInstance()
+    if not IsInInstance then return false end
+    local _, kind = IsInInstance()
+    return kind == "raid"
+end
+
 -- Lowest durability of all equipped items in percent, or nil when nothing has durability
 local function LowestDurability()
     if not GetInventoryItemDurability then return nil end
@@ -140,8 +148,13 @@ local function Missing()
                     if Knows(id) then known = id break end
                 end
                 if known then
-                    local ok, hand
-                    if b.kind == "weapon" then
+                    local ok, hand, low
+                    if b.kind == "happiness" then
+                        -- 1 = unhappy, 2 = content, 3 = happy. No pet out: the "pet" reminder covers that.
+                        local mood = UnitExists("pet") and GetPetHappiness and GetPetHappiness()
+                        ok = not mood or mood >= 3
+                        low = mood == 1
+                    elseif b.kind == "weapon" then
                         hand = WeaponMissing()
                         ok = hand == nil
                     elseif b.kind == "pet" then
@@ -164,8 +177,9 @@ local function Missing()
                         local name = SpellName(known) or "?"
                         local why = b.kind == "weapon" and ("Your " .. (hand or "main hand") .. " weapon has no " .. name:lower() .. " on it.")
                             or b.kind == "pet" and "Your pet is not out."
+                            or b.kind == "happiness" and "Your pet is not happy and does less damage. Feed it."
                             or ("You don't have " .. name .. " on you.")
-                        list[#list + 1] = { icon = SpellIcon(known), text = name, why = why }
+                        list[#list + 1] = { icon = SpellIcon(known), text = name, why = why, low = low }
                     end
                 end
             end
@@ -182,6 +196,29 @@ local function Missing()
                     list[#list + 1] = { icon = ItemIcon(r.item), text = r.label .. " " .. count,
                         why = ("You carry %d %s. Buy more before you leave town."):format(count, r.label:lower()), low = true }
                 end
+            end
+        end
+    end
+
+    if cfg.raidFood and InRaidInstance() then
+        local raid = data.raid or {}
+        local have = PlayerBuffs()
+        local fed = false
+        for _, id in ipairs(raid.food or {}) do
+            local n = SpellName(id)
+            if n and have[n] then fed = true break end
+        end
+        if not fed then
+            list[#list + 1] = { icon = FOOD_ICON, text = "Food",
+                why = "You are not Well Fed. Eat buff food before the pull." }
+        end
+        for _, f in ipairs(raid.flasks or {}) do
+            local n = SpellName(f.buff)
+            local count = ItemCount(f.item)
+            if n and count and count > 0 and not have[n] then
+                list[#list + 1] = { icon = ItemIcon(f.item), text = "Flask",
+                    why = "You carry " .. n .. " but it is not up." }
+                break
             end
         end
     end
@@ -267,7 +304,7 @@ end
 local function Update()
     if not ns.db then return end
     local cfg = Cfg()
-    if not (cfg.buffs or cfg.reagents or cfg.durability) or Hidden() then
+    if not (cfg.buffs or cfg.reagents or cfg.durability or cfg.raidFood) or Hidden() then
         if row then row:Hide() end
         return
     end
@@ -342,9 +379,10 @@ end
 ns.TryOn("UNIT_AURA", function(_, unit) if unit == "player" then Schedule() end end)
 ns.TryOn("UNIT_INVENTORY_CHANGED", function(_, unit) if unit == "player" then Schedule() end end)
 ns.TryOn("UNIT_PET", function(_, unit) if unit == "player" then Schedule() end end)
+ns.TryOn("UNIT_HAPPINESS", function(_, unit) if unit == "pet" then Schedule() end end)
 for _, event in ipairs({ "BAG_UPDATE_DELAYED", "PLAYER_REGEN_DISABLED", "PLAYER_REGEN_ENABLED", "PLAYER_UPDATE_RESTING",
     "SPELLS_CHANGED", "PLAYER_DEAD", "PLAYER_UNGHOST", "PLAYER_ALIVE", "PLAYER_CONTROL_GAINED", "PLAYER_CONTROL_LOST",
-    "PLAYER_MOUNT_DISPLAY_CHANGED" }) do
+    "PLAYER_MOUNT_DISPLAY_CHANGED", "GROUP_ROSTER_UPDATE", "ZONE_CHANGED_NEW_AREA" }) do
     ns.TryOn(event, Schedule)
 end
 -- Hide right away when combat starts, no delay
@@ -363,7 +401,7 @@ ns.On("PLAYER_ENTERING_WORLD", function()
     if not ticker and C_Timer.NewTicker then
         ticker = C_Timer.NewTicker(10, function()
             local c = ns.db and Cfg()
-            if c and (c.buffs or c.reagents) and not InCombatLockdown() then Schedule() end
+            if c and (c.buffs or c.reagents or c.raidFood) and not InCombatLockdown() then Schedule() end
         end)
     end
 end)
@@ -394,7 +432,8 @@ function R.Entries()
             end
             name = SpellName(known or b.spells[1])
             if name then
-                out[#out + 1] = { key = "b:" .. b.spells[1], name = name, kind = "buff", known = known ~= nil, roles = b.roles }
+                out[#out + 1] = { key = "b:" .. b.spells[1], name = name, kind = "buff", sub = b.kind, known = known ~= nil,
+                    roles = b.roles }
             end
         end
     end

@@ -17,6 +17,8 @@ globals = {
     "MLZUI_OnAddonCompartmentClick", "MLZUI_OnAddonCompartmentEnter", "MLZUI_OnAddonCompartmentLeave",
     -- Blizzard chat tab alphas, set by Fade and restored on undo
     "CHAT_FRAME_TAB_NORMAL_NOMOUSE_ALPHA", "CHAT_FRAME_TAB_SELECTED_NOMOUSE_ALPHA",
+    -- Key Bindings names for Bindings.xml (Modules/Group.lua)
+    "BINDING_HEADER_MLZUI", "BINDING_NAME_MLZUI_PULL",
 }
 
 -- WoW API, frames and constants we read. Add new ones here when luacheck flags them.
@@ -27,7 +29,7 @@ read_globals = {
 
     -- C_ namespaces and tables
     "C_ActionBar", "C_AddOns", "C_Container", "C_CVar", "C_EditMode", "C_EncodingUtil", "C_Item",
-    "C_NamePlate", "C_PetBattles", "C_SpecializationInfo", "C_Spell", "C_Timer", "C_TooltipInfo",
+    "C_NamePlate", "C_PartyInfo", "C_PetBattles", "C_SpecializationInfo", "C_Spell", "C_Timer", "C_TooltipInfo",
     "C_UnitAuras", "Constants", "Enum", "EventRegistry", "Settings", "TooltipDataProcessor",
 
     -- Frames and fonts
@@ -62,10 +64,17 @@ read_globals = {
     "SetRaidTargetIconTexture", "ShowUIPanel", "UnitAffectingCombat", "UnitAura", "UnitBuff",
     "UnitCanAttack", "UnitCastingInfo", "UnitChannelInfo", "UnitClass", "UnitClassification",
     "UnitEffectiveLevel", "UnitExists", "UnitGroupRolesAssigned", "UnitGUID", "UnitHasEffectivelyTankAura",
-    "UnitHealth", "UnitHealthMax", "UnitIsDeadOrGhost", "UnitIsFriend", "UnitIsPlayer", "UnitIsQuestBoss",
+    "UnitHealth", "UnitHealthMax", "UnitIsConnected", "UnitIsDeadOrGhost", "UnitIsFriend", "UnitIsGroupAssistant", "UnitIsGroupLeader", "UnitIsPlayer", "UnitIsQuestBoss",
     "UnitIsTapDenied", "UnitIsUnit", "UnitLevel", "UnitName", "UnitNameplateShowsWidgetsOnly", "UnitOnTaxi",
     "UnitPlayerOrPetInParty", "UnitPlayerOrPetInRaid", "UnitPower", "UnitPowerMax", "UnitPowerType",
     "UnitReaction", "UnitThreatSituation", "UnitXP", "UnitXPMax", "UseContainerItem",
+
+    -- Quests, popups, summons and pets (Modules/Automate.lua, Modules/Reminders.lua)
+    "AcceptQuest", "AcceptResurrect", "C_GossipInfo", "C_SummonInfo", "CancelDuel", "CompleteQuest",
+    "ConfirmLootSlot", "ConfirmSummon", "GetActiveTitle", "GetAvailableTitle", "GetQuestMoneyToGet", "GetNumActiveQuests", "GetNumAvailableQuests",
+    "GetNumQuestChoices", "GetPetHappiness", "GetQuestReward", "GetSummonConfirmSummoner",
+    "GetSummonConfirmTimeLeft", "IsQuestCompletable", "QuestGetAutoAccept", "SelectActiveQuest",
+    "SelectAvailableQuest", "StaticPopup_Hide",
 
     -- Other addons we read settings from (only when they are loaded)
     "AtlasLoot", "AUCTIONATOR_CHARACTER_CONFIG", "AUCTIONATOR_CONFIG", "BAGANATOR_CONFIG",

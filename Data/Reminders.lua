@@ -8,9 +8,12 @@
 --   also   = extra spell IDs that count as "has it" (group versions cast by someone else, Demonic Sacrifice)
 --   roles  = (optional) only for these roles
 --   kind   = "aura" (default), "weapon" (weapon enchant on each hand that holds a weapon: poisons, imbues)
---            or "pet" (no pet out)
+--            or "pet" (no pet out), or "happiness" (hunter pet out but not happy)
 -- reagents: shown when you know `spell` and carry fewer than `min` of `item`.
 --   item = item ID, or "ammo" for the equipped ammo (hunters)
+-- raid: only inside a raid instance, with its own switch (food and flask in raids).
+--   food  = spell IDs whose aura name counts as fed (every "Well Fed" buff shares the name)
+--   flasks = { item, buff }: reminded only when you carry the flask but don't have its buff
 
 local _, ns = ...
 
@@ -34,6 +37,7 @@ ns.data.reminders = {
         { class = "SHAMAN", kind = "weapon", spells = { 8232, 8024, 8033, 8017 } }, -- Windfury, Flametongue, Frostbrand, Rockbiter
         { class = "HUNTER", spells = { 13165, 13163, 5118, 13159, 20043, 13161 } }, -- aspects: Hawk, Monkey, Cheetah, Pack, Wild, Beast
         { class = "HUNTER", kind = "pet", spells = { 883 } },            -- Call Pet
+        { class = "HUNTER", kind = "happiness", spells = { 6991 } },     -- Feed Pet (pet is not happy)
         { class = "ROGUE", kind = "weapon", spells = { 2842 } },         -- Poisons
         { class = "PALADIN", spells = { 19740, 19742, 20217, 1038, 19977, 20911 },  -- any Blessing
           also = { 25782, 25894, 25898, 25895, 25890, 25899 } },         -- or a Greater Blessing
@@ -64,5 +68,25 @@ ns.data.reminders = {
         { class = "PALADIN", spell = 25782, item = 21177, min = 10, label = "Symbol of Kings" }, -- Greater Blessing of Might
         { class = "PALADIN", spell = 19752, item = 17033, min = 1, label = "Symbol of Divinity" }, -- Divine Intervention
         { class = "DRUID", spell = 21849, item = 17021, min = 5, label = "Wild Thornroot" },   -- Gift of the Wild
+    },
+
+    -- Buff check on ready check (Modules/Group.lua): long buffs one class gives the whole group.
+    --   class = who casts it, spells = single-target spell (rank 1, also tells if you know it),
+    --   also = the group version, skip = classes that don't need it
+    groupBuffs = {
+        { class = "PRIEST", label = "Fortitude", spells = { 1243 }, also = { 21562 } },
+        { class = "MAGE", label = "Arcane Intellect", spells = { 1459 }, also = { 23028 },
+          skip = { WARRIOR = true, ROGUE = true } },
+        { class = "DRUID", label = "Mark of the Wild", spells = { 1126 }, also = { 21849 } },
+    },
+
+    raid = {
+        food = { 19705 }, -- Well Fed
+        flasks = {
+            { item = 13510, buff = 17626 }, -- Flask of the Titans
+            { item = 13511, buff = 17627 }, -- Flask of Distilled Wisdom
+            { item = 13512, buff = 17628 }, -- Flask of Supreme Power
+            { item = 13513, buff = 17629 }, -- Flask of Chromatic Resistance
+        },
     },
 }

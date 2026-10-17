@@ -1,0 +1,6 @@
+<Bindings>
+    <!-- Names come from BINDING_HEADER_MLZUI and BINDING_NAME_MLZUI_PULL in Modules/Group.lua -->
+    <Binding name="MLZUI_PULL" header="MLZUI" category="ADDONS">
+        SlashCmdList["MLZUI"]("pull")
+    </Binding>
+</Bindings>

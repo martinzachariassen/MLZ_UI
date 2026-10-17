@@ -36,7 +36,7 @@ These are not up for debate. Breaking one is a bug.
 - 4 spaces, no tabs. Keep lines readable (about 120 characters).
 - File header: `-- MLZ UI: <Area>` followed by 1–4 comment lines on what the file does and where the player finds it.
 - Section banners with `----` lines for long files.
-- `local` everything. The only globals are `MLZUIDB`, `MLZUI`, named font objects (`MLZUI_Font*`) and `MLZUIScanTooltip` (quest scan on clients without `C_TooltipInfo`). `GetMinimapShape` is defined only while the square minimap is on and no other addon has defined it (minimap button libraries read it).
+- `local` everything. The only globals are `MLZUIDB`, `MLZUI`, named font objects (`MLZUI_Font*`) and `MLZUIScanTooltip` (quest scan on clients without `C_TooltipInfo`), plus the Key Bindings names `BINDING_HEADER_MLZUI` and `BINDING_NAME_MLZUI_*` for `Bindings.xml`. `GetMinimapShape` is defined only while the square minimap is on and no other addon has defined it (minimap button libraries read it).
 - Upvalue hot globals at the top (`local GetTime = GetTime`) only where it matters (OnUpdate, frequent events).
 - Comments in English, short, explaining *why*, not *what*.
 - Module tables are PascalCase (`local Tweaks = ns.RegisterModule(...)`), locals are camelCase, constants are UPPER_CASE.

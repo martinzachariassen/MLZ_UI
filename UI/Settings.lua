@@ -217,10 +217,15 @@ SECTIONS[#SECTIONS + 1] = function(Add)
     local names = {}
     if V.Get("repair") then names[#names + 1] = "auto-repair" end
     if V.Get("sell") then names[#names + 1] = "sell greys" end
+    if ns.Automate then
+        for _, n in ipairs(ns.Automate.OnNames()) do names[#names + 1] = n end
+    end
     if MT.IsOn() then names[#names + 1] = "mana tick bar" end
     if ns.Cooking and ns.Cooking.Get() then names[#names + 1] = "cooking tips" end
     if IA.Get() ~= "off" then names[#names + 1] = "interrupt announce" end
+    if ns.Group and ns.Group.Get("buffCheck") then names[#names + 1] = "buff check" end
     if ns.RoleProfiles.Auto() then names[#names + 1] = "role profiles" end
+    if ns.SituationProfiles and ns.SituationProfiles.Auto() then names[#names + 1] = "situation profiles" end
     local R = ns.Reminders
     if R and (R.Get("buffs") or R.Get("reagents")) then names[#names + 1] = "reminders" end
     Add("qol", "Helpers", #names > 0 and "on" or "off", #names > 0 and (#names .. " on") or "Off",
@@ -1278,6 +1283,52 @@ PAGES[#PAGES + 1] = { key = "qol", title = "Helpers", icon = "Interface\\Icons\\
         function() return V.Get("sell") end, function(on) V.Set("sell", on) end,
         { avail = function() if V.LeatrixSells() then return "Leatrix Plus already sells junk" end end })
 
+    local AU = ns.Automate
+    if AU then
+    local function Auto(key, label, desc, tip, extra)
+        p:Toggle(label, desc, function() return AU.Get(key) end, function(on) AU.Set(key, on) end,
+            { tip = tip, avail = function()
+                if AU.LeatrixDoes(key) then return "Leatrix Plus already does this" end
+                if extra then return extra() end
+            end })
+    end
+    p:Card("Fewer clicks", "Answers the popups you always answer the same way. Hold SHIFT to skip once.")
+    Auto("acceptQuests", "Accept quests", "Accepts a quest as soon as you open it at a quest giver.",
+        "Grey quests, quests started from an item and quests shared by other players (escorts included) are left to you.")
+    Auto("turnInQuests", "Turn in quests", "Hands in finished quests. You still pick the reward when there is a choice.",
+        "Works at quest givers with a list of quests too. Quests with more than one reward, "
+            .. "and quests that cost gold, wait for you.")
+    Auto("summon", "Accept summons", "Accepts a summon after 1 second, out of combat only.",
+        "One line in chat says who summoned you.")
+    Auto("resurrect", "Accept resurrection", "Accepts a res unless the player who cast it is still in combat.",
+        "Waiting while the caster fights keeps you from landing back in the fight.")
+    Auto("bopSolo", "Confirm bind on pickup loot when solo", "No popup for soulbound loot while you are not in a group.",
+        "In a group you still confirm it yourself, so you never take an item someone else needs by mistake.")
+    Auto("declineDuels", "Decline duels", "Duel requests are declined without a popup.",
+        "Turn this off when you want to duel a friend.")
+    end
+
+    local G = ns.Group
+    if G then
+    p:Card("Group & raid", "Checks only show in your own chat. Nothing is sent to the group.")
+    p:Toggle("Buff check on ready check", "One line lists who misses a buff you can cast (Fortitude, Arcane Intellect, "
+        .. "Mark of the Wild).", function() return G.Get("buffCheck") end, function(on) G.Set("buffCheck", on) end,
+        { tip = "Dead and offline players are left out. Type /mlz buffs to check at any time." })
+    p:Toggle("All class buffs when I lead", "As leader or raid assistant the line covers every class buff the group "
+        .. "can give, not just yours.", function() return G.Get("leaderAll") end, function(on) G.Set("leaderAll", on) end,
+        { avail = function() if not G.Get("buffCheck") then return "Turn on the buff check first" end end })
+    p:Value("Pull timer key", nil, function()
+        local key = GetBindingKey and GetBindingKey("MLZUI_PULL")
+        return key and (C.blue .. key .. C.r) or (C.grey .. "Not set (Key Bindings > AddOns > MLZ UI)" .. C.r)
+    end)
+    p:Buttons({
+        { text = "Pull in 10", width = 120, fn = function()
+            if G.Pull(10) then S:Notify("Pull timer started: 10 seconds.", "good") end
+        end, avail = G.PullUnavailable,
+          tip = "Starts a 10 second countdown for the group. Type /mlz pull 5 for another length." },
+    })
+    end
+
     -- Warriors only have rage, which does not tick. Druids keep the bar: they still have mana in Bear Form.
     local class = ns.data.classes and ns.data.classes[ns.PlayerClass() or ""] or {}
     local function NoTick() if class.resource == "Rage" and ns.PlayerClass() ~= "DRUID" then return "Warriors use rage, which has no tick" end end
@@ -1352,13 +1403,19 @@ PAGES[#PAGES + 1] = { key = "reminders", title = "Reminders", icon = "Interface\
         { avail = function() if not HasKind("reagent") then return "Nothing to check for your class" end end })
     p:Toggle("Worn gear", ("An icon and one chat line when your most worn item drops to %d%% durability."):format(R.DurabilityLimit()),
         function() return R.Get("durability") end, function(on) R.Set("durability", on) end)
+    p:Toggle("Food and flask in raids", "Inside a raid: an icon when you are not Well Fed, or carry a flask that is not up.",
+        function() return R.Get("raidFood") end, function(on) R.Set("raidFood", on) end,
+        { tip = "Only inside raid instances, never in the open world or in dungeons.\n\n"
+            .. "The flask icon only shows when a flask is in your bags, so you are never told to buy one." })
 
     -- What your class can be reminded about, one switch each. Rows wait until you learn the spell.
     if #entries > 0 then
         p:Card("Reminders for your class", "Turn off the ones you don't want. The two switches above must be on.")
         for _, e in ipairs(entries) do
             local master = e.kind == "buff" and "buffs" or "reagents"
-            local desc = e.kind == "buff" and "Shown when you don't have it on you."
+            local desc = e.sub == "happiness" and "Shown when your pet is out but not happy."
+                or e.sub == "pet" and "Shown when your pet is not out."
+                or e.kind == "buff" and "Shown when you don't have it on you."
                 or ("Shown when you carry fewer than %d."):format(e.min or 1)
             if e.roles then
                 local names = {}
@@ -1490,6 +1547,49 @@ PAGES[#PAGES + 1] = { key = "profiles", title = "Profiles & backup", icon = "Int
             end
         end), avail = NoRoleProfile, tip = "Deletes the saved profile for your role. Click twice to confirm." },
     })
+
+    local SP = ns.SituationProfiles
+    if SP then
+    p:Card("By situation (this character)", "Save faded frames, the quest tracker and threat colors once for solo, dungeon, "
+        .. "raid and battleground. With switching on, the saved one is loaded when you get there, on top of your role profile.")
+    p:Toggle("Switch with where I am", "Only loads a place that has a saved profile. Save a Solo one too, so leaving a "
+        .. "dungeon puts things back.", SP.Auto, SP.SetAuto,
+        { tip = "Checked when you enter a zone or instance, out of combat. One line in chat when something changed." })
+    for _, kind in ipairs(SP.ORDER) do
+        p:Value(SP.TEXT[kind] .. " profile", nil, function()
+            local t = SP.Time(kind)
+            local here = (SP.Current() == kind) and (C.blue .. "  (you are here)" .. C.r) or ""
+            return (t and ("Saved " .. t) or (C.grey .. "Not saved" .. C.r)) .. here
+        end)
+    end
+    local function NoSituation()
+        if not SP.Has(SP.Current()) then return "No saved profile for " .. SP.TEXT[SP.Current()]:lower() end
+    end
+    p:Buttons({
+        { text = "Save for here", width = 140, style = "primary", fn = function()
+            local kind = SP.Current()
+            local replaced = SP.Time(kind)
+            SP.Save(kind)
+            S:Notify("Saved as your " .. SP.TEXT[kind]:lower() .. " profile."
+                .. (replaced and (" Replaced the one from " .. replaced .. ".") or ""), "good")
+        end, tip = "Saves your current fades, quest tracker and threat colors for the kind of place you are in now." },
+        { text = "Load for here", width = 140, fn = function()
+            local kind = SP.Current()
+            local ok, ran = SP.Load(kind)
+            if not ok then S:Notify("No saved profile for " .. SP.TEXT[kind]:lower() .. " yet.", "warn") return end
+            if ran == false then
+                S:Notify("In combat: your " .. SP.TEXT[kind]:lower() .. " profile is loaded when combat ends.", "warn")
+                return
+            end
+            S:Notify("Loaded your " .. SP.TEXT[kind]:lower() .. " profile.", "good")
+        end, avail = NoSituation, tip = "Loads the saved profile for the kind of place you are in now." },
+        { text = "Delete for here", width = 140, style = "subtle", fn = Confirm("Delete for here", function()
+            local kind = SP.Current()
+            SP.Delete(kind)
+            S:Notify("Deleted your " .. SP.TEXT[kind]:lower() .. " profile.", "info")
+        end), avail = NoSituation, tip = "Deletes the saved profile for this kind of place. Click twice to confirm." },
+    })
+    end
 
     p:Card("Share your setup", "Export gives a string with your MLZ UI choices. Import it on another character or computer.")
     p:Buttons({

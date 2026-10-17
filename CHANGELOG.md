@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- New "Fewer clicks" card on Helpers, all off by default: accept and turn in quests, accept summons and
+  resurrections, confirm bind on pickup loot when solo, decline duels. Hold SHIFT to skip once.
+  Options that Leatrix Plus already handles step aside.
+- Reminders: a hunter pet that is not happy, and food and flask inside raids (own switch, off by default).
+- New "Group & raid" card on Helpers: a buff check on ready check lists who misses a buff you can cast
+  (or every class buff when you lead), only in your own chat. `/mlz buffs` checks at any time.
+- Pull timer: `/mlz pull [seconds]` or a key in Key Bindings > AddOns > MLZ UI. Uses the game's countdown
+  when the client has it, otherwise Deadly Boss Mods.
+- Situation profiles on Profiles & backup: save fading, the quest tracker and threat colors for solo,
+  dungeon, raid and battleground. With switching on, the saved one loads when you get there, on top of
+  your role profile.
 - Lint (luacheck and a Lua 5.1 syntax check) runs on every push and pull request.
 - Tagged versions are packaged and published to GitHub Releases, and to CurseForge and Wago when they are set up.
 - MIT license.

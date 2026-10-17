@@ -120,8 +120,10 @@ If the guess is wrong, set your role by hand with `/mlz role`, on the Your role 
 - Class-aware key hints, extra form keys, pet keys, and reminders for all 9 classes
 - Our own flat nameplates: health, cast bar, quest marker, your debuffs and threat colors per role. Platynator is optional
 - Auto-repair, sell greys, a mana tick bar and an interrupt announce
+- Fewer clicks (all off until you turn them on): accept and turn in quests, accept summons and resurrections, confirm bind on pickup loot when solo, decline duels
+- Group and raid: a buff check on ready check (only in your own chat) and a pull timer on `/mlz pull` or a key
 - Cooking uses in item tooltips: meat, fish and spices show which dishes they make, colored by your Cooking skill
-- Reminders for missing self buffs, low reagents and ammo, and worn gear (out of combat only)
+- Reminders for missing self buffs, an unhappy hunter pet, low reagents and ammo, worn gear, and food and flask in raids (out of combat only)
 - XP per hour and time to the next level while leveling
 - Class colored names and a "Target:" line in unit tooltips, and class colored names in chat
 - Optional style: square minimap with a 1px border, flat chat input box, Roboto chat font
@@ -134,7 +136,7 @@ If the guess is wrong, set your role by hand with `/mlz role`, on the Your role 
 **Ecosystem**
 - Recommended settings for 15 addons, many of them per role: a healer and a tank do not get the same Questie, DBM or Details setup
 - Optional: Platynator as the nameplate engine, with modes per role and archetype and a clean style
-- Role profiles, export/import strings and a health check for missing addons
+- Role and situation profiles, export/import strings and a health check for missing addons
 
 ## Quick start
 
@@ -170,6 +172,8 @@ If the guess is wrong, set your role by hand with `/mlz role`, on the Your role 
 | `/mlz fps` | Show or hide the FPS counter |
 | `/mlz quests` · `/mlz tracker` | Hide or show the quest tracker, or only its "All Objectives" line |
 | `/mlz pet save\|reset\|show` | Remember or reset the pet bar position |
+| `/mlz pull [seconds]` | Start a pull timer for the group (10 seconds by default, also on a key in Key Bindings > AddOns) |
+| `/mlz buffs` | List who in your group misses a buff you can cast |
 | `/mlz xp` | XP per hour and time to level (`/mlz xp reset` starts counting again) |
 | `/mlz addons` | Which supported addons are loaded and how many of their settings differ |
 | `/mlz health` | Which supported addons are switched off or not installed |
@@ -214,9 +218,9 @@ Rows that only fit one role or archetype show only for you. Settings that don't 
 | **Minimalism** | Bars 4-5, micro menu, bags, chat buttons and XP bar hidden until hover. Bars 2-3 dimmed out of combat. Damage meter only in a group. |
 | **Action buttons** | Red = out of range, blue = no resource, grey = unusable. Short hotkeys (`S1`, `C1`) and hidden macro names. Stance, pet and bonus bars included. |
 | **Nameplates** | MLZ nameplates (or Platynator). Tank / Healer / DPS / Solo picked from your role. Healer: unclickable friendly names, dimmed enemies. Tank: bigger target, your debuffs on every mob. Quest marker, cast bar, level only when it matters. Applies at once, no `/reload`. |
-| **Helpers** | Auto-repair (guild money first), sell greys (hold Shift to skip), mana tick / 5-second rule bar (energy tick for rogues and cats), interrupt announce. Cooking uses in item tooltips (dish and skill needed, colored by your Cooking skill). Reminder icons for missing self buffs (not in cities), low reagents and ammo, and gear at 25% durability or less. XP per hour and time to level. |
+| **Helpers** | Auto-repair (guild money first), sell greys (hold Shift to skip), fewer clicks (accept and turn in quests, summons, resurrections, BoP loot when solo, decline duels; all off by default, Shift skips once), buff check on ready check and a pull timer, mana tick / 5-second rule bar (energy tick for rogues and cats), interrupt announce. Cooking uses in item tooltips (dish and skill needed, colored by your Cooking skill). Reminder icons for missing self buffs (not in cities), low reagents and ammo, and gear at 25% durability or less. XP per hour and time to level. |
 | **Classes and roles** | All 9 classes. Role is tank, healer or DPS, and DPS is melee, ranged or caster. Defensive Stance, Bear Form and Righteous Fury count as tanking. Data in `Data/Classes.lua`. |
-| **Role profiles** | Nameplates, fading, tick bar and interrupt announce saved per role, loaded automatically when your role changes. |
+| **Role profiles** | Nameplates, fading, tick bar and interrupt announce saved per role, loaded automatically when your role changes. Situation profiles (solo, dungeon, raid, battleground) save fading, the quest tracker and threat colors, and load on top when you get there. |
 | **Tweaks** | Minimap size, FPS counter, calmer combat text (Roboto Bold), hide the quest tracker or its header, class colors and a target line in unit tooltips, class colored names in chat (your old choice per chat type comes back when you turn it off). Style: square minimap with a 1px border (rotation off while square, skipped when Leatrix Plus styles the minimap), flat chat input box, Roboto chat font. |
 | **Backup / undo** | A stack of up to 5 backups. Every wizard run is reversible. |
 | **Health check** | Warns after login if a configured addon is installed but not loaded. |
@@ -234,10 +238,10 @@ Rows that only fit one role or archetype show only for you. Settings that don't 
 | Nameplates | Engine (MLZ, Platynator or off), mode picker with the active mode and why, friendly names, threat colors, PvP tweak, what the plates show, size, Platynator profile save/restore |
 | Minimalism | Pause fading, one switch per faded frame |
 | Bars & interface | Button colors and hotkeys, quest tracker, tooltips, chat (clean chat, class names, flat input, Roboto font), minimap (size, square, minimap button), FPS counter and combat text |
-| Helpers | Repair and sell greys, mana tick bar, cooking tooltips, interrupt announce, XP per hour |
-| Reminders | Missing self buffs, reagents, ammo and durability, with one switch per reminder for your class |
+| Helpers | Repair and sell greys, fewer clicks, group and raid (buff check, pull timer), mana tick bar, cooking tooltips, interrupt announce, XP per hour |
+| Reminders | Missing self buffs, pet happiness, reagents, ammo, durability, and food and flask in raids, with one switch per reminder for your class |
 | Other addons | Which supported addons are loaded and how many settings differ, addons worth a look for your role, list addon problems |
-| Profiles & backup | Role profiles, export/import, backups, undo |
+| Profiles & backup | Role profiles, situation profiles, export/import, backups, undo |
 | About & help | How it works, show me around, commands, debug |
 
 The footer always shows whether a reload is needed and why.
