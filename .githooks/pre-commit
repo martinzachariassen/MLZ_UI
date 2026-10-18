@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# MLZ UI: runs all checks before a commit. Turn on with: git config core.hooksPath .githooks
+# Skip once with: git commit --no-verify
+exec "$(git rev-parse --show-toplevel)/tools/check.sh"

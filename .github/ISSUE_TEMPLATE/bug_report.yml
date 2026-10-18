@@ -1,0 +1,66 @@
+name: Bug report
+description: Something in MLZ UI doesn't work, or shows a Lua error.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. The Lua error text and `/mlz probe` output make most bugs easy to fix.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What did you see, and what did you expect to see?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. /mlz install
+        2. Step 4 Keybinds, pick WASD
+        3. Apply
+    validations:
+      required: true
+  - type: textarea
+    id: error
+    attributes:
+      label: Lua error
+      description: Copy it from BugSack if there is one.
+      render: text
+  - type: input
+    id: version
+    attributes:
+      label: MLZ UI version
+      description: Shown on the About & help page in `/mlz`.
+      placeholder: "0.8.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: client
+    attributes:
+      label: Game client
+      options:
+        - WoW Forever
+        - Other Classic client (not tested)
+    validations:
+      required: true
+  - type: input
+    id: character
+    attributes:
+      label: Class and role
+      placeholder: "Druid, healer"
+  - type: textarea
+    id: addons
+    attributes:
+      label: Other addons
+      description: Addons you have loaded, especially the ones MLZ UI configures (DBM, Questie, Details!, Platynator...).
+  - type: textarea
+    id: probe
+    attributes:
+      label: /mlz probe output
+      description: |
+        Run `/mlz probe`, then `/reload`. Paste the `probe` part of
+        `WTF/Account/<ACCOUNT>/SavedVariables/MLZ_UI.lua`. Most useful for keybind, Edit Mode or CVar bugs.
+      render: lua

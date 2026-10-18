@@ -1,0 +1,229 @@
+/*
+ * MLZ UI mockup theme.
+ * Mirrors W.T in UI/Widgets.lua 1:1. If the theme changes in Lua, change it here too
+ * and re-render the screenshots (see CLAUDE.md > Screenshots).
+ */
+
+@font-face {
+    font-family: "Roboto MLZ";
+    src: url("../../Media/Roboto-Bold.ttf") format("truetype");
+    font-weight: 700;
+}
+
+:root {
+    /* W.T */
+    --bg:     rgba(18, 20, 24, 0.97);   /* 0.071, 0.078, 0.094, 0.97 */
+    --panel:  #191c22;                  /* 0.098, 0.110, 0.133 */
+    --card:   #20242b;                  /* 0.125, 0.141, 0.169 */
+    --hover:  #2a2f38;                  /* 0.165, 0.184, 0.220 */
+    --border: #313640;                  /* 0.192, 0.212, 0.251 */
+    --accent: #33a0ff;                  /* 0.200, 0.627, 1.000 */
+    --accent-tint: rgba(51, 160, 255, 0.10); /* accentTint: hover and highlight wash */
+    --green:  #4ad173;                  /* 0.290, 0.820, 0.450 */
+    --amber:  #ffb040;                  /* 1.000, 0.690, 0.250 */
+    --red:    #ff5c5c;                  /* 1.000, 0.360, 0.360 */
+    --off:    #4d525c;                  /* 0.300, 0.320, 0.360 */
+    --text:   #edf0f5;                  /* 0.930, 0.940, 0.960 */
+    --muted:  #949ba8;                  /* 0.580, 0.610, 0.660, same as W.C.grey */
+    --gold:   #ffd100;                  /* W.C.gold */
+    --well:   #0f1216;                  /* 0.06, 0.07, 0.085: inputs, segmented, slider track */
+    --well-edge: #525969;               /* inputEdge */
+    --shade:  rgba(255, 255, 255, 0.04); /* soft hover on rows and list items */
+    --press:  rgba(255, 255, 255, 0.08); /* stronger hover on small controls */
+    --white:  #ffffff;                  /* text on accent fills */
+
+    /* W.T controls */
+    --btn:           #2b303b;           /* 0.170, 0.190, 0.230 */
+    --btn-hover:     #38404d;           /* 0.220, 0.250, 0.300 */
+    --primary:       #2173c7;           /* 0.130, 0.450, 0.780 */
+    --primary-hover: #2e8ae6;           /* 0.180, 0.540, 0.900 */
+    --primary-edge:  #4099f2;           /* 0.250, 0.600, 0.950 */
+    --danger:        #6b2424;           /* 0.420, 0.140, 0.140 */
+    --danger-hover:  #8c2e2e;           /* 0.550, 0.180, 0.180 */
+    --danger-edge:   #a64040;           /* 0.650, 0.250, 0.250 */
+    --danger-text:   #ffe6e6;           /* 1.000, 0.900, 0.900 */
+    --knob:          #f2f5fa;           /* 0.950, 0.960, 0.980 */
+    --on-text:       #0d331a;           /* 0.050, 0.200, 0.100 */
+    --off-text:      #b3b8c2;           /* 0.700, 0.720, 0.760 */
+    --edge:          rgba(0, 0, 0, 0.35);
+    --thumb:         rgba(102, 112, 128, 0.9);
+    --close-hover:   rgba(255, 77, 77, 0.15);
+
+    --head: "Roboto MLZ", "Roboto", "Helvetica Neue", Arial, sans-serif;
+    --body: "Helvetica Neue", Arial, sans-serif;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+    background: #07080a;
+    color: var(--text);
+    font-family: var(--body);
+    font-size: 13px;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* Product-shot backdrop: a dim, blurred "game world" so the window reads as in-game */
+.stage {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    background:
+        radial-gradient(ellipse 60% 50% at 20% 25%, rgba(51, 160, 255, 0.16), transparent 70%),
+        radial-gradient(ellipse 50% 45% at 85% 80%, rgba(74, 209, 115, 0.10), transparent 70%),
+        radial-gradient(ellipse 70% 60% at 60% 10%, rgba(255, 176, 64, 0.07), transparent 70%),
+        linear-gradient(160deg, #10141b 0%, #0a0c10 55%, #07080a 100%);
+}
+.stage::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image: radial-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+    background-size: 4px 4px;
+    pointer-events: none;
+}
+
+/* Text helpers (W.Text font objects) */
+.f-title  { font: 700 20px/1.2 var(--head); text-shadow: 1px 1px 0 rgba(0,0,0,.7); }
+.f-head   { font: 700 14px/1.2 var(--head); text-shadow: 1px 1px 0 rgba(0,0,0,.7); }
+.f-button { font: 700 12px/1.2 var(--head); text-shadow: 1px 1px 0 rgba(0,0,0,.7); }
+.f-sbold  { font: 700 11px/1.2 var(--head); text-shadow: 1px 1px 0 rgba(0,0,0,.7); }
+.f-body   { font: 400 13px/1.35 var(--body); }
+.f-small  { font: 400 11px/1.4 var(--body); }
+.muted  { color: var(--muted); }
+.accent { color: var(--accent); }
+.green  { color: var(--green); }
+.amber  { color: var(--amber); }
+.red    { color: var(--red); }
+.gold   { color: var(--gold); }
+.white  { color: #fff; }
+
+/* W.Window */
+.window {
+    position: relative;
+    z-index: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(0, 0, 0, 0.4);
+    display: flex;
+    flex-direction: column;
+}
+.titlebar {
+    height: 36px;
+    flex: none;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding-left: 10px;
+    gap: 8px;
+}
+.titlebar .ver { font-size: 11px; color: #7f7f7f; margin-left: 0; padding-top: 2px; }
+.titlebar .close {
+    margin-left: auto;
+    width: 36px; height: 36px;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--muted);
+}
+
+/* Gear icon (stands in for INV_Misc_Gear_01) */
+.gear {
+    width: 20px; height: 20px;
+    border-radius: 2px;
+    background: linear-gradient(145deg, #5a6170, #2a2e36);
+    border: 1px solid #0b0c0e;
+    display: flex; align-items: center; justify-content: center;
+}
+.gear svg { width: 14px; height: 14px; }
+
+/* W.Card */
+.card { background: var(--card); border: 1px solid var(--border); }
+
+/* W.Button */
+.btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    height: 24px; padding: 0 14px;              /* W.BUTTON_H */
+    background: var(--btn); border: 1px solid var(--border);
+    color: var(--text);
+    font: 700 12px/1 var(--head); text-shadow: 1px 1px 0 rgba(0,0,0,.7);
+    white-space: nowrap;
+}
+.btn.primary { background: var(--primary); border-color: var(--primary-edge); color: #fff; }
+.btn.danger  { background: var(--danger); border-color: var(--danger-edge); color: var(--danger-text); }
+.btn.subtle  { background: transparent; border-color: transparent; color: var(--muted); }
+.btn.lg { height: 28px; }                       /* W.BUTTON_H_LARGE: footer and banner */
+
+/* W.Toggle: 48x20 */
+.toggle {
+    position: relative;
+    width: 48px; height: 20px; flex: none;
+    background: var(--off);
+    border: 1px solid var(--edge);
+}
+.toggle::before {
+    content: ""; position: absolute; top: 1px; left: 1px;
+    width: 16px; height: 16px; background: var(--knob);
+}
+.toggle::after {
+    content: "OFF"; position: absolute; right: 4px; top: 3px;
+    font: 700 11px/1 var(--head); color: var(--off-text);
+}
+.toggle.on { background: var(--green); }
+.toggle.on::before { left: auto; right: 1px; }
+.toggle.on::after { content: "ON"; right: auto; left: 4px; color: var(--on-text); }
+
+/* W.Segmented */
+.seg {
+    display: inline-flex; height: 22px; flex: none;
+    background: var(--well); border: 1px solid var(--border);
+}
+.seg span {
+    display: flex; align-items: center; justify-content: center;
+    border-left: 1px solid var(--border);
+    font: 700 12px/1 var(--head); color: var(--muted);
+    text-shadow: 1px 1px 0 rgba(0,0,0,.7);
+}
+.seg span:first-child { border-left: 0; }
+.seg span.sel { background: var(--accent); color: #fff; margin: 1px; border-left-color: transparent; }
+
+/* W.Stepper */
+.stepper {
+    display: inline-flex; align-items: center; justify-content: space-between;
+    height: 22px; background: var(--well); border: 1px solid var(--border);
+    font: 700 12px/1 var(--head);
+}
+.stepper b { width: 22px; text-align: center; color: var(--accent); font: 700 14px/1 var(--head); }
+
+/* W.Badge */
+.badge { display: inline-flex; align-items: center; gap: 6px; font: 700 11px/1 var(--head); text-shadow: 1px 1px 0 rgba(0,0,0,.7); white-space: nowrap; }
+.badge i { width: 8px; height: 8px; display: inline-block; background: currentColor; }
+.badge.on   { color: var(--green); }
+.badge.warn { color: var(--amber); }
+.badge.bad  { color: var(--red); }
+.badge.off  { color: var(--muted); }
+.badge.off i, .badge.na i { background: var(--off); }
+.badge.na   { color: var(--muted); }
+.badge.info { color: var(--accent); }
+
+/* W.Check */
+.check { width: 16px; height: 16px; flex: none; background: var(--well); border: 1px solid var(--well-edge); position: relative; }
+.check.on::after { content: ""; position: absolute; inset: 3px; background: var(--accent); }
+.check.dis { border-color: var(--border); }
+.check.dis.on::after { background: var(--off); }
+
+/* GameTooltip (Blizzard look, simplified) */
+.tooltip {
+    position: absolute; z-index: 5;
+    background: rgba(8, 8, 12, 0.94);
+    border: 1px solid #5c5c66;
+    border-radius: 4px;
+    box-shadow: 0 0 0 1px rgba(0,0,0,.6), 0 10px 30px rgba(0,0,0,.5);
+    padding: 9px 11px;
+    font: 400 12px/1.45 var(--body);
+    color: #ccc;
+}
+.tooltip .tt-title { color: #fff; font-size: 14px; margin-bottom: 2px; }
+.tooltip .tt-row { display: flex; justify-content: space-between; gap: 28px; }
+.tooltip .tt-row span:first-child { color: #d9dbe0; }

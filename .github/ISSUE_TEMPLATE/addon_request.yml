@@ -1,0 +1,37 @@
+name: Addon settings request
+description: Ask MLZ UI to set up another addon, or change what it sets for one it already supports.
+labels: ["enhancement", "addon"]
+body:
+  - type: input
+    id: addon
+    attributes:
+      label: Addon
+      description: Name and a link (CurseForge, Wago or GitHub).
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Addon version
+      description: The version you have installed.
+  - type: textarea
+    id: settings
+    attributes:
+      label: Settings
+      description: Which settings should MLZ UI suggest, and why? Saved variable names help if you know them.
+      placeholder: |
+        Hide the minimap button (MyAddonDB.minimap.hide = true): one less button around the minimap.
+    validations:
+      required: true
+  - type: dropdown
+    id: roles
+    attributes:
+      label: Who is it for
+      multiple: true
+      options:
+        - Everyone
+        - Tank
+        - Healer
+        - Melee DPS
+        - Ranged DPS
+        - Caster DPS

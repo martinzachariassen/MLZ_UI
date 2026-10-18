@@ -1,0 +1,104 @@
+<!doctype html>
+<!-- Mockup of the minimap button: tooltip summary + right-click quick menu (UI/MinimapButton.lua).
+     Render: see CLAUDE.md > Screenshots -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>MLZ UI - Minimap button</title>
+<link rel="stylesheet" href="theme.css">
+<script src="icons.js"></script>
+<style>
+    html, body { width: 1000px; height: 620px; }
+    .stage { width: 1000px; height: 620px; }
+
+    /* Minimap (top right), stands in for the Blizzard minimap */
+    .minimap {
+        position: absolute; right: 60px; top: 50px; z-index: 1;
+        width: 190px; height: 190px; border-radius: 50%;
+        background:
+            radial-gradient(circle at 40% 35%, rgba(120, 150, 90, .55), transparent 55%),
+            radial-gradient(circle at 70% 70%, rgba(70, 110, 140, .55), transparent 50%),
+            radial-gradient(circle, #3d4a35 0%, #263022 70%);
+        border: 4px solid #6b5a3a;
+        box-shadow: 0 0 0 2px #1c160c, 0 10px 40px rgba(0,0,0,.6);
+    }
+    .minimap::after { content: ""; position: absolute; left: 50%; top: 50%; width: 0; height: 0;
+        border: 6px solid transparent; border-bottom: 12px solid #fff; transform: translate(-50%, -70%); }
+    .mm-btn {
+        position: absolute; z-index: 2; right: 230px; top: 168px;
+        width: 32px; height: 32px; border-radius: 50%;
+        background: #1a1d22; border: 2px solid #8a7444;
+        display: flex; align-items: center; justify-content: center;
+        box-shadow: 0 2px 6px rgba(0,0,0,.6), 0 0 0 3px rgba(51,160,255,.35);
+    }
+    .mm-btn svg { width: 18px; height: 18px; }
+
+    /* Quick menu: 230 wide, W.T.bg, 1px border */
+    .menu {
+        position: absolute; z-index: 3; right: 254px; top: 192px;
+        width: 230px; padding: 8px 4px 6px;
+        background: var(--bg); border: 1px solid var(--border);
+        box-shadow: 0 20px 50px rgba(0,0,0,.6);
+    }
+    .menu .hdr { padding: 4px 8px 0; height: 22px; color: var(--muted); }
+    .menu .div { height: 1px; background: var(--border); margin: 4px 4px 4px; }
+    .menu .item { height: 22px; display: flex; align-items: center; padding-left: 26px; position: relative; color: var(--text); }
+    .menu .item.mk::before { content: ""; position: absolute; left: 10px; width: 8px; height: 8px; background: var(--off); }
+    .menu .item.mk { color: var(--muted); }
+    .menu .item.mk.on::before { background: var(--accent); }
+    .menu .item.mk.on { color: var(--text); }
+    .menu .item.hov { background: rgba(255,255,255,.07); }
+
+    /* Tooltip with the live summary */
+    .tip { left: 110px; top: 190px; width: 330px; }
+    .tip .sp { height: 10px; }
+</style>
+</head>
+<body>
+<div class="stage">
+    <div class="minimap"></div>
+    <div class="mm-btn" data-gear></div>
+
+    <div class="tooltip tip">
+        <div class="tt-title">MLZ UI&nbsp; <span style="color:#8a909a">v0.8.0</span></div>
+        <div class="tt-row"><span>UI scale</span><span class="green">0.71</span></div>
+        <div class="tt-row"><span>Screen layout</span><span class="green">Active</span></div>
+        <div class="tt-row"><span>Your role</span><span class="green">Healer</span></div>
+        <div class="tt-row"><span>Nameplates</span><span class="green">Healer</span></div>
+        <div class="tt-row"><span>Minimalism</span><span class="green">7 of 9</span></div>
+        <div class="tt-row"><span>Action buttons</span><span class="green">5 of 5</span></div>
+        <div class="tt-row"><span>Interface</span><span class="green">2 on</span></div>
+        <div class="tt-row"><span>Helpers</span><span class="green">4 on</span></div>
+        <div class="tt-row"><span>Other addons</span><span class="amber">7 of 16</span></div>
+        <div class="sp"></div>
+        <div class="tt-row"><span class="muted">Left-click</span><span>Settings</span></div>
+        <div class="tt-row"><span class="muted">Right-click</span><span>Quick menu</span></div>
+        <div class="tt-row"><span class="muted">Drag</span><span>Move</span></div>
+    </div>
+
+    <div class="menu f-body">
+        <div class="hdr f-sbold">NAMEPLATES</div>
+        <div class="item mk on">Auto (follow role)</div>
+        <div class="item mk">Tank</div>
+        <div class="item mk">Healer</div>
+        <div class="item mk">DPS</div>
+        <div class="item mk">Solo</div>
+        <div class="div"></div>
+        <div class="hdr f-sbold">MY ROLE</div>
+        <div class="item mk on">Auto (from talents)</div>
+        <div class="item mk">Tank</div>
+        <div class="item mk hov">Healer</div>
+        <div class="item mk">DPS</div>
+        <div class="div"></div>
+        <div class="item mk">Pause fading</div>
+        <div class="item mk on">FPS counter</div>
+        <div class="div"></div>
+        <div class="item">Open settings</div>
+        <div class="item">Setup wizard</div>
+        <div class="item">My keybinds</div>
+        <div class="item">Show me around</div>
+        <div class="item">Reload UI</div>
+    </div>
+</div>
+</body>
+</html>

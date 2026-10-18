@@ -1,0 +1,41 @@
+name: Checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    # Required status check on main (ruleset "main-protection-solo"). Keep the name stable.
+    name: checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install Lua 5.1
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq lua5.1
+
+      - name: Syntax check (Lua 5.1)
+        run: git ls-files '*.lua' | xargs -n 1 luac5.1 -p
+
+      - name: Luacheck
+        uses: lunarmodules/luacheck@cc089e3f65acdd1ef8716cc73a3eca24a6b845e4 # v1.2.0
+
+      - name: Repo rules
+        run: lua5.1 tools/check.lua
+
+      - name: Load test
+        run: lua5.1 tests/load.lua

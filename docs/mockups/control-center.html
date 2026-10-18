@@ -1,0 +1,75 @@
+<!doctype html>
+<!-- Mockup of the control center, Overview page (UI/Settings.lua). Render: see CLAUDE.md > Screenshots -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>MLZ UI - Control center</title>
+<link rel="stylesheet" href="theme.css">
+<link rel="stylesheet" href="control-center.css">
+<script src="icons.js"></script>
+<style>
+    html, body { width: 1100px; height: 720px; }
+    .stage { width: 1100px; height: 720px; }
+</style>
+</head>
+<body>
+<div class="stage">
+<div class="window cc">
+    <div class="titlebar">
+        <div class="gear" data-gear></div>
+        <span class="f-head">MLZ UI</span><span class="ver">v0.8.0</span>
+        <div class="close f-head">X</div>
+    </div>
+
+    <div class="cc-body">
+        <nav class="sidebar">
+            <div class="side-search">Search settings</div>
+            <div class="side-btn sel"><span data-icon="overview"></span>Overview</div>
+            <div class="side-btn"><span data-icon="healer"></span>Your role</div>
+            <div class="side-btn"><span data-icon="layout"></span>Layout &amp; scale</div>
+            <div class="side-btn"><span data-icon="nameplates"></span>Nameplates</div>
+            <div class="side-btn"><span data-icon="fade"></span>Minimalism</div>
+            <div class="side-btn"><span data-icon="buttons"></span>Bars &amp; interface</div>
+            <div class="side-btn"><span data-icon="qol"></span>Helpers</div>
+            <div class="side-btn"><span data-icon="reminders"></span>Reminders</div>
+            <div class="side-btn"><span data-icon="addons"></span>Other addons</div>
+            <div class="side-gap"></div>
+            <div class="side-btn"><span data-icon="profiles"></span>Profiles &amp; backup</div>
+            <div class="side-btn"><span data-icon="about"></span>About &amp; help</div>
+        </nav>
+
+        <main class="page">
+            <div class="page-inner">
+                <div class="f-title page-title">Overview</div>
+                <div class="f-body muted page-sub">Everything MLZ UI looks after. Click a line to change it.</div>
+
+                <div class="card slist">
+                    <div class="sline on"><span class="f-button ttl">UI scale</span><span class="f-small txt">Auto (recommended)</span><span class="badge on"><i></i>0.71</span><span class="f-sbold open">Open &gt;</span></div>
+                    <div class="sline on"><span class="f-button ttl">Screen layout</span><span class="f-small txt">MLZ UI</span><span class="badge on"><i></i>Active</span><span class="f-sbold open">Open &gt;</span></div>
+                    <div class="sline on"><span class="f-button ttl">Your role</span><span class="f-small txt">Druid: Healer (talents). Layout: MLZ UI Heal Dungeon</span><span class="badge on"><i></i>Healer</span><span class="f-sbold open">Open &gt;</span></div>
+                    <div class="sline on hover"><span class="f-button ttl">Nameplates</span><span class="f-small txt">MLZ, Auto: from talents</span><span class="badge on"><i></i>Healer</span><span class="f-sbold open">Open &gt;</span></div>
+                    <div class="sline on"><span class="f-button ttl">Minimalism</span><span class="f-small txt">7 of 9 frames hidden until needed, clean chat</span><span class="badge on"><i></i>7 of 9</span><span class="f-sbold open">Open &gt;</span></div>
+                    <div class="sline on"><span class="f-button ttl">Action buttons</span><span class="f-small txt">On: range, mana, unusable, short keys, no macro names</span><span class="badge on"><i></i>5 of 5</span><span class="f-sbold open">Open &gt;</span></div>
+                    <div class="sline on"><span class="f-button ttl">Interface</span><span class="f-small txt">On: no tracker header, FPS counter. Minimap 120%</span><span class="badge on"><i></i>2 on</span><span class="f-sbold open">Open &gt;</span></div>
+                    <div class="sline on"><span class="f-button ttl">Helpers</span><span class="f-small txt">On: auto-repair, sell greys, mana tick bar, interrupt announce</span><span class="badge on"><i></i>4 on</span><span class="f-sbold open">Open &gt;</span></div>
+                    <div class="sline warn"><span class="f-button ttl">Other addons</span><span class="f-small txt">7 loaded, 1 set up differently than MLZ UI suggests</span><span class="badge warn"><i></i>7 of 16</span><span class="f-sbold open">Open &gt;</span></div>
+                </div>
+                <div class="card tipcard">
+                    <div class="tip-body"><div class="f-sbold">TIP</div><div class="f-body">See every key you have bound, with the SHIFT, CTRL and ALT layers.</div></div>
+                    <span class="btn" style="width:108px">Show my keys</span>
+                    <span class="btn subtle" style="width:72px">Next tip</span>
+                </div>
+            </div>
+                    </main>
+    </div>
+
+    <div class="footer">
+        <span class="dot"></span>
+        <span class="f-body msg">All changes are applied.</span>
+        <span class="btn" style="width:130px">Setup wizard</span>
+        <span class="btn" style="width:110px">Reload UI</span>
+    </div>
+</div>
+</div>
+</body>
+</html>
