@@ -1,6 +1,7 @@
 -- MLZ UI: MLZ nameplates (our own engine)
 -- Flat, calm nameplates drawn on our own frames: health bar, name, level when it matters, cast bar,
--- quest marker, raid marker, your own debuffs and threat colors per role. Modules/Nameplates.lua
+-- quest marker, raid marker, your own debuffs, crowd control from anyone, an execute range strip
+-- and threat colors per role. Modules/Nameplates.lua
 -- decides the mode and calls Plates.Configure; this file only draws. Values: Data/Nameplates.lua.
 --
 -- Taint safety: Blizzard's own plate (nameplate.UnitFrame) is only made invisible with SetAlpha(0)
@@ -34,7 +35,7 @@ local active = false
 local lastError
 local cfg = {
     mode = "solo", pvp = false, threat = false, friends = true, size = 1,
-    show = { healthText = true, castBar = true, quest = true, debuffs = true, level = true },
+    show = { healthText = true, castBar = true, quest = true, debuffs = true, level = true, execute = true, cc = true },
 }
 
 local frames = {}    -- [nameplate] = our frame (kept for reuse)
@@ -43,6 +44,8 @@ local casting = {}   -- [our frame] = true while a cast bar runs
 local hidden = setmetatable({}, { __mode = "k" }) -- Blizzard UnitFrames we made invisible
 local hooked = setmetatable({}, { __mode = "k" })
 local questCache = {} -- [guid] = true/false
+local execPct        -- health fraction where your execute spell works, nil if your class has none or doesn't know it
+local ccNames        -- [spell name] = true for crowd control worth showing (built on first use, every rank matches)
 local Wake -- starts the OnUpdate (cast bars, debuff timers); set once the event frame exists
 
 ------------------------------------------------------------------------
@@ -168,6 +171,16 @@ local function Build(plate)
     f.strip:SetPoint("BOTTOMRIGHT", f.health, "BOTTOMLEFT", -3, -1)
     f.strip:Hide()
 
+    -- execute range: an amber strip on the right, mirroring the target strip
+    f.exec = f:CreateTexture(nil, "ARTWORK")
+    f.exec:SetTexture(TEX)
+    f.exec:SetWidth(3)
+    f.exec:SetPoint("TOPLEFT", f.health, "TOPRIGHT", 3, 1)
+    f.exec:SetPoint("BOTTOMLEFT", f.health, "BOTTOMRIGHT", 3, -1)
+    local amber = Theme("amber", { 1, 0.69, 0.25 })
+    f.exec:SetVertexColor(amber[1], amber[2], amber[3])
+    f.exec:Hide()
+
     f.name = f:CreateFontString(nil, "OVERLAY")
     Font(f.name, d.nameSize)
     f.name:SetPoint("BOTTOM", f.health, "TOP", 0, 4)
@@ -178,7 +191,7 @@ local function Build(plate)
     Font(f.quest, d.nameSize + 3)
     f.quest:SetText("!")
     f.quest:SetTextColor(unpack(C().quest))
-    f.quest:SetPoint("LEFT", f.health, "RIGHT", 4, 0)
+    f.quest:SetPoint("LEFT", f.health, "RIGHT", 8, 0)
     f.quest:Hide()
 
     f.raid = f:CreateTexture(nil, "OVERLAY")
@@ -208,6 +221,12 @@ local function Build(plate)
         end
         f.auras[i] = a
     end
+
+    -- crowd control from anyone, left of the raid mark, so nobody breaks it
+    f.cc = MakeAura(f)
+    f.cc:SetSize(d.iconSize, d.iconSize)
+    f.cc.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    f.cc:SetPoint("RIGHT", f.health, "LEFT", -28, 0)
 
     f:Hide()
     frames[plate] = f
@@ -376,6 +395,8 @@ local function UpdateHealth(f)
     else
         f.healthText:Hide()
     end
+    f.exec:SetShown(cfg.show.execute and execPct and cur > 0 and cur / max <= execPct
+        and UnitCanAttack and UnitCanAttack("player", unit) and true or false)
 end
 
 local function UpdateColor(f)
@@ -417,17 +438,69 @@ local function UpdateQuest(f)
     f.quest:SetShown(cfg.show.quest and not f.nameOnly and IsQuestUnit(f.unit))
 end
 
--- Returns name, icon, count, duration, expires of your own debuff number i, or nil
-local function OwnDebuff(unit, i)
+-- Returns name, icon, count, duration, expires of aura number i for the filter, or nil
+local function AuraAt(unit, i, filter)
     if C_UnitAuras and C_UnitAuras.GetAuraDataByIndex then
-        local a = C_UnitAuras.GetAuraDataByIndex(unit, i, "HARMFUL|PLAYER")
+        local a = C_UnitAuras.GetAuraDataByIndex(unit, i, filter)
         if not a then return nil end
         return a.name, a.icon, a.applications, a.duration, a.expirationTime
     end
     if UnitAura then
-        local name, icon, count, _, duration, expires = UnitAura(unit, i, "HARMFUL|PLAYER")
+        local name, icon, count, _, duration, expires = UnitAura(unit, i, filter)
         return name, icon, count, duration, expires
     end
+end
+
+local function SpellName(id)
+    if C_Spell and C_Spell.GetSpellName then return C_Spell.GetSpellName(id) end
+    return GetSpellInfo and (GetSpellInfo(id))
+end
+
+-- Names, not ids: every rank of a spell has its own id but the same name
+local function CCNames()
+    if ccNames then return ccNames end
+    ccNames = {}
+    for _, id in ipairs(D().cc or {}) do
+        local ok, name = pcall(SpellName, id)
+        if ok and name then ccNames[name] = true end
+    end
+    return ccNames
+end
+
+-- Returns icon, duration, expires of the first crowd control on the unit, or nil
+local function CCAura(unit)
+    local names = CCNames()
+    if not next(names) then return nil end
+    for i = 1, 40 do
+        local name, icon, _, duration, expires = AuraAt(unit, i, "HARMFUL")
+        if not name then return nil end
+        if names[name] then return icon, duration, expires end
+    end
+end
+
+local function SetTimer(a, duration, expires)
+    a.expires = (duration and duration > 0) and expires or nil
+    a.time:SetText("")
+end
+
+-- Your class's execute spell, if you know it (any rank). Asked again when your spells change.
+local function UpdateExecute()
+    execPct = nil
+    local class = select(2, UnitClass("player"))
+    local data = class and ns.data.classes[class]
+    local ex = data and data.execute
+    if not ex then return end
+    local name = SpellName(ex.spell)
+    local known = (IsSpellKnown and IsSpellKnown(ex.spell)) or (IsPlayerSpell and IsPlayerSpell(ex.spell))
+    -- GetSpellInfo(name) only answers for spells in your spellbook, so every rank counts
+    if not known and name and GetSpellInfo then known = GetSpellInfo(name) ~= nil end
+    if known then execPct = ex.pct or 0.2 end
+end
+
+function Plates.ExecuteSpell()
+    local class = select(2, UnitClass("player"))
+    local ex = class and ns.data.classes[class] and ns.data.classes[class].execute
+    return ex and SpellName(ex.spell) or nil
 end
 
 local function UpdateAuras(f)
@@ -436,21 +509,30 @@ local function UpdateAuras(f)
     local n = 0
     if want then
         for i = 1, 40 do
-            local name, icon, count, duration, expires = OwnDebuff(f.unit, i)
+            local name, icon, count, duration, expires = AuraAt(f.unit, i, "HARMFUL|PLAYER")
             if not name then break end
             n = n + 1
             local a = f.auras[n]
             a.icon:SetTexture(icon)
             a.count:SetText((count and count > 1) and count or "")
-            a.expires = (duration and duration > 0) and expires or nil
-            a.time:SetText("")
+            SetTimer(a, duration, expires)
             a:Show()
             if n >= #f.auras then break end
         end
     end
     for i = n + 1, #f.auras do f.auras[i]:Hide() end
-    f.hasTimers = n > 0
-    if n > 0 and Wake then Wake() end
+    -- crowd control shows on every enemy plate, not only your target
+    local ccIcon, ccDuration, ccExpires
+    if cfg.show.cc and not f.nameOnly then ccIcon, ccDuration, ccExpires = CCAura(f.unit) end
+    if ccIcon then
+        f.cc.icon:SetTexture(ccIcon)
+        SetTimer(f.cc, ccDuration, ccExpires)
+        f.cc:Show()
+    else
+        f.cc:Hide()
+    end
+    f.hasTimers = n > 0 or ccIcon ~= nil
+    if f.hasTimers and Wake then Wake() end
 end
 
 -- Cast info works across client versions: the "can't interrupt" flag is the first boolean after
@@ -489,6 +571,7 @@ local function UpdateAll(f)
     if not f.unit then return end
     f.nameOnly = IsFriendly(f.unit)
     f.health:SetShown(not f.nameOnly)
+    if f.nameOnly then f.exec:Hide() end
     UpdateTarget(f)
     UpdateName(f)
     if not f.nameOnly then
@@ -563,6 +646,15 @@ local function QuestChanged()
     end)
 end
 
+-- Execute range depends on what you know: check at login and whenever your spells change
+local function ExecuteChanged()
+    UpdateExecute()
+    if active then ForEach(function(f) if not f.nameOnly then UpdateHealth(f) end end) end
+end
+ns.On("PLAYER_LOGIN", ExecuteChanged)
+ns.TryOn("SPELLS_CHANGED", ExecuteChanged)
+ns.TryOn("LEARNED_SPELL_IN_TAB", ExecuteChanged)
+
 -- A long grind without quest events would keep every mob GUID: start fresh after each loading screen
 ns.On("PLAYER_ENTERING_WORLD", function() wipe(questCache) end)
 
@@ -617,6 +709,20 @@ end)
 -- One OnUpdate for cast bars (every frame) and debuff timers (4 times a second).
 -- It stops itself when nothing is casting and no plate has a timer; Wake starts it again.
 local auraClock = 0
+local function TickTimer(a, now)
+    if not (a:IsShown() and a.expires) then return end
+    local left = a.expires - now
+    if left <= 0 then
+        a.time:SetText("")
+    elseif left < 10 then
+        a.time:SetFormattedText("%.0f", math.ceil(left))
+    elseif left < 60 then
+        a.time:SetFormattedText("%d", left)
+    else
+        a.time:SetFormattedText("%dm", math.ceil(left / 60))
+    end
+end
+
 Wake = function()
     if active and not events:IsShown() then events:Show() end
 end
@@ -640,20 +746,8 @@ events:SetScript("OnUpdate", function(self, elapsed)
     for _, f in pairs(byUnit) do
         if f.hasTimers then
             timers = true
-            for _, a in ipairs(f.auras) do
-                if a:IsShown() and a.expires then
-                    local left = a.expires - now
-                    if left <= 0 then
-                        a.time:SetText("")
-                    elseif left < 10 then
-                        a.time:SetFormattedText("%.0f", math.ceil(left))
-                    elseif left < 60 then
-                        a.time:SetFormattedText("%d", left)
-                    else
-                        a.time:SetFormattedText("%dm", math.ceil(left / 60))
-                    end
-                end
-            end
+            for _, a in ipairs(f.auras) do TickTimer(a, now) end
+            TickTimer(f.cc, now)
         end
     end
     if not timers and not next(casting) then self:Hide() end

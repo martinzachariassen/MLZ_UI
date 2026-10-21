@@ -12,7 +12,8 @@ local MAX_BACKUPS = 5
 -- Order the wizard applies modules in (UI/Installer.lua); undo goes the other way
 Backup.APPLY_ORDER = { "role", "scale", "settings", "layout", "bindings", "fade", "actionbuttons", "tweaks", "addons", "nameplates" }
 
--- selections = { { mod = <module>, items = {...} }, ... }; kind = "import" for profile imports.
+-- selections = { { mod = <module>, items = {...} }, ... }
+-- kind = "import" for profile imports, "preset" for ready-made setups.
 -- Returns the entry, or nil plus the title of the module that failed (the caller tells the player).
 function Backup:Create(selections, kind)
     local entry = { time = date("%Y-%m-%d %H:%M:%S"), data = {}, kind = kind }
@@ -81,7 +82,7 @@ function Backup:Undo(quiet)
             return
         end
         -- Undoing an import only gives back your old choices; the setup itself is still in place
-        if #list == 0 and entry.kind ~= "import" then ns.db.installed = false end
+        if #list == 0 and entry.kind ~= "import" and entry.kind ~= "preset" then ns.db.installed = false end
         -- Modules that can't restore live (some addon settings) have called ns.MarkReload themselves
         Say("Undone: back to how things were on " .. entry.time .. "."
             .. (ns.needsReload and " Reload to finish." or ""))

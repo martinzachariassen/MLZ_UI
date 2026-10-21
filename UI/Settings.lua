@@ -1118,15 +1118,26 @@ PAGES[#PAGES + 1] = { key = "nameplates", title = "Nameplates", icon = "Interfac
     if builtEngine ~= "mlz" then
         Unused("Only used when MLZ draws the nameplates. Pick MLZ under Engine to change these.")
     else
-        local function ShowToggle(key, label, desc, tip)
+        local function ShowToggle(key, label, desc, tip, avail)
             p:Toggle(label, desc, function() return NP.Show(key) end, function(on) NP.SetShow(key, on) end,
-                { avail = MLZOnly, tip = tip })
+                { avail = avail or MLZOnly, tip = tip })
+        end
+        local function HasExecute()
+            local why = MLZOnly()
+            if why then return why end
+            if not ns.Plates.ExecuteSpell() then return "Your class has no execute spell" end
         end
         ShowToggle("healthText", "Health percent", "Inside the bar, on your target and on mobs that are hurt.")
         ShowToggle("castBar", "Cast bar", "Under the health bar. Blue can be interrupted, grey can't.")
         ShowToggle("quest", "Quest marker", "A yellow ! next to mobs you still need for a quest.",
             "Read from the mob's tooltip and remembered per mob, so it costs nothing in a fight.")
         ShowToggle("debuffs", "Your debuffs", "Only your own, with time left. On your target, or on every mob in Tank mode.")
+        ShowToggle("cc", "Crowd control", "Polymorph, Sap, Fear and the like from anyone, next to the bar, so you don't break it.",
+            "Polymorph, Sap, Gouge, Blind, Shackle Undead, Hibernate, Freezing Trap, Seduction, Banish, Fear, "
+                .. "Repentance and more. On every enemy plate, with the time left.")
+        ShowToggle("execute", "Execute range",
+            "An amber strip on the right when " .. (ns.Plates.ExecuteSpell() or "your execute spell") .. " can finish the mob.",
+            "Warrior: Execute. Paladin: Hammer of Wrath. Only once you know the spell. Under 20% health.", HasExecute)
         ShowToggle("level", "Level", "Only when it is 3 or more levels from yours, or ??. Elite and rare marks always show.")
         p:Step("Size", "Width and text size of the plates. Your target is a bit bigger on top of this.", SIZE_OPTIONS, 140,
             NP.Size, NP.SetSize, { avail = MLZOnly })
@@ -1672,6 +1683,26 @@ PAGES[#PAGES + 1] = { key = "profiles", title = "Profiles & backup", icon = "Int
     })
     end
 
+    local presetButtons = {}
+    for _, preset in ipairs(ns.Presets.List()) do
+        presetButtons[#presetButtons + 1] = { text = preset.name, width = 120, tip = preset.desc, fn = function()
+            local ok, why, same = ns.Presets.Apply(preset.id)
+            if ok then
+                S:Notify("Loaded the " .. preset.name .. " setup. Undo last change puts things back.", "good")
+            else
+                S:Notify(why, same and "info" or "bad")
+            end
+        end }
+    end
+    p:Card("Ready-made setups", "Faded frames, nameplate options and reminders in one click. Keybinds and scale stay "
+        .. "as they are. A backup is taken first.")
+    p:Value("In use", "The setup your choices match right now.", function()
+        local current = ns.Presets.Current()
+        return current and current.name or (C.grey .. "Your own mix" .. C.r)
+    end, { tip = "Change one faded frame, nameplate option or reminder and it becomes your own mix. "
+        .. "Clicking the setup that is already in use does nothing." })
+    p:Buttons(presetButtons)
+
     p:Card("Share your setup", "Export gives a string with your MLZ UI choices: wizard choices, faded frames, helpers, "
         .. "reminders, and the role and situation profiles of this character. Import it on another character or computer.")
     p:Buttons({
@@ -1694,7 +1725,8 @@ PAGES[#PAGES + 1] = { key = "profiles", title = "Profiles & backup", icon = "Int
                 parts[#parts + 1] = mod and mod.title or k
             end
             table.sort(parts)
-            local what = e.kind == "import" and "import" or (i == 1 and "before MLZ UI" or "setup wizard")
+            local what = (e.kind == "import" and "import") or (e.kind == "preset" and "ready-made setup")
+                or (i == 1 and "before MLZ UI" or "setup wizard")
             lines[#lines + 1] = (i == #list and C.green or C.grey) .. S.BackupLabel(e.time) .. ", " .. what .. C.r
                 .. "   " .. table.concat(parts, ", ") .. (i == #list and (C.green .. "   (undo restores this)" .. C.r) or "")
         end
@@ -1717,7 +1749,7 @@ PAGES[#PAGES + 1] = { key = "profiles", title = "Profiles & backup", icon = "Int
             end
         end), avail = function()
             if (ns.db.backups and #ns.db.backups or 0) == 0 then return "No backups yet" end
-        end, tip = "Puts back everything the newest backup saved, from the setup wizard or an import. Click twice to confirm." },
+        end, tip = "Puts back everything the newest backup saved, from the setup wizard, an import or a ready-made setup. Click twice to confirm." },
     })
 end }
 

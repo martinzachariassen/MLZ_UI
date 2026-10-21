@@ -44,14 +44,17 @@ local function Engine()
     return ENGINES[e] and e or "off"
 end
 
-local SHOW_DEFAULTS = { healthText = true, castBar = true, quest = true, debuffs = true, level = true }
+local SHOW_DEFAULTS = {
+    healthText = true, castBar = true, quest = true, debuffs = true, level = true, execute = true, cc = true,
+}
+NP.SHOW_KEYS = SHOW_DEFAULTS -- read only: Profile.lua validates imported show options against it
 
 local function Show()
     local db = DB()
-    db.show = db.show or {}
+    local saved = db.show or {} -- read only: undo compares the saved table with what it was
     local out = {}
     for k, v in pairs(SHOW_DEFAULTS) do
-        if db.show[k] == nil then out[k] = v else out[k] = db.show[k] and true or false end
+        if saved[k] == nil then out[k] = v else out[k] = saved[k] and true or false end
     end
     return out
 end

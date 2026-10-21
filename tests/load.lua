@@ -140,6 +140,53 @@ local function Copy(t)
     return c
 end
 
+-- MLZ nameplates on one fake enemy plate: a warrior (the stub's class) sees the execute strip at 15% health
+-- and a Polymorph from someone else. Turning the options off hides both. The client API is swapped in for the
+-- test only and put back afterwards.
+local function CheckPlates()
+    local P = ns.Plates
+    if not P then return Fail("plates", "ns.Plates is missing") end
+    local plate = CreateFrame("Frame")
+    plate.UnitFrame = CreateFrame("Frame", nil, plate)
+    local ours
+    local poly = GetSpellInfo(118)
+    local saved = {}
+    local fakes = {
+        C_NamePlate = { GetNamePlateForUnit = function(unit) return unit == "nameplate1" and plate or nil end },
+        UnitCanAttack = function(_, u) return u == "nameplate1" end,
+        UnitIsFriend = function(_, u) return u ~= "nameplate1" end,
+        UnitAura = function(u, i, filter)
+            if u == "nameplate1" and i == 1 and filter == "HARMFUL" then return poly, 136071, 0, nil, 50, 60 end
+        end,
+        CreateFrame = function(kind, name, parent)
+            local f = saved.CreateFrame(kind, name, parent)
+            if parent == plate and not ours and f ~= plate.UnitFrame then ours = f end
+            return f
+        end,
+    }
+    for k, v in pairs(fakes) do saved[k] = _G[k]; _G[k] = v end
+    stub.units.nameplate1 = { health = 15 }
+    local function Opts(show)
+        return { mode = "dps", show = show or { execute = true, cc = true }, size = 1 }
+    end
+    local ok, err = pcall(function()
+        stub.Fire("SPELLS_CHANGED") -- the execute spell is looked up again
+        P.Configure(true, Opts())
+        if P.LastError() then error(P.LastError(), 0) end
+        if not ours then error("no MLZ frame was built on the nameplate", 0) end
+        if not ours.exec:IsShown() then Fail("plates", "the execute strip is hidden at 15% health") end
+        if not ours.cc:IsShown() then Fail("plates", "Polymorph does not show on the plate") end
+        P.Configure(true, Opts({ execute = false, cc = false }))
+        if ours.exec:IsShown() then Fail("plates", "the execute strip shows while it is turned off") end
+        if ours.cc:IsShown() then Fail("plates", "crowd control shows while it is turned off") end
+        P.Configure(false, Opts())
+    end)
+    for k in pairs(fakes) do _G[k] = saved[k] end
+    stub.units.nameplate1 = nil
+    if not ok then Fail("plates", err) end
+    return ok and ours and 1 or 0
+end
+
 -- Applies the wizard with its suggested rows, then undoes it: CVars and bindings must be back as before
 local function CheckApplyUndo()
     local I = ns.Installer
@@ -160,6 +207,111 @@ local function CheckApplyUndo()
     for _, d in ipairs(Diff(cvars, stub.cvars, "0")) do Fail("undo CVar", d) end
     for _, d in ipairs(Diff(bindings, stub.bindings, "")) do Fail("undo binding", d) end
     return changed
+end
+
+-- A stable text form of a nested table, so two db states can be compared
+local function Dump(v)
+    if type(v) ~= "table" then return tostring(v) end
+    local keys, out = {}, {}
+    for k in pairs(v) do keys[#keys + 1] = k end
+    table.sort(keys, function(x, y) return tostring(x) < tostring(y) end)
+    for _, k in ipairs(keys) do out[#out + 1] = tostring(k) .. "=" .. Dump(v[k]) end
+    return "{" .. table.concat(out, ",") .. "}"
+end
+
+-- Each ready-made setup must load without errors, change something, and undo back to the same db
+local PRESET_KEYS = { "fade", "nameplates", "reminders", "group", "vendor", "automate" }
+
+-- Every value the setup asks for is what the player now has
+local function CheckPresetSet(preset)
+    local data, label = preset.data or {}, "preset set " .. preset.id
+    for _, row in ipairs(ns.data.fade) do
+        local want = (data.fade or {})[row.id] and true or false
+        if ns.modules.fade:IsOn(row.id) ~= want then Fail(label, "fade " .. row.id .. " is not " .. tostring(want)) end
+    end
+    for k, v in pairs((data.nameplates or {}).show or {}) do
+        if ns.NP.Show(k) ~= v then Fail(label, "nameplates show " .. k .. " is not " .. tostring(v)) end
+    end
+    local mods = { reminders = ns.Reminders, group = ns.Group, vendor = ns.Vendor, automate = ns.Automate }
+    for key, values in pairs(data.switches or {}) do
+        for k, v in pairs(values) do
+            if not mods[key] then
+                Fail(label, "no module for switches." .. key)
+            elseif mods[key].Get(k) ~= v then
+                Fail(label, key .. "." .. k .. " is not " .. tostring(v))
+            end
+        end
+    end
+end
+local function CheckPresets()
+    local P = ns.Presets
+    if not P then return Fail("presets", "ns.Presets is missing") end
+    local function State()
+        local t = {}
+        for _, k in ipairs(PRESET_KEYS) do t[k] = Dump(ns.db[k]) end
+        return t
+    end
+    local count = 0
+    for _, preset in ipairs(P.List()) do
+        local before = State()
+        local ok, applied, why, same = pcall(P.Apply, preset.id)
+        if not ok then
+            Fail("preset " .. preset.id, applied)
+        elseif same then
+            count = count + 1 -- already in use: nothing to apply or undo
+            CheckPresetSet(preset)
+        elseif not applied then
+            Fail("preset " .. preset.id, why)
+        else
+            count = count + 1
+            stub.FlushTimers(function(err) Fail("preset timer", err) end)
+            CheckPresetSet(preset)
+            if Step("preset undo " .. preset.id, ns.Backup.Undo, ns.Backup, true) then
+                stub.FlushTimers(function(err) Fail("preset undo timer", err) end)
+                local after = State()
+                for _, k in ipairs(PRESET_KEYS) do
+                    if before[k] ~= after[k] then
+                        Fail("preset undo " .. preset.id, k .. ": " .. before[k] .. " -> " .. after[k])
+                    end
+                end
+            end
+        end
+    end
+    if count == 0 then Fail("presets", "no ready-made setups were applied") end
+    -- a switch one setup sets must be set by all of them, or it stays behind when you switch setups
+    local all = {}
+    for _, preset in ipairs(P.List()) do
+        for key, values in pairs((preset.data or {}).switches or {}) do
+            for k in pairs(values) do all[key .. "." .. k] = { key, k } end
+        end
+    end
+    for _, preset in ipairs(P.List()) do
+        local sw = (preset.data or {}).switches or {}
+        for name, pair in pairs(all) do
+            if (sw[pair[1]] or {})[pair[2]] == nil then
+                Fail("preset " .. preset.id, name .. " is set by another setup but not by this one")
+            end
+        end
+    end
+    -- switching between setups must not leave something from the one before
+    if P.Get("informative") and P.Get("balanced") then
+        local before = State()
+        local backups = (P.Apply("informative")) and 1 or 0
+        local ok = P.Apply("balanced")
+        if ok then backups = backups + 1 else Fail("preset switch", "balanced did not load after informative") end
+        CheckPresetSet(P.Get("balanced"))
+        if (P.Current() or {}).id ~= "balanced" then Fail("preset switch", "Current() is not balanced") end
+        local again, _, same = P.Apply("balanced")
+        if again or not same then Fail("preset switch", "loading balanced twice took a second backup") end
+        for i = 1, backups do Step("preset switch undo " .. i, ns.Backup.Undo, ns.Backup, true) end
+        stub.FlushTimers(function(err) Fail("preset switch timer", err) end)
+        local after = State()
+        for _, k in ipairs(PRESET_KEYS) do
+            if before[k] ~= after[k] then Fail("preset switch undo", k .. ": " .. before[k] .. " -> " .. after[k]) end
+        end
+    end
+    Step("slash /mlz preset", SlashCmdList.MLZUI, "preset nosuchsetup")
+    return count
 end
 
 local function CheckSettings()
@@ -198,6 +350,8 @@ local modules = CheckModules()
 CheckWizard()
 local pages = CheckSettings() or 0
 local changed = CheckApplyUndo() or 0
+local presets = CheckPresets() or 0
+local plates = CheckPlates() or 0
 CheckMigration()
 
 if verbose then
@@ -209,5 +363,5 @@ if #failures > 0 then
     for _, f in ipairs(failures) do print("  " .. f) end
     os.exit(1)
 end
-print(("Load test: OK (%d modules previewed, %d settings pages built, %d changes applied and undone)")
-    :format(modules, pages, changed))
+print(("Load test: OK (%d modules previewed, %d settings pages built, %d changes applied and undone, "
+    .. "%d ready-made setups loaded and undone, %d nameplate drawn)"):format(modules, pages, changed, presets, plates))
