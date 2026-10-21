@@ -134,6 +134,7 @@ ns.data.nameplates = {
             8122,   -- Psychic Scream
             5246,   -- Intimidating Shout
             19386,  -- Wyvern Sting
+            19503,  -- Scatter Shot
             20066,  -- Repentance
         },
 

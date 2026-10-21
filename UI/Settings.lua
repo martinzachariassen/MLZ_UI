@@ -1686,16 +1686,21 @@ PAGES[#PAGES + 1] = { key = "profiles", title = "Profiles & backup", icon = "Int
     local presetButtons = {}
     for _, preset in ipairs(ns.Presets.List()) do
         presetButtons[#presetButtons + 1] = { text = preset.name, width = 120, tip = preset.desc, fn = function()
-            local ok, why = ns.Presets.Apply(preset.id)
+            local ok, why, same = ns.Presets.Apply(preset.id)
             if ok then
                 S:Notify("Loaded the " .. preset.name .. " setup. Undo last change puts things back.", "good")
             else
-                S:Notify(why, "bad")
+                S:Notify(why, same and "info" or "bad")
             end
         end }
     end
     p:Card("Ready-made setups", "Faded frames, nameplate options and reminders in one click. Keybinds and scale stay "
         .. "as they are. A backup is taken first.")
+    p:Value("In use", "The setup your choices match right now.", function()
+        local current = ns.Presets.Current()
+        return current and current.name or (C.grey .. "Your own mix" .. C.r)
+    end, { tip = "Change one faded frame, nameplate option or reminder and it becomes your own mix. "
+        .. "Clicking the setup that is already in use does nothing." })
     p:Buttons(presetButtons)
 
     p:Card("Share your setup", "Export gives a string with your MLZ UI choices: wizard choices, faded frames, helpers, "

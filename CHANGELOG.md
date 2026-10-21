@@ -4,7 +4,8 @@
 
 - Ready-made setups on Profiles & backup: Minimal, Balanced and Informative set faded frames, nameplate
   options and reminders in one click (or `/mlz preset minimal`). Keybinds and scale stay as they are.
-  A backup is taken first, so undo puts it back.
+  A backup is taken first, so undo puts it back. "In use" shows which setup your choices match, and
+  clicking the one already in use takes no new backup.
 - MLZ nameplates: an amber strip on the right when a mob can be finished with Execute (warrior) or Hammer
   of Wrath (paladin). Only once you know the spell.
 - MLZ nameplates: crowd control from anyone (Polymorph, Sap, Blind, Fear and more) shows next to the bar

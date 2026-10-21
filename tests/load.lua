@@ -221,6 +221,28 @@ end
 
 -- Each ready-made setup must load without errors, change something, and undo back to the same db
 local PRESET_KEYS = { "fade", "nameplates", "reminders", "group", "vendor", "automate" }
+
+-- Every value the setup asks for is what the player now has
+local function CheckPresetSet(preset)
+    local data, label = preset.data or {}, "preset set " .. preset.id
+    for _, row in ipairs(ns.data.fade) do
+        local want = (data.fade or {})[row.id] and true or false
+        if ns.modules.fade:IsOn(row.id) ~= want then Fail(label, "fade " .. row.id .. " is not " .. tostring(want)) end
+    end
+    for k, v in pairs((data.nameplates or {}).show or {}) do
+        if ns.NP.Show(k) ~= v then Fail(label, "nameplates show " .. k .. " is not " .. tostring(v)) end
+    end
+    local mods = { reminders = ns.Reminders, group = ns.Group, vendor = ns.Vendor, automate = ns.Automate }
+    for key, values in pairs(data.switches or {}) do
+        for k, v in pairs(values) do
+            if not mods[key] then
+                Fail(label, "no module for switches." .. key)
+            elseif mods[key].Get(k) ~= v then
+                Fail(label, key .. "." .. k .. " is not " .. tostring(v))
+            end
+        end
+    end
+end
 local function CheckPresets()
     local P = ns.Presets
     if not P then return Fail("presets", "ns.Presets is missing") end
@@ -232,14 +254,18 @@ local function CheckPresets()
     local count = 0
     for _, preset in ipairs(P.List()) do
         local before = State()
-        local ok, applied, why = pcall(P.Apply, preset.id)
+        local ok, applied, why, same = pcall(P.Apply, preset.id)
         if not ok then
             Fail("preset " .. preset.id, applied)
+        elseif same then
+            count = count + 1 -- already in use: nothing to apply or undo
+            CheckPresetSet(preset)
         elseif not applied then
             Fail("preset " .. preset.id, why)
         else
             count = count + 1
             stub.FlushTimers(function(err) Fail("preset timer", err) end)
+            CheckPresetSet(preset)
             if Step("preset undo " .. preset.id, ns.Backup.Undo, ns.Backup, true) then
                 stub.FlushTimers(function(err) Fail("preset undo timer", err) end)
                 local after = State()
@@ -252,6 +278,38 @@ local function CheckPresets()
         end
     end
     if count == 0 then Fail("presets", "no ready-made setups were applied") end
+    -- a switch one setup sets must be set by all of them, or it stays behind when you switch setups
+    local all = {}
+    for _, preset in ipairs(P.List()) do
+        for key, values in pairs((preset.data or {}).switches or {}) do
+            for k in pairs(values) do all[key .. "." .. k] = { key, k } end
+        end
+    end
+    for _, preset in ipairs(P.List()) do
+        local sw = (preset.data or {}).switches or {}
+        for name, pair in pairs(all) do
+            if (sw[pair[1]] or {})[pair[2]] == nil then
+                Fail("preset " .. preset.id, name .. " is set by another setup but not by this one")
+            end
+        end
+    end
+    -- switching between setups must not leave something from the one before
+    if P.Get("informative") and P.Get("balanced") then
+        local before = State()
+        local backups = (P.Apply("informative")) and 1 or 0
+        local ok = P.Apply("balanced")
+        if ok then backups = backups + 1 else Fail("preset switch", "balanced did not load after informative") end
+        CheckPresetSet(P.Get("balanced"))
+        if (P.Current() or {}).id ~= "balanced" then Fail("preset switch", "Current() is not balanced") end
+        local again, _, same = P.Apply("balanced")
+        if again or not same then Fail("preset switch", "loading balanced twice took a second backup") end
+        for i = 1, backups do Step("preset switch undo " .. i, ns.Backup.Undo, ns.Backup, true) end
+        stub.FlushTimers(function(err) Fail("preset switch timer", err) end)
+        local after = State()
+        for _, k in ipairs(PRESET_KEYS) do
+            if before[k] ~= after[k] then Fail("preset switch undo", k .. ": " .. before[k] .. " -> " .. after[k]) end
+        end
+    end
     Step("slash /mlz preset", SlashCmdList.MLZUI, "preset nosuchsetup")
     return count
 end

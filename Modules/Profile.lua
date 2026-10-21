@@ -350,12 +350,49 @@ function Presets.Get(id)
     end
 end
 
--- Returns true, or false and a reason
+-- True when everything the setup sets already has that value
+local function Matches(clean)
+    if next(clean) == nil then return false end
+    local fade = ns.modules.fade
+    if clean.fade and fade then
+        for _, row in ipairs(ns.data.fade or {}) do
+            if fade:IsOn(row.id) ~= (clean.fade[row.id] or false) then return false end
+        end
+    end
+    local np = ns.db.nameplates or {}
+    for k, v in pairs(clean.nameplates or {}) do
+        if k == "show" then
+            for key, on in pairs(v) do
+                if not (ns.NP and ns.NP.Show) or ns.NP.Show(key) ~= on then return false end
+            end
+        elseif np[k] ~= v then
+            return false
+        end
+    end
+    local now = Switches()
+    for key, values in pairs(clean.switches or {}) do
+        for k, v in pairs(values) do
+            if not now[key] or now[key][k] ~= v then return false end
+        end
+    end
+    return true
+end
+
+-- The setup your current choices match, or nil (your own mix)
+function Presets.Current()
+    for _, p in ipairs(Presets.List()) do
+        if Matches(Validate(p.data or {})) then return p end
+    end
+end
+
+-- Returns true, or false, a reason and (when the setup is already in use) true
 function Presets.Apply(id)
     local preset = Presets.Get(id)
     if not preset then return false, "There is no setup called " .. tostring(id) .. "." end
     local clean = Validate(preset.data or {})
     if next(clean) == nil then return false, "The " .. preset.name .. " setup has no settings MLZ UI knows." end
+    -- no backup for nothing: only 5 are kept, and older ones would be pushed out
+    if Matches(clean) then return false, "You already use the " .. preset.name .. " setup.", true end
     if not ApplyClean(clean, "preset") then return false, "The backup failed. Nothing was changed." end
     return true
 end
@@ -369,7 +406,11 @@ ns.AddCommand("preset", "loads a ready-made setup: minimal | balanced | informat
         ns.Print(list, "Load one with " .. ns.Cmd("/mlz preset <name>") .. ".")
         return
     end
-    local ok, why = Presets.Apply(id)
+    local ok, why, same = Presets.Apply(id)
+    if same then
+        ns.Print(why)
+        return
+    end
     if not ok then
         ns.Print(ns.Paint("red", why), list)
         return

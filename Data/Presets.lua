@@ -23,6 +23,7 @@ ns.data.presets = {
             },
             switches = {
                 reminders = { buffs = false, reagents = false, durability = true, raidFood = false, levelFood = false },
+                group = { buffCheck = false },
             },
         },
     },
@@ -41,6 +42,7 @@ ns.data.presets = {
             },
             switches = {
                 reminders = { buffs = false, reagents = false, durability = true, raidFood = false, levelFood = false },
+                group = { buffCheck = false },
             },
         },
     },
