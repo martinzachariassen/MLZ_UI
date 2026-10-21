@@ -23,6 +23,7 @@ Data\Classes.lua
 Data\Layout.lua
 Data\Fade.lua
 Data\Nameplates.lua
+Data\Presets.lua
 Data\Addons.lua
 Data\Reminders.lua
 Data\Tips.lua

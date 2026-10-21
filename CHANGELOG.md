@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Ready-made setups on Profiles & backup: Minimal, Balanced and Informative set faded frames, nameplate
+  options and reminders in one click (or `/mlz preset minimal`). Keybinds and scale stay as they are.
+  A backup is taken first, so undo puts it back.
+- MLZ nameplates: an amber strip on the right when a mob can be finished with Execute (warrior) or Hammer
+  of Wrath (paladin). Only once you know the spell.
+- MLZ nameplates: crowd control from anyone (Polymorph, Sap, Blind, Fear and more) shows next to the bar
+  with the time left, so nobody breaks it by accident.
+- Export and import now include which details MLZ nameplates show.
 - Search in the control center: type in the box at the top of the sidebar (or `/mlz search minimap`) to
   find any setting. Typos, short forms (5sr, np) and other words (junk, kick) still find it. UP and DOWN
   pick a match, ENTER opens the page and points out the setting.

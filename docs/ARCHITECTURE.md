@@ -16,7 +16,8 @@ MLZ_UI/
 │   ├── Classes.lua       The 9 WoW Forever classes: talent trees, archetypes, stance and pet bars
 │   ├── Layout.lua
 │   ├── Fade.lua
-│   ├── Nameplates.lua
+│   ├── Nameplates.lua    Platynator presets, MLZ plate look, crowd control list
+│   ├── Presets.lua       Ready-made setups (same shape as an export)
 │   ├── Addons.lua
 │   ├── Reminders.lua     Self buffs, reagents, food and group buffs per class
 │   ├── Tips.lua          Tips for the overview card
@@ -29,7 +30,7 @@ MLZ_UI/
 │   ├── Fade.lua  ActionButtons.lua  Tweaks.lua  Plates.lua  Nameplates.lua  Addons.lua
 │   ├── Health.lua        Addon state and versions, switch addons on, /mlz health
 │   ├── Vendor.lua  Automate.lua  Group.lua  ManaTick.lua  Interrupt.lua
-│   ├── Profile.lua       Export/import, role profiles, situation profiles
+│   ├── Profile.lua       Export/import, ready-made setups, role profiles, situation profiles
 │   └── Reminders.lua  XPRate.lua  Cooking.lua
 ├── UI/
 │   ├── Widgets.lua       Theme tokens (W.T, W.C), fonts and every widget
@@ -99,11 +100,11 @@ Rules:
 
 Feature-only modules (`Vendor`, `Automate`, `Group`, `ManaTick`, `Interrupt`, `Health`, `Healer`, `Plates`, `Reminders`, `XPRate`, `Cooking`) don't register. They hook events through `ns.On` and expose a small table on `ns` (e.g. `ns.Vendor`) for the control center. Their settings live in a lazily filled `ns.db.<key>` table (`DEFAULTS` plus `Cfg()`). Automations that act for you (Fewer clicks, Group) are off by default, and SHIFT skips an automation once. Passive helpers such as repair, sell greys, the durability reminder and the cooking tooltip start on.
 
-`Profile` registers as a module (so an import can be undone) but is not in `APPLY_ORDER`: it only runs through `/mlz import`.
+`Profile` registers as a module (so an import can be undone) but is not in `APPLY_ORDER`: it only runs through `/mlz import` and ready-made setups (`ns.Presets`, `/mlz preset`). Both go through `Validate` and `ApplyClean`.
 
 `Bindings.xml` sits next to the `.toc` and is loaded by the game, not listed in the `.toc`. Its names come from `BINDING_HEADER_MLZUI` and `BINDING_NAME_MLZUI_*` in `Modules/Group.lua`.
 
-Export strings start with `MLZ!2!` (`MLZ!1!` still imports). `Validate` in `Modules/Profile.lua` lets only known keys with the right types through. A new exported key needs a line there, in `Profile:Backup` and in `Profile:Restore`.
+Export strings start with `MLZ!2!` (`MLZ!1!` still imports). `Validate` in `Modules/Profile.lua` lets only known keys with the right types through. A new exported key needs a line there, in `Profile:Backup` and in `Profile:Restore`. Ready-made setups in `Data/Presets.lua` use the same shape as an export, so a setup can only set keys `Validate` knows.
 
 ## Settings for other addons
 
@@ -132,7 +133,7 @@ Wizard "Apply"
   └─ waits for combat to end if needed
 ```
 
-`/mlz import` also takes a backup first (`kind = "import"`), so an import can be undone the same way.
+`/mlz import` also takes a backup first (`kind = "import"`), so an import can be undone the same way. Ready-made setups do the same with `kind = "preset"`.
 
 ## Core helpers
 

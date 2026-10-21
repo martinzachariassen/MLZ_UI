@@ -300,13 +300,16 @@ function UnitName() return "Tester" end
 function UnitClass() return "Warrior", "WARRIOR", 1 end
 function UnitLevel() return 60 end
 function UnitEffectiveLevel() return 60 end
-function UnitExists(u) return u == "player" end
+-- Extra units a test can add, e.g. stub.units.nameplate1 = { health = 15 }. Read at call time, since addon
+-- files keep their own copy of UnitExists and UnitHealth.
+stub.units = {}
+function UnitExists(u) return u == "player" or stub.units[u] ~= nil end
 function UnitGUID(u) return u == "player" and "Player-1-0001" or nil end
 function UnitIsUnit(a, b) return a == b end
 function UnitIsPlayer(u) return u == "player" end
 function UnitAffectingCombat() return false end
 function UnitIsDeadOrGhost() return false end
-function UnitHealth() return 100 end
+function UnitHealth(u) return stub.units[u] and stub.units[u].health or 100 end
 function UnitHealthMax() return 100 end
 function UnitPower() return 100 end
 function UnitPowerMax() return 100 end

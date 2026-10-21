@@ -120,7 +120,7 @@ If the guess is wrong, set your role by hand with `/mlz role`, on the Your role 
 - Action buttons colored by range, mana and usability, with short hotkey labels
 - Role detection (talents, spec, form, group or your choice; DPS until your talents decide) that drives the layouts and nameplates, with melee, ranged and caster DPS told apart
 - Class-aware key hints, extra form keys, pet keys, and reminders for all 9 classes
-- Our own flat nameplates: health, cast bar, quest marker, your debuffs and threat colors per role. Platynator is optional
+- Our own flat nameplates: health, cast bar, quest marker, your debuffs, crowd control from anyone, execute range and threat colors per role. Platynator is optional
 - Auto-repair, sell greys, a mana tick bar and an interrupt announce
 - Fewer clicks (all off until you turn them on): accept and turn in quests, accept summons and resurrections, confirm bind on pickup loot when solo, decline duels
 - Group and raid: a buff check on ready check (only in your own chat) and a pull timer on `/mlz pull` or a key
@@ -138,7 +138,7 @@ If the guess is wrong, set your role by hand with `/mlz role`, on the Your role 
 **Ecosystem**
 - Recommended settings for 15 addons, many of them per role: a healer and a tank do not get the same Questie, DBM or Details setup
 - Optional: Platynator as the nameplate engine, with modes per role and archetype and a clean style
-- Role and situation profiles, one export string for all your MLZ UI choices, and an addon overview (loaded, switched off, missing, version)
+- Ready-made setups (Minimal, Balanced, Informative), role and situation profiles, one export string for all your MLZ UI choices, and an addon overview (loaded, switched off, missing, version)
 
 ## Quick start
 
@@ -167,12 +167,13 @@ If you use "Download ZIP" on GitHub, rename the unzipped `MLZ_UI-main` folder to
 | `/mlz` | Open the control center |
 | `/mlz search [words]` | Find a setting in the control center, for example `/mlz search minimap` |
 | `/mlz install` | Open the setup wizard |
-| `/mlz undo` | Undo the last wizard run or import |
+| `/mlz undo` | Undo the last wizard run, import or ready-made setup |
 | `/mlz backups` | List saved backups |
 | `/mlz role tank\|healer\|dps\|auto` | Set your role for this character |
 | `/mlz heal on\|off\|auto\|build` | Healer layouts: status, switch them, or rebuild |
 | `/mlz np auto\|tank\|healer\|dps\|solo` | Nameplate mode (also `engine mlz\|platynator\|off`, `style`, `threat`, `pvp`, `save`, `load`, `export`) |
 | `/mlz export` · `/mlz import` | Share your choices as a string (wizard choices, fading, helpers, reminders, role and situation profiles) |
+| `/mlz preset [name]` | Load a ready-made setup: `minimal`, `balanced` or `informative` (no name lists them) |
 | `/mlz keys` | A keyboard map of your keybinds, with the SHIFT, CTRL and ALT layers |
 | `/mlz tour` | Show where the hidden bars and buttons are |
 | `/mlz scale [auto\|0.64\|...]` | Recalculate and reapply the UI scale |

@@ -140,6 +140,53 @@ local function Copy(t)
     return c
 end
 
+-- MLZ nameplates on one fake enemy plate: a warrior (the stub's class) sees the execute strip at 15% health
+-- and a Polymorph from someone else. Turning the options off hides both. The client API is swapped in for the
+-- test only and put back afterwards.
+local function CheckPlates()
+    local P = ns.Plates
+    if not P then return Fail("plates", "ns.Plates is missing") end
+    local plate = CreateFrame("Frame")
+    plate.UnitFrame = CreateFrame("Frame", nil, plate)
+    local ours
+    local poly = GetSpellInfo(118)
+    local saved = {}
+    local fakes = {
+        C_NamePlate = { GetNamePlateForUnit = function(unit) return unit == "nameplate1" and plate or nil end },
+        UnitCanAttack = function(_, u) return u == "nameplate1" end,
+        UnitIsFriend = function(_, u) return u ~= "nameplate1" end,
+        UnitAura = function(u, i, filter)
+            if u == "nameplate1" and i == 1 and filter == "HARMFUL" then return poly, 136071, 0, nil, 50, 60 end
+        end,
+        CreateFrame = function(kind, name, parent)
+            local f = saved.CreateFrame(kind, name, parent)
+            if parent == plate and not ours and f ~= plate.UnitFrame then ours = f end
+            return f
+        end,
+    }
+    for k, v in pairs(fakes) do saved[k] = _G[k]; _G[k] = v end
+    stub.units.nameplate1 = { health = 15 }
+    local function Opts(show)
+        return { mode = "dps", show = show or { execute = true, cc = true }, size = 1 }
+    end
+    local ok, err = pcall(function()
+        stub.Fire("SPELLS_CHANGED") -- the execute spell is looked up again
+        P.Configure(true, Opts())
+        if P.LastError() then error(P.LastError(), 0) end
+        if not ours then error("no MLZ frame was built on the nameplate", 0) end
+        if not ours.exec:IsShown() then Fail("plates", "the execute strip is hidden at 15% health") end
+        if not ours.cc:IsShown() then Fail("plates", "Polymorph does not show on the plate") end
+        P.Configure(true, Opts({ execute = false, cc = false }))
+        if ours.exec:IsShown() then Fail("plates", "the execute strip shows while it is turned off") end
+        if ours.cc:IsShown() then Fail("plates", "crowd control shows while it is turned off") end
+        P.Configure(false, Opts())
+    end)
+    for k in pairs(fakes) do _G[k] = saved[k] end
+    stub.units.nameplate1 = nil
+    if not ok then Fail("plates", err) end
+    return ok and ours and 1 or 0
+end
+
 -- Applies the wizard with its suggested rows, then undoes it: CVars and bindings must be back as before
 local function CheckApplyUndo()
     local I = ns.Installer
@@ -160,6 +207,53 @@ local function CheckApplyUndo()
     for _, d in ipairs(Diff(cvars, stub.cvars, "0")) do Fail("undo CVar", d) end
     for _, d in ipairs(Diff(bindings, stub.bindings, "")) do Fail("undo binding", d) end
     return changed
+end
+
+-- A stable text form of a nested table, so two db states can be compared
+local function Dump(v)
+    if type(v) ~= "table" then return tostring(v) end
+    local keys, out = {}, {}
+    for k in pairs(v) do keys[#keys + 1] = k end
+    table.sort(keys, function(x, y) return tostring(x) < tostring(y) end)
+    for _, k in ipairs(keys) do out[#out + 1] = tostring(k) .. "=" .. Dump(v[k]) end
+    return "{" .. table.concat(out, ",") .. "}"
+end
+
+-- Each ready-made setup must load without errors, change something, and undo back to the same db
+local PRESET_KEYS = { "fade", "nameplates", "reminders", "group", "vendor", "automate" }
+local function CheckPresets()
+    local P = ns.Presets
+    if not P then return Fail("presets", "ns.Presets is missing") end
+    local function State()
+        local t = {}
+        for _, k in ipairs(PRESET_KEYS) do t[k] = Dump(ns.db[k]) end
+        return t
+    end
+    local count = 0
+    for _, preset in ipairs(P.List()) do
+        local before = State()
+        local ok, applied, why = pcall(P.Apply, preset.id)
+        if not ok then
+            Fail("preset " .. preset.id, applied)
+        elseif not applied then
+            Fail("preset " .. preset.id, why)
+        else
+            count = count + 1
+            stub.FlushTimers(function(err) Fail("preset timer", err) end)
+            if Step("preset undo " .. preset.id, ns.Backup.Undo, ns.Backup, true) then
+                stub.FlushTimers(function(err) Fail("preset undo timer", err) end)
+                local after = State()
+                for _, k in ipairs(PRESET_KEYS) do
+                    if before[k] ~= after[k] then
+                        Fail("preset undo " .. preset.id, k .. ": " .. before[k] .. " -> " .. after[k])
+                    end
+                end
+            end
+        end
+    end
+    if count == 0 then Fail("presets", "no ready-made setups were applied") end
+    Step("slash /mlz preset", SlashCmdList.MLZUI, "preset nosuchsetup")
+    return count
 end
 
 local function CheckSettings()
@@ -198,6 +292,8 @@ local modules = CheckModules()
 CheckWizard()
 local pages = CheckSettings() or 0
 local changed = CheckApplyUndo() or 0
+local presets = CheckPresets() or 0
+local plates = CheckPlates() or 0
 CheckMigration()
 
 if verbose then
@@ -209,5 +305,5 @@ if #failures > 0 then
     for _, f in ipairs(failures) do print("  " .. f) end
     os.exit(1)
 end
-print(("Load test: OK (%d modules previewed, %d settings pages built, %d changes applied and undone)")
-    :format(modules, pages, changed))
+print(("Load test: OK (%d modules previewed, %d settings pages built, %d changes applied and undone, "
+    .. "%d ready-made setups loaded and undone, %d nameplate drawn)"):format(modules, pages, changed, presets, plates))

@@ -15,15 +15,19 @@
 --   stance   = number of extra keys (bar 5 buttons 1-N, max 5, see B.extra) to drag stances, forms or auras onto
 --   stanceNeedsForms = only when the client has forms for it (Priest: Shadowform does not exist on every client)
 --   pet      = has a pet bar (keys BONUSACTIONBUTTON1-3)
+--   execute  = a finishing spell that only works on low health: first rank id and the health fraction.
+--              MLZ nameplates show an amber strip on the right once a mob is in range (if you know the spell)
 
 local _, ns = ...
 
 ns.data.classes = {
     WARRIOR = {
         tabs = { "MELEE", "MELEE", "TANK" }, dps = "MELEE", resource = "Rage", stance = 3,
+        execute = { spell = 5308, pct = 0.2 },  -- Execute
     },
     PALADIN = {
         tabs = { "HEALER", "TANK", "MELEE" }, dpsTabs = { [2] = "MELEE" }, dps = "MELEE", resource = "Mana", stance = 3,
+        execute = { spell = 24275, pct = 0.2 }, -- Hammer of Wrath
     },
     HUNTER = {
         dps = "RANGED", pureDps = true, resource = "Mana", pet = true,

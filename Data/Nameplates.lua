@@ -114,6 +114,29 @@ ns.data.nameplates = {
         debuffLimit = 6,
         levelDiff = 3,        -- show the level only when it differs this much from yours (or is ??)
 
+        -- Crowd control shown on every enemy plate, from anyone, so nobody breaks it by accident.
+        -- First rank ids: names are used, so every rank matches. Ids the client doesn't know are skipped.
+        cc = {
+            118,    -- Polymorph
+            28272,  -- Polymorph: Pig (its own name, so it needs its own line)
+            28271,  -- Polymorph: Turtle
+            6770,   -- Sap
+            1776,   -- Gouge
+            2094,   -- Blind
+            9484,   -- Shackle Undead
+            2637,   -- Hibernate
+            3355,   -- Freezing Trap Effect
+            1513,   -- Scare Beast
+            6358,   -- Seduction (succubus)
+            710,    -- Banish
+            5782,   -- Fear
+            5484,   -- Howl of Terror
+            8122,   -- Psychic Scream
+            5246,   -- Intimidating Shout
+            19386,  -- Wyvern Sting
+            20066,  -- Repentance
+        },
+
         -- per mode: alpha of plates you don't target (only while you have a target), target scale,
         -- and whether your debuffs show on every mob or only on your target
         modes = {

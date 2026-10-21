@@ -71,7 +71,8 @@ local function Export()
         spellQueueWindow = db.spellQueueWindow,
         scale = db.scale and { mode = db.scale.mode } or nil,
         nameplatesAuto = np.auto,
-        nameplates = { mode = np.mode, style = np.style, threat = np.threat, pvp = np.pvp, healerFriends = np.healerFriends },
+        nameplates = { mode = np.mode, style = np.style, threat = np.threat, pvp = np.pvp, healerFriends = np.healerFriends,
+                       show = np.show and ns.CopyTable(np.show) or nil },
         fade = ns.CopyTable(db.fade or {}),
         switches = Switches(),
         roleProfiles = char.roleProfiles,
@@ -120,6 +121,14 @@ local function NameplateOpts(n, withAuto)
         if type(n[k]) == "boolean" then out[k] = n[k] end
     end
     if withAuto and type(n.auto) == "boolean" then out.auto = n.auto end
+    local known = ns.NP and ns.NP.SHOW_KEYS
+    if type(n.show) == "table" and known then
+        local show = {}
+        for k in pairs(known) do
+            if type(n.show[k]) == "boolean" then show[k] = n.show[k] end
+        end
+        if next(show) then out.show = show end
+    end
     return out
 end
 
@@ -203,6 +212,7 @@ function Profile:Backup()
     local np = ns.db.nameplates or {}
     local npCopy = {}
     for _, k in ipairs(NP_KEYS) do npCopy[k] = np[k] end
+    npCopy.show = np.show or false -- false: no show options were saved (all defaults)
     local char = ns.CharDB()
     return ns.CopyTable({
         toggles = ns.db.toggles, movement = ns.db.movement, spellQueueWindow = ns.db.spellQueueWindow,
@@ -220,6 +230,12 @@ function Profile:Restore(snap)
     ns.db.nameplates = ns.db.nameplates or {}
     if snap.nameplates then
         for _, k in ipairs(NP_KEYS) do ns.db.nameplates[k] = snap.nameplates[k] end
+        -- nil: an older backup without show options, so keep what you have
+        if snap.nameplates.show == false then
+            ns.db.nameplates.show = nil
+        elseif type(snap.nameplates.show) == "table" then
+            ns.db.nameplates.show = ns.CopyTable(snap.nameplates.show)
+        end
     elseif snap.nameplatesAuto ~= nil then -- backups made by older versions
         ns.db.nameplates.auto = snap.nameplatesAuto
     end
@@ -238,25 +254,9 @@ function Profile:Restore(snap)
     ns.FireState()
 end
 
-local function Import(text)
-    if not (C_EncodingUtil and C_EncodingUtil.DeserializeCBOR) then
-        ns.Print("This client has no C_EncodingUtil, import is not possible.")
-        return
-    end
-    local data, reason = Decode(text)
-    if not data then
-        ns.Print(ns.Paint("red", "Import failed:"), reason)
-        return
-    end
-    local clean = Validate(data)
-    if next(clean) == nil then
-        ns.Print(ns.Paint("red", "Import failed:"), "the string has none of the settings MLZ UI knows.")
-        return
-    end
-    if not ns.Backup:Create({ { mod = Profile, items = {} } }, "import") then
-        ns.Print(ns.Paint("red", "Import stopped because the backup failed. Nothing was changed."))
-        return
-    end
+-- Writes validated choices after taking a backup (kind: "import" or "preset"). Returns false if the backup failed.
+local function ApplyClean(clean, kind)
+    if not ns.Backup:Create({ { mod = Profile, items = {} } }, kind) then return false end
     if clean.toggles then ns.db.toggles = clean.toggles end
     if clean.movement then ns.db.movement = clean.movement end
     if clean.spellQueueWindow then ns.db.spellQueueWindow = clean.spellQueueWindow end
@@ -282,6 +282,28 @@ local function Import(text)
     end
     if ns.FireRole then ns.FireRole() end
     if ns.NP and ns.NP.Apply then ns.NP.Apply() end -- nameplate options may have changed
+    return true
+end
+
+local function Import(text)
+    if not (C_EncodingUtil and C_EncodingUtil.DeserializeCBOR) then
+        ns.Print("This client has no C_EncodingUtil, import is not possible.")
+        return
+    end
+    local data, reason = Decode(text)
+    if not data then
+        ns.Print(ns.Paint("red", "Import failed:"), reason)
+        return
+    end
+    local clean = Validate(data)
+    if next(clean) == nil then
+        ns.Print(ns.Paint("red", "Import failed:"), "the string has none of the settings MLZ UI knows.")
+        return
+    end
+    if not ApplyClean(clean, "import") then
+        ns.Print(ns.Paint("red", "Import stopped because the backup failed. Nothing was changed."))
+        return
+    end
     ns.Print("Imported. Run " .. ns.Cmd("/mlz install") .. " to apply the settings, or " .. ns.Cmd("/mlz undo")
         .. " to go back.")
     local S = ns.Settings
@@ -310,6 +332,54 @@ ns.AddCommand("import", "pastes a string made by /mlz export", function(arg)
         Import(arg)
     else
         ns.ShowCopy("MLZ UI: paste a string and press Import", "", Import)
+    end
+end)
+
+------------------------------------------------------------------------
+-- Ready-made setups (Data/Presets.lua)
+-- Plain tables in the same shape as an export, so they go through the same checks and backup.
+------------------------------------------------------------------------
+local Presets = {}
+ns.Presets = Presets
+
+function Presets.List() return ns.data.presets or {} end
+
+function Presets.Get(id)
+    for _, p in ipairs(Presets.List()) do
+        if p.id == id then return p end
+    end
+end
+
+-- Returns true, or false and a reason
+function Presets.Apply(id)
+    local preset = Presets.Get(id)
+    if not preset then return false, "There is no setup called " .. tostring(id) .. "." end
+    local clean = Validate(preset.data or {})
+    if next(clean) == nil then return false, "The " .. preset.name .. " setup has no settings MLZ UI knows." end
+    if not ApplyClean(clean, "preset") then return false, "The backup failed. Nothing was changed." end
+    return true
+end
+
+ns.AddCommand("preset", "loads a ready-made setup: minimal | balanced | informative", function(arg)
+    local id = strtrim(arg or ""):lower()
+    local ids = {}
+    for _, p in ipairs(Presets.List()) do ids[#ids + 1] = p.id end
+    local list = "Setups: " .. table.concat(ids, ", ") .. "."
+    if id == "" then
+        ns.Print(list, "Load one with " .. ns.Cmd("/mlz preset <name>") .. ".")
+        return
+    end
+    local ok, why = Presets.Apply(id)
+    if not ok then
+        ns.Print(ns.Paint("red", why), list)
+        return
+    end
+    local text = "Loaded the " .. Presets.Get(id).name .. " setup. " .. ns.Cmd("/mlz undo") .. " puts things back."
+    local S = ns.Settings
+    if S and S.frame and S.frame:IsShown() then
+        S:Notify(text, "good")
+    else
+        ns.Print(text)
     end
 end)
 
