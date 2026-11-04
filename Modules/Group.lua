@@ -24,16 +24,7 @@ end
 BINDING_HEADER_MLZUI = "MLZ UI"
 BINDING_NAME_MLZUI_PULL = "Pull timer"
 
-local function SpellName(id)
-    if C_Spell and C_Spell.GetSpellName then return C_Spell.GetSpellName(id) end
-    return GetSpellInfo and (GetSpellInfo(id))
-end
-
-local function Knows(id)
-    if IsSpellKnown and IsSpellKnown(id) then return true end
-    if IsPlayerSpell and IsPlayerSpell(id) then return true end
-    return false
-end
+local SpellName, Knows = ns.SpellName, ns.KnowsSpell
 
 ------------------------------------------------------------------------
 -- Buff check
@@ -55,12 +46,16 @@ local function UnitBuffNames(unit)
         local name
         if C_UnitAuras and C_UnitAuras.GetAuraDataByIndex then
             local aura = C_UnitAuras.GetAuraDataByIndex(unit, i, "HELPFUL")
-            name = aura and aura.name
+            if not aura then break end
+            name = aura.name
         elseif UnitBuff then
             name = UnitBuff(unit, i)
+            if not name then break end
+        else
+            break
         end
-        if not name then break end
-        names[name] = true
+        -- a hidden (secret) name can't be compared or used as a key: skip that aura
+        if name and not (issecretvalue and issecretvalue(name)) then names[name] = true end
     end
     return names
 end

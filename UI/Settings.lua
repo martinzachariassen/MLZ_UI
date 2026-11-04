@@ -1635,7 +1635,9 @@ PAGES[#PAGES + 1] = { key = "qol", title = "Helpers", icon = "Interface\\Icons\\
     p:Card("Interrupts")
     p:Choice("Announce my interrupts", "\"Interrupted <mob>'s <spell>\" when you or your pet interrupt a cast. Say and Group only post while you are in a group.",
         IA.CHANNELS, IA.Get, IA.Set, 62, {
-        tip = "One line per interrupt, never more. Off posts nothing. Your pet's interrupts (Spell Lock) count too.",
+        tip = "One line per interrupt, never more. Off posts nothing. Your pet's interrupts (Spell Lock) count too.\n\n"
+            .. "Works for your target, your focus and mobs with a nameplate. Where the game hides who interrupted "
+            .. "(some instances), nothing is posted.",
         avail = function()
             local data = ns.data.classes and ns.data.classes[ns.PlayerClass() or ""]
             if not (data and data.interrupt) then return "Your class has no interrupt" end

@@ -24,10 +24,7 @@ end
 
 local GetItemInfoInstant = (C_Item and C_Item.GetItemInfoInstant) or GetItemInfoInstant
 
-local function SpellName(id)
-    if C_Spell and C_Spell.GetSpellName then return C_Spell.GetSpellName(id) end
-    if GetSpellInfo then return (GetSpellInfo(id)) end
-end
+local SpellName = ns.SpellName
 
 ------------------------------------------------------------------------
 -- The player's Cooking skill, read from the skill list and cached until it changes

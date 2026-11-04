@@ -93,6 +93,31 @@ function ns.Try(f, ...)
     return pcall(f, ...)
 end
 
+-- Spell and item info. Newer engines (WoW Forever) have them in C_SpellBook, C_Spell and C_Item and may
+-- not have the old globals at all.
+function ns.SpellName(id)
+    if C_Spell and C_Spell.GetSpellName then return C_Spell.GetSpellName(id) end
+    return GetSpellInfo and (GetSpellInfo(id))
+end
+
+-- true when the player knows the spell (this rank or id)
+function ns.KnowsSpell(id)
+    if not id then return false end
+    local book = C_SpellBook
+    if book and book.IsSpellKnown and book.IsSpellKnown(id) then return true end
+    if book and book.IsSpellInSpellBook and book.IsSpellInSpellBook(id) then return true end
+    if IsSpellKnown and IsSpellKnown(id) then return true end
+    if IsPlayerSpell and IsPlayerSpell(id) then return true end
+    return false
+end
+
+-- Returns GetItemInfo's values, or nothing when the client has neither API or doesn't know the item yet
+function ns.ItemInfo(item)
+    local get = (C_Item and C_Item.GetItemInfo) or GetItemInfo
+    if not (get and item) then return end
+    return get(item)
+end
+
 ------------------------------------------------------------------------
 -- State changes: modules call ns.FireState() after changing something, so the settings window,
 -- its footer and the minimap tooltip can redraw. ns.MarkReload(reason) also flags that a /reload is needed.
@@ -400,8 +425,7 @@ local function HasPlayerAura(spellId)
     if C_UnitAuras and C_UnitAuras.GetPlayerAuraBySpellID then
         return C_UnitAuras.GetPlayerAuraBySpellID(spellId) ~= nil
     end
-    local name = (C_Spell and C_Spell.GetSpellName and C_Spell.GetSpellName(spellId))
-        or (GetSpellInfo and (GetSpellInfo(spellId)))
+    local name = ns.SpellName(spellId)
     if not (name and UnitBuff) then return false end
     for i = 1, 40 do
         local buff = UnitBuff("player", i)

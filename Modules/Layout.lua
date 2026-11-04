@@ -111,14 +111,18 @@ function Layout:ToRaw(sysEnum, sysIndex, setting, value, currentRaw)
             end
         end
     end
-    -- 2) Use slider info: stored value = steps from minimum, unless the current value shows it is stored raw
+    -- 2) Use the slider's own converter: steps from the minimum (percent sliders), the difference from the
+    -- minimum (width and height) or the value itself (counts, padding)
     local info = FindDisplayInfo(sysEnum, setting)
     if info and info.minValue and info.maxValue then
         local v = math.max(info.minValue, math.min(info.maxValue, value))
+        if type(info.ConvertValue) == "function" then
+            local ok, raw = pcall(info.ConvertValue, info, v, false)
+            if ok and type(raw) == "number" then return math.floor(raw + 0.5) end
+        end
+        -- Older clients without a converter: steps from minimum, unless the current value shows it is stored raw
         local step = (info.stepSize and info.stepSize > 0) and info.stepSize or 1
         local steps = (info.maxValue - info.minValue) / step
-        -- Only sliders with ConvertValue are stored as steps; the rest (counts, padding) are stored raw
-        if not info.ConvertValue then return v end
         if type(currentRaw) == "number" and currentRaw >= info.minValue and currentRaw <= info.maxValue and currentRaw > steps then
             return v -- stored raw
         end

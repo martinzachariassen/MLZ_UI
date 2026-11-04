@@ -41,7 +41,7 @@ end
 
 local function SellPrice(link, count)
     if not link then return 0 end
-    local price = select(11, GetItemInfo(link))
+    local price = select(11, ns.ItemInfo(link))
     return (tonumber(price) or 0) * (count or 1)
 end
 

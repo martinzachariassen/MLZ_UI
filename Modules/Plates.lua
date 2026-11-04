@@ -435,12 +435,17 @@ local function InGroupUnit(unit)
     return false
 end
 
--- Threat values can be secret in combat on newer clients; a secret number is treated as unknown
+-- Health, cast, aura and threat values can be secret on newer engines (WoW Forever, in combat and in some
+-- instances). A secret can be shown (status bars, font strings, textures) but not compared, used in math
+-- or used as a table key. Num turns a secret number into "unknown".
 local issecretvalue = issecretvalue
+local function IsSecret(v) return issecretvalue and issecretvalue(v) or false end
 local function Num(v)
-    if v == nil or (issecretvalue and issecretvalue(v)) then return nil end
+    if v == nil or IsSecret(v) then return nil end
     return v
 end
+-- true when the game returned something, secret or not (a secret is never compared to nil)
+local function Present(v) return IsSecret(v) or v ~= nil end
 
 local function InGroup()
     return IsInGroup and IsInGroup() and true or false
@@ -668,9 +673,35 @@ local function StartChip(f, prev)
     if Wake then Wake() end
 end
 
+-- Hidden health: the bar shows it as the game gives it, without the chip, the execute mark or our math.
+-- The percent comes from the game's own percent curve when the client has it.
+local function UpdateSecretHealth(f, cur, max)
+    StopChip(f)
+    f.frac = nil
+    f.health:SetMinMaxValues(0, max)
+    f.health:SetValue(cur)
+    f.secretHealth = true
+    f.exec:Hide()
+    local scale = CurveConstants and CurveConstants.ScaleTo100
+    if cfg.show.healthText and f.isTarget and UnitHealthPercent and scale then
+        local ok, pct = pcall(UnitHealthPercent, f.unit, true, scale)
+        if ok and Present(pct) and pcall(f.healthText.SetFormattedText, f.healthText, "%.0f%%", pct) then
+            f.healthText:Show()
+            return
+        end
+    end
+    f.healthText:Hide()
+end
+
 local function UpdateHealth(f)
     local unit = f.unit
     local cur, max = UnitHealth(unit), UnitHealthMax(unit)
+    if IsSecret(cur) or IsSecret(max) then return UpdateSecretHealth(f, cur, max) end
+    if f.secretHealth then
+        f.secretHealth = nil
+        f.health:SetMinMaxValues(0, 1)
+    end
+    cur = cur or 0
     if not max or max <= 0 then max = 1 end
     local frac = cur / max
     local prev = f.frac
@@ -794,23 +825,23 @@ local function UpdateQuest(f)
     f.quest:SetShown(cfg.show.quest and not f.nameOnly and IsQuestUnit(f.unit))
 end
 
--- Returns name, icon, count, duration, expires of aura number i for the filter, or nil
+-- Returns found, name, icon, count, duration, expires of aura number i for the filter, or nil when there is
+-- none. Secret name, count and times come back as nil (the aura still shows, without a timer); the icon is
+-- passed on as it is, a texture can show a secret.
 local function AuraAt(unit, i, filter)
     if C_UnitAuras and C_UnitAuras.GetAuraDataByIndex then
         local a = C_UnitAuras.GetAuraDataByIndex(unit, i, filter)
         if not a then return nil end
-        return a.name, a.icon, a.applications, a.duration, a.expirationTime
+        return true, Num(a.name), a.icon, Num(a.applications), Num(a.duration), Num(a.expirationTime)
     end
     if UnitAura then
         local name, icon, count, _, duration, expires = UnitAura(unit, i, filter)
-        return name, icon, count, duration, expires
+        if not name then return nil end
+        return true, name, icon, count, duration, expires
     end
 end
 
-local function SpellName(id)
-    if C_Spell and C_Spell.GetSpellName then return C_Spell.GetSpellName(id) end
-    return GetSpellInfo and (GetSpellInfo(id))
-end
+local SpellName = ns.SpellName
 
 -- Names, not ids: every rank of a spell has its own id but the same name
 local function CCNames()
@@ -828,9 +859,9 @@ local function CCAura(unit)
     local names = CCNames()
     if not next(names) then return nil end
     for i = 1, 40 do
-        local name, icon, _, duration, expires = AuraAt(unit, i, "HARMFUL")
-        if not name then return nil end
-        if names[name] then return icon, duration, expires end
+        local found, name, icon, _, duration, expires = AuraAt(unit, i, "HARMFUL")
+        if not found then return nil end
+        if name and names[name] then return icon, duration, expires end
     end
 end
 
@@ -868,9 +899,10 @@ end
 
 -- GetSpellInfo(name) only answers for spells in your spellbook, so every rank counts
 local function Known(id, name)
-    local known = (IsSpellKnown and IsSpellKnown(id)) or (IsPlayerSpell and IsPlayerSpell(id))
-    if not known and name and GetSpellInfo then known = GetSpellInfo(name) ~= nil end
-    return known and true or false
+    if ns.KnowsSpell(id) then return true end
+    if not name then return false end
+    if C_Spell and C_Spell.GetSpellInfo then return C_Spell.GetSpellInfo(name) ~= nil end
+    return GetSpellInfo and GetSpellInfo(name) ~= nil or false
 end
 
 -- Your class's execute spell, if you know it (any rank). Asked again when your spells change.
@@ -969,11 +1001,11 @@ local function UpdateAuras(f)
     local n = 0
     if want then
         for i = 1, 40 do
-            local name, icon, count, duration, expires = AuraAt(f.unit, i, "HARMFUL|PLAYER")
-            if not name then break end
+            local found, _, icon, count, duration, expires = AuraAt(f.unit, i, "HARMFUL|PLAYER")
+            if not found then break end
             n = n + 1
             local a = f.auras[n]
-            a.icon:SetTexture(icon)
+            pcall(a.icon.SetTexture, a.icon, icon)
             a.count:SetText((count and count > 1) and count or "")
             a:Show() -- before SetTimer, which only paints a shown icon
             SetTimer(a, duration, expires)
@@ -998,22 +1030,37 @@ end
 -- Cast info works across client versions: the "can't interrupt" flag is return 8 for casts and 7 for
 -- channels. Clients without the flag send the spell id there, which `== true` ignores.
 -- Returns name, icon, startMS, endMS, locked, channel.
+-- A secret "can't interrupt" flag counts as interruptible (the normal cast color).
 local function CastInfo(unit)
     if UnitCastingInfo then
         local name, _, icon, startMS, endMS, _, _, a = UnitCastingInfo(unit)
-        if name then return name, icon, startMS, endMS, a == true, false end
+        if Present(name) then return name, icon, startMS, endMS, not IsSecret(a) and a == true, false end
     end
     if UnitChannelInfo then
         local name, _, icon, startMS, endMS, _, a = UnitChannelInfo(unit)
-        if name then return name, icon, startMS, endMS, a == true, true end
+        if Present(name) then return name, icon, startMS, endMS, not IsSecret(a) and a == true, true end
     end
+end
+
+-- Hidden cast times: the game's duration object drives the bar (no time text, no spark). Returns true when
+-- the client can do that.
+local function SetCastTimer(f, channel)
+    local get = channel and UnitChannelDuration or UnitCastingDuration
+    if not (get and f.cast.SetTimerDuration) then return false end
+    local ok, duration = pcall(get, f.unit)
+    if not ok or duration == nil then return false end
+    local E = Enum or {}
+    local interp = E.StatusBarInterpolation and E.StatusBarInterpolation.Immediate or 0
+    local dirs = E.StatusBarTimerDirection or {}
+    local dir = channel and (dirs.RemainingTime or 1) or (dirs.ElapsedTime or 0)
+    return (pcall(f.cast.SetTimerDuration, f.cast, duration, interp, dir))
 end
 
 -- Who the cast is aimed at (the caster's target), in class color for players. Mobs turn to the player
 -- they cast on, so a healer sees who is about to take the hit.
 local function UpdateCastTarget(f)
     local tgt = f.unit and (f.unit .. "target")
-    if not (tgt and casting[f] and UnitExists(tgt)) or UnitIsUnit(tgt, f.unit) then
+    if not (tgt and (casting[f] or f.castTimed) and UnitExists(tgt)) or UnitIsUnit(tgt, f.unit) then
         f.castTarget:SetText("")
         return
     end
@@ -1028,7 +1075,7 @@ local function CastColor(f)
     local c
     if f.castLocked then
         c = C().castLocked
-    elseif cfg.show.kick and KickBlocked(f.castEnd) then
+    elseif cfg.show.kick and not f.castTimed and KickBlocked(f.castEnd) then
         c = C().castCooldown or C().cast
     else
         c = C().cast
@@ -1041,24 +1088,34 @@ local function UpdateCast(f)
     if cfg.show.castBar and not f.nameOnly then
         name, icon, startMS, endMS, locked, channel = CastInfo(f.unit)
     end
-    if not name or not startMS or not endMS or endMS <= startMS then
+    local timed = Present(name) and (IsSecret(startMS) or IsSecret(endMS))
+    if timed then timed = SetCastTimer(f, channel) end
+    if not timed and (not Present(name) or IsSecret(startMS) or IsSecret(endMS)
+        or not startMS or not endMS or endMS <= startMS) then
         casting[f] = nil
+        f.castTimed = nil
         -- an interrupted cast stays up for a moment: the stop event that follows must not hide it
         if not held[f] then f.cast:Hide() end
         return
     end
     held[f] = nil
-    f.castStart, f.castEnd, f.castChannel = startMS / 1000, endMS / 1000, channel
+    f.castTimed = timed or nil
+    if timed then
+        f.castStart, f.castEnd, f.castChannel = nil, nil, channel
+    else
+        f.castStart, f.castEnd, f.castChannel = startMS / 1000, endMS / 1000, channel
+    end
     f.castLocked = locked
     CastColor(f)
     f.castText:SetText(name)
     f.castTime:SetText("")
-    f.castIcon:SetTexture(icon)
-    f.castIcon:SetShown(icon ~= nil)
-    f.castIcon.edge:SetShown(icon ~= nil)
-    f.spark:Show()
+    local hasIcon = Present(icon)
+    pcall(f.castIcon.SetTexture, f.castIcon, icon)
+    f.castIcon:SetShown(hasIcon)
+    f.castIcon.edge:SetShown(hasIcon)
+    f.spark:SetShown(not timed)
     f.cast:Show()
-    casting[f] = true
+    casting[f] = (not timed) or nil
     UpdateCastTarget(f)
     if Wake then Wake() end
 end
@@ -1067,6 +1124,7 @@ end
 local function CastInterrupted(f)
     if not (cfg.show.castBar and not f.nameOnly and f.cast:IsShown()) then return end
     casting[f] = nil
+    f.castTimed = nil
     held[f] = GetTime() + (D().interruptedHold or 0.6)
     local r = Theme("red", { 1, 0.36, 0.36 })
     f.cast:SetStatusBarColor(r[1], r[2], r[3])
@@ -1129,6 +1187,7 @@ local function UnitRemoved(unit)
     if not f then return end
     byUnit[unit] = nil
     casting[f] = nil
+    f.castTimed = nil
     held[f] = nil
     warned[f] = nil
     losing[f] = nil
@@ -1201,7 +1260,7 @@ handlers.UNIT_FLAGS = OnUnit(function(f) if not f.nameOnly then UpdateColor(f) e
 handlers.UNIT_TARGET = OnUnit(function(f)
     if f.nameOnly then return end
     UpdateColor(f)
-    if casting[f] then UpdateCastTarget(f) end
+    if casting[f] or f.castTimed then UpdateCastTarget(f) end
 end)
 handlers.UNIT_THREAT_LIST_UPDATE = handlers.UNIT_FLAGS
 handlers.UNIT_THREAT_SITUATION_UPDATE = function() ForEach(function(f) if not f.nameOnly then UpdateColor(f) end end) end

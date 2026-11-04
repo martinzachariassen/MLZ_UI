@@ -27,10 +27,7 @@ end
 ------------------------------------------------------------------------
 -- Game info, feature-detected (Classic clients differ)
 ------------------------------------------------------------------------
-local function SpellName(id)
-    if C_Spell and C_Spell.GetSpellName then return C_Spell.GetSpellName(id) end
-    return GetSpellInfo and (GetSpellInfo(id))
-end
+local SpellName = ns.SpellName
 
 local function SpellIcon(id)
     if C_Spell and C_Spell.GetSpellTexture then return C_Spell.GetSpellTexture(id) end
@@ -45,9 +42,7 @@ local function Knows(id)
         end
         return false
     end
-    if IsSpellKnown and IsSpellKnown(id) then return true end
-    if IsPlayerSpell and IsPlayerSpell(id) then return true end
-    return false
+    return ns.KnowsSpell(id)
 end
 
 -- Names of every helpful aura on the player
@@ -57,12 +52,15 @@ local function PlayerBuffs()
         local name
         if C_UnitAuras and C_UnitAuras.GetAuraDataByIndex then
             local aura = C_UnitAuras.GetAuraDataByIndex("player", i, "HELPFUL")
-            name = aura and aura.name
+            if not aura then break end
+            name = aura.name
         elseif UnitBuff then
             name = UnitBuff("player", i)
+            if not name then break end
+        else
+            break
         end
-        if not name then break end
-        names[name] = true
+        if name and not (issecretvalue and issecretvalue(name)) then names[name] = true end
     end
     return names
 end

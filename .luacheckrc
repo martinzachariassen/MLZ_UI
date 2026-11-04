@@ -35,7 +35,7 @@ read_globals = {
     -- C_ namespaces and tables
     "C_ActionBar", "C_AddOns", "C_CombatLog", "C_Container", "C_CVar", "C_EditMode", "C_EncodingUtil", "C_Item",
     "C_NamePlate", "C_PartyInfo", "C_PetBattles", "C_SpecializationInfo", "C_Spell", "C_Timer", "C_TooltipInfo",
-    "C_UnitAuras", "Constants", "Enum", "EventRegistry", "Settings", "TooltipDataProcessor",
+    "C_SpellBook", "C_UnitAuras", "Constants", "CurveConstants", "Enum", "EventRegistry", "Settings", "TooltipDataProcessor",
 
     -- Frames and fonts
     "ChatFontNormal", "DEFAULT_CHAT_FRAME", "EditModeManagerFrame", "EditModePresetLayoutManager",
@@ -68,7 +68,7 @@ read_globals = {
     "IsResting", "IsShiftKeyDown", "IsSpellKnown", "IsUsableAction", "IsXPUserDisabled", "ReloadUI",
     "RepairAllItems", "SaveBindings", "SendChatMessage", "SetActionBarToggles", "SetBinding", "SetCVar",
     "SetRaidTargetIconTexture", "ShowUIPanel", "UnitAffectingCombat", "UnitAura", "UnitBuff",
-    "UnitCanAttack", "UnitCastingInfo", "UnitChannelInfo", "UnitClass", "UnitClassification",
+    "UnitCanAttack", "UnitCastingDuration", "UnitCastingInfo", "UnitChannelDuration", "UnitChannelInfo", "UnitHealthPercent", "UnitClass", "UnitClassification",
     "UnitEffectiveLevel", "UnitExists", "UnitGroupRolesAssigned", "UnitGUID", "UnitHasEffectivelyTankAura",
     "UnitHealth", "UnitHealthMax", "UnitIsConnected", "UnitIsDeadOrGhost", "UnitIsFriend", "UnitIsGroupAssistant", "UnitIsGroupLeader", "UnitIsPlayer", "UnitIsQuestBoss",
     "UnitIsTapDenied", "UnitIsUnit", "UnitIsVisible", "UnitLevel", "UnitName", "UnitNameplateShowsWidgetsOnly", "UnitOnTaxi",
@@ -84,7 +84,7 @@ read_globals = {
 
     -- Other addons we read settings from (only when they are loaded)
     "AtlasLoot", "AUCTIONATOR_CHARACTER_CONFIG", "AUCTIONATOR_CONFIG", "BAGANATOR_CONFIG",
-    "BAGANATOR_CURRENT_PROFILE", "Bagnon_Sets", "Clique", "DBM", "DBM_MinimapIcon", "DBT", "Details",
+    "Auctionator", "BAGANATOR_CURRENT_PROFILE", "Bagnon", "Bagnon_Sets", "Clique", "DBM", "DBM_MinimapIcon", "DBT", "Details",
     "LeaMapsDB", "LeaPlusDB", "Platynator", "PLATYNATOR_CONFIG", "PLATYNATOR_CURRENT_PROFILE", "Prat",
     "Questie", "TomTom",
 }

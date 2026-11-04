@@ -69,9 +69,10 @@ local CAST_Y = CLASS_Y + CLASS_H + CAST_TEXT + 6 -- bottom edge of cast bar (6 u
 local CAST_GAP = 4                             -- gap between cast bar and off hand
 local SWING_GAP = 2                            -- gap between the swing timers
 
--- Swing timer settings are stored raw (width/height in units before scale, Scale in steps)
--- Width 453 = the same width the game currently shows.
-local SWING = { Scale = 0, Opacity = 100, Width = 453, Height = 15, ShowBarTitle = 0, ShowTime = 0, Visibility = 1 }
+-- Swing timer size in the units Edit Mode shows (converted to raw on save). Width 453 = the width of the action
+-- bars, Height 15 = the game's own height. Title, time and visibility are on/off and dropdown values, stored raw.
+local SWING = { Scale = 100, Opacity = 100, Width = 453, Height = 15 }
+local SWING_RAW = { ShowBarTitle = 0, ShowTime = 0, Visibility = 1 }
 
 -- Healer layouts: copies of the main layout where the group frames sit in the middle of the screen, right above
 -- the cast bar, and the swing timers are hidden (a healer has no use for them; that is also where the room comes from).
@@ -139,15 +140,15 @@ ns.data.layout = {
         { label = "Swing timer off hand", system = "SwingTimer",
           indexEnum = "EditModeSwingTimerSystemIndices", index = "OffHand",
           point = "BOTTOM", relPoint = "TOP", relTo = "PlayerCastingBarFrame", x = 0, y = CAST_GAP,
-          settingEnum = "EditModeSwingTimerSetting", rawSettings = SWING },
+          settingEnum = "EditModeSwingTimerSetting", settings = SWING, rawSettings = SWING_RAW },
         { label = "Swing timer main hand", system = "SwingTimer",
           indexEnum = "EditModeSwingTimerSystemIndices", index = "MainHand",
           point = "BOTTOM", relPoint = "TOP", relTo = "SwingTimerOffHandFrame", x = 0, y = SWING_GAP,
-          settingEnum = "EditModeSwingTimerSetting", rawSettings = SWING },
+          settingEnum = "EditModeSwingTimerSetting", settings = SWING, rawSettings = SWING_RAW },
         { label = "Swing timer ranged", system = "SwingTimer",
           indexEnum = "EditModeSwingTimerSystemIndices", index = "Ranged",
           point = "BOTTOM", relPoint = "TOP", relTo = "SwingTimerMainHandFrame", x = 0, y = SWING_GAP,
-          settingEnum = "EditModeSwingTimerSetting", rawSettings = SWING },
+          settingEnum = "EditModeSwingTimerSetting", settings = SWING, rawSettings = SWING_RAW },
 
         -- Class bar: pet (hunter, warlock: 10 buttons, ~338 wide) or stance, centered right above bar 3,
         -- so pet commands are as close to your eyes as your own spells. Both use the same spot.

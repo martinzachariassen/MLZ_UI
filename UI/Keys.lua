@@ -59,10 +59,7 @@ local BAR_BUTTONS = {
 ------------------------------------------------------------------------
 -- What a key does
 ------------------------------------------------------------------------
-local function SpellName(id)
-    if C_Spell and C_Spell.GetSpellName then return C_Spell.GetSpellName(id) end
-    return GetSpellInfo and (GetSpellInfo(id))
-end
+local SpellName = ns.SpellName
 
 local function ActionName(slot)
     local kind, id = GetActionInfo(slot)
@@ -70,7 +67,7 @@ local function ActionName(slot)
     if kind == "macro" then return GetActionText(slot) or (GetMacroInfo and (GetMacroInfo(id))) end
     if kind == "item" then
         if C_Item and C_Item.GetItemNameByID then return C_Item.GetItemNameByID(id) end
-        return GetItemInfo and (GetItemInfo(id))
+        return (ns.ItemInfo(id))
     end
     return GetActionText(slot)
 end
