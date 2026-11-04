@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- Combat text settings work on WoW Forever. The client renamed those CVars (`_v2`), so the rows showed as
+  not available.
+- Healers see friendly nameplates again on Forever, which uses `nameplateShowFriendlyPlayers`.
+- Details!: the bar font row now uses Expressway at size 11. Details replaced the old font file on every
+  refresh, so the row did nothing.
+- Prat: the chat background row works (it pointed at the wrong module), and chat fades after 20 seconds,
+  the same as MLZ's chat fade, instead of 45.
+- The flat chat input box and Roboto chat font say "Prat styles..." when Prat already does it. The minimap
+  size says "Leatrix Plus sets the minimap size" when Leatrix scales the minimap, so the two don't fight.
+- AtlasLoot: removed the world map button row. The Forever version has no world map button.
+- RXP Guides: the drowning warning row is off by default, because the tips row already turns it off.
+
 - MLZ nameplates look sharper: thicker bars in Roboto, a cast bar with the spell icon, time left and who
   the spell is aimed at, a red "Interrupted" when a cast is kicked, and a light edge on the mob under
   your mouse.

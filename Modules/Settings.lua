@@ -15,6 +15,13 @@ local function CVarExists(name)
     return ok and value ~= nil
 end
 
+-- The CVar name this client uses for a row: `name`, else `alt` (Forever renamed the combat text CVars), else nil
+local function CVarName(row)
+    if CVarExists(row.name) then return row.name end
+    if row.alt and CVarExists(row.alt) then return row.alt end
+end
+Settings.CVarName = CVarName
+
 local function Same(a, b)
     local na, nb = tonumber(a), tonumber(b)
     if na and nb then return math.abs(na - nb) < 0.0001 end
@@ -48,12 +55,14 @@ function Settings:Preview()
         if row.behaviour then
             item.note = (item.note or "") .. "  Changes how the game plays, not how it looks."
         end
-        if not CVarExists(row.name) then
+        local cvar = CVarName(row)
+        item.cvar = cvar
+        if not cvar then
             item.old, item.new = "-", "not available"
             item.enabled, item.unavailable = false, true
             item.note = (item.note or "") .. "  Your game version does not have this setting."
         else
-            local raw = GetCVar(row.name)
+            local raw = GetCVar(cvar)
             local target = tostring(row.value)
             if row.name == "SpellQueueWindow" and ns.db.spellQueueWindow then target = ns.db.spellQueueWindow end
             item.rawOld = raw
@@ -96,7 +105,11 @@ end
 
 function Settings:Backup(items)
     local snap = {}
-    for _, item in ipairs(items) do snap[item.id] = GetCVar(item.id) end
+    -- keyed by the real CVar name, which is what Restore sets
+    for _, item in ipairs(items) do
+        local cvar = item.cvar or item.id
+        snap[cvar] = GetCVar(cvar)
+    end
     -- the spell queue value is also kept in our saved variables (the wizard and export read it)
     snap.__spellQueueWindow = ns.db.spellQueueWindow or false
     return snap
@@ -106,7 +119,7 @@ function Settings:Apply(items)
     local changed, failed = 0, 0
     for _, item in ipairs(items) do
         if not item.unavailable and item.value ~= nil then
-            local ok, err = pcall(SetCVar, item.id, item.value)
+            local ok, err = pcall(SetCVar, item.cvar or item.id, item.value)
             if ok then
                 changed = changed + 1
                 if item.id == "SpellQueueWindow" then ns.db.spellQueueWindow = item.value end

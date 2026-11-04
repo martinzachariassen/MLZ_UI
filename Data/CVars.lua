@@ -10,6 +10,8 @@
 --   text    = (optional) plain words for the raw values, e.g. { ["0"] = "unlocked", ["1"] = "locked" }.
 --             Rows that only switch between 0 and 1 show "off" and "on" by default; set numeric = true to opt out.
 --   behaviour = true: changes how the game plays, not how it looks (amber in the wizard)
+--   alt     = (optional) a second CVar name, used when the client doesn't have `name` (Forever only has the
+--             combat text CVars with a _v2 suffix)
 
 local _, ns = ...
 
@@ -79,20 +81,27 @@ ns.data.cvars = {
 
     -- Combat text: small, calm numbers rising above the target
     { name = "floatingCombatTextCombatDamage", value = "1", label = "Damage numbers", enabled = true, group = "Combat text",
+      alt = "floatingCombatTextCombatDamage_v2",
       desc = "Floating numbers for damage you deal (and take)." },
     { name = "floatingCombatTextCombatHealing", value = "1", label = "Healing numbers", enabled = true, group = "Combat text",
+      alt = "floatingCombatTextCombatHealing_v2",
       desc = "Floating numbers for healing you give and receive." },
     { name = "floatingCombatTextFloatMode", value = "1", label = "Numbers rise upward", enabled = true, group = "Combat text",
+      alt = "floatingCombatTextFloatMode_v2",
       desc = "Numbers float straight up instead of arcing or falling." },
     { name = "floatingCombatTextCombatDamageDirectionalScale", value = "0", label = "No sideways scatter", enabled = true, group = "Combat text",
+      alt = "floatingCombatTextCombatDamageDirectionalScale_v2",
       text = { ["0"] = "no scatter", ["1"] = "scatter" },
       desc = "Keeps numbers from flying out to the sides, so the middle of the screen stays calm." },
     { name = "WorldTextScale", value = "0.7", label = "Combat text size", enabled = true, group = "Combat text",
+      alt = "WorldTextScale_v2",
       choices = { "0.5", "0.6", "0.7", "0.8", "1" },
       desc = "Size of floating numbers. Default 1. Click the value to change it." },
     { name = "WorldTextGravity", value = "0.5", label = "Combat text gravity", enabled = true, group = "Combat text",
+      alt = "WorldTextGravity_v2",
       desc = "How fast numbers move away. Lower = calmer." },
     { name = "floatingCombatTextReactives", value = "1", label = "Reactive ability alerts", enabled = true, group = "Combat text",
+      alt = "floatingCombatTextReactives_v2",
       desc = "Short text when a reactive ability becomes usable, like Overpower or Revenge." },
 
     -- Nameplates (stacking and friendly plates are handled by Platynator, see the Nameplates page)

@@ -1287,7 +1287,7 @@ PAGES[#PAGES + 1] = { key = "buttons", title = "Bars & interface", icon = "Inter
         function() return tw.MapSize() end,
         function(v) tw.PreviewMap(v) end,
         function(v) SaveMap(v, "Minimap size saved") end,
-        { avail = NoEditMode })
+        { avail = function() return NoEditMode() or (tw.MapAvail and tw.MapAvail()) end })
     Tweaks("Minimap")
     p:Toggle("Show the minimap button", "Left-click opens this window, right-click opens a quick menu, SHIFT-click reloads when a reload is needed. Drag it to move it around the minimap.",
         function() return not (ns.db.minimap and ns.db.minimap.hide) end,

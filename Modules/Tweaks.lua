@@ -45,7 +45,19 @@ local function LeatrixMinimap()
     return ns.IsAddOnLoaded("Leatrix_Plus") and type(_G.LeaPlusDB) == "table" and _G.LeaPlusDB.MinimapModder == "On"
 end
 
+-- Prat's Editbox and Font modules (on by default) style the same chat frames as our chat tweaks
+local function PratModuleOn(name)
+    local prat = _G.Prat
+    if not (ns.IsAddOnLoaded("Prat-3.0") and type(prat) == "table" and prat.GetModule) then return false end
+    local ok, mod = pcall(prat.GetModule, prat, name, true)
+    if not (ok and mod and mod.IsEnabled) then return false end
+    local ok2, on = pcall(mod.IsEnabled, mod)
+    return ok2 and on and true or false
+end
+
 local AVAIL = {
+    flatChatInput = function() if PratModuleOn("Editbox") then return "Prat styles the chat input box" end end,
+    chatFont = function() if PratModuleOn("Font") then return "Prat sets the chat font" end end,
     tooltipClass = function() if not TooltipsAvailable() then return "Tooltip hooks not available" end end,
     tooltipTarget = function() if not TooltipsAvailable() then return "Tooltip hooks not available" end end,
     chatClassNames = function()
@@ -521,15 +533,25 @@ local function MapSize()
 end
 
 -- The minimap cluster is an Edit Mode frame; only touch it out of combat
+-- With its minimap option on, Leatrix Plus scales the cluster itself. Two scales would fight.
+local function MapAvail()
+    if LeatrixMinimap() then return "Leatrix Plus sets the minimap size" end
+end
+Tweaks.MapAvail = MapAvail
+
 local function PreviewMap(size)
     local cluster = _G.MinimapCluster
-    if not cluster or InCombatLockdown() then return end
+    if not cluster or InCombatLockdown() or LeatrixMinimap() then return end
     if math.abs(cluster:GetScale() - size / 100) > 0.001 then pcall(cluster.SetScale, cluster, size / 100) end
 end
 
 -- Saves the size in MLZUIDB and in the Edit Mode layout. quiet = no chat output (the settings window
 -- shows the result itself). In combat it waits until combat ends. Returns ok, error message.
 local function SaveMap(size, quiet)
+    if LeatrixMinimap() then
+        if not quiet then ns.Print("Minimap size not changed:", MapAvail() .. ".") end
+        return false, MapAvail()
+    end
     size = math.max(MAP_MIN, math.min(MAP_MAX, math.floor(size / MAP_STEP + 0.5) * MAP_STEP))
     ns.db.overrides = ns.db.overrides or {}
     ns.db.overrides.minimapSize = size

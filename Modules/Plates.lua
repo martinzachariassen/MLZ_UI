@@ -973,19 +973,31 @@ local function SetClickThrough(on)
     end
 end
 
+-- Older clients have one CVar for friendly plates; Forever splits it into players and NPCs. Healers only
+-- need the players (the group), so the NPC plates stay as they are.
+local function FriendsCVar()
+    for _, name in ipairs({ "nameplateShowFriends", "nameplateShowFriendlyPlayers" }) do
+        if GetCVar(name) ~= nil then return name end
+    end
+end
+
 local function ApplyFriends()
     local want = active and cfg.friends and cfg.mode == "healer" and not cfg.pvp
     ns.RunOutOfCombat(function()
         local db = ns.db and ns.db.nameplates
         if not db then return end
         if want then
+            local cvar = FriendsCVar()
+            if not cvar then return end
             if db.friendsBase == nil then
-                db.friendsBase = { show = GetCVar("nameplateShowFriends"), click = GetClickThrough() }
+                db.friendsBase = { cvar = cvar, show = GetCVar(cvar), click = GetClickThrough() }
             end
-            SetCVar("nameplateShowFriends", "1")
+            SetCVar(cvar, "1")
             SetClickThrough(true)
         elseif db.friendsBase then
-            if db.friendsBase.show ~= nil then SetCVar("nameplateShowFriends", db.friendsBase.show) end
+            -- saved before `cvar` was stored: it was always nameplateShowFriends then
+            local cvar = db.friendsBase.cvar or "nameplateShowFriends"
+            if db.friendsBase.show ~= nil then pcall(SetCVar, cvar, db.friendsBase.show) end
             SetClickThrough(db.friendsBase.click and true or false)
             db.friendsBase = nil
         end

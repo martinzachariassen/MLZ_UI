@@ -41,9 +41,12 @@ end
 local bit_band = bit.band
 local MINE = COMBATLOG_OBJECT_AFFILIATION_MINE or 0x00000001
 
+-- Newer engines keep the combat log reader in C_CombatLog; the old global may only be an alias
+local GetEventInfo = CombatLogGetCurrentEventInfo or (C_CombatLog and C_CombatLog.GetCurrentEventInfo)
+
 local function OnCombatLog()
     local _, sub, _, sourceGUID, _, sourceFlags, _, _, destName, _, _, _, _, _, extraSpellId, extraSpellName =
-        CombatLogGetCurrentEventInfo()
+        GetEventInfo()
     if sub ~= "SPELL_INTERRUPT" then return end
     -- you, or something you control (your pet)
     if sourceGUID ~= UnitGUID("player") and not (sourceFlags and bit_band(sourceFlags, MINE) ~= 0) then return end
@@ -60,7 +63,7 @@ end
 -- announce is on (the shared event bus can't unregister).
 local logFrame
 local function Update()
-    local on = Channel() ~= "off" and CombatLogGetCurrentEventInfo ~= nil
+    local on = Channel() ~= "off" and GetEventInfo ~= nil
     if on and not logFrame then
         logFrame = CreateFrame("Frame")
         logFrame:SetScript("OnEvent", function()

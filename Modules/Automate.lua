@@ -29,12 +29,11 @@ local LEATRIX = {
     bopSolo = "NoConfirmLoot",
 }
 
--- LeaPlusLC holds what Leatrix uses right now; LeaPlusDB is only written at logout
+-- LeaPlusDB holds what Leatrix loaded at login (its live table is private). A change made in /ltp during
+-- the session counts after the next /reload.
 local function LeatrixDoes(key)
     local lkey = LEATRIX[key]
     if not lkey or not ns.IsAddOnLoaded("Leatrix_Plus") then return false end
-    local lc = _G.LeaPlusLC
-    if type(lc) == "table" and lc[lkey] ~= nil then return lc[lkey] == "On" end
     local db = _G.LeaPlusDB
     return type(db) == "table" and db[lkey] == "On"
 end

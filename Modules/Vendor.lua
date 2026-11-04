@@ -43,11 +43,10 @@ local function SellPrice(link, count)
     return (tonumber(price) or 0) * (count or 1)
 end
 
--- LeaPlusLC holds what Leatrix uses right now; LeaPlusDB is only written at logout
+-- LeaPlusDB holds what Leatrix loaded at login (its live table is private). A change made in /ltp during
+-- the session counts after the next /reload.
 local function LeatrixOn(key)
     if not ns.IsAddOnLoaded("Leatrix_Plus") then return false end
-    local lc = _G.LeaPlusLC
-    if type(lc) == "table" and lc[key] ~= nil then return lc[key] == "On" end
     local db = _G.LeaPlusDB
     return type(db) == "table" and db[key] == "On"
 end

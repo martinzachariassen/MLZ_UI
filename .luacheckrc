@@ -33,7 +33,7 @@ read_globals = {
     "hooksecurefunc", "issecure", "issecretvalue",
 
     -- C_ namespaces and tables
-    "C_ActionBar", "C_AddOns", "C_Container", "C_CVar", "C_EditMode", "C_EncodingUtil", "C_Item",
+    "C_ActionBar", "C_AddOns", "C_CombatLog", "C_Container", "C_CVar", "C_EditMode", "C_EncodingUtil", "C_Item",
     "C_NamePlate", "C_PartyInfo", "C_PetBattles", "C_SpecializationInfo", "C_Spell", "C_Timer", "C_TooltipInfo",
     "C_UnitAuras", "Constants", "Enum", "EventRegistry", "Settings", "TooltipDataProcessor",
 

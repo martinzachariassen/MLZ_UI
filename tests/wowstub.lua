@@ -265,8 +265,21 @@ RAID_CLASS_COLORS = setmetatable({}, {
 -- Client and player
 ------------------------------------------------------------------------
 stub.cvars = {}
-function GetCVar(name) return stub.cvars[name] or "0" end
-function SetCVar(name, value) stub.cvars[name] = tostring(value) end
+-- Names the Forever client doesn't have (it uses the _v2 combat text CVars and nameplateShowFriendlyPlayers)
+stub.missingCVars = {
+    floatingCombatTextCombatDamage = true, floatingCombatTextCombatHealing = true,
+    floatingCombatTextFloatMode = true, floatingCombatTextCombatDamageDirectionalScale = true,
+    floatingCombatTextReactives = true, WorldTextScale = true, WorldTextGravity = true,
+    nameplateShowFriends = true,
+}
+function GetCVar(name)
+    if stub.missingCVars[name] then return nil end
+    return stub.cvars[name] or "0"
+end
+function SetCVar(name, value)
+    if stub.missingCVars[name] then error("unknown CVar " .. tostring(name)) end
+    stub.cvars[name] = tostring(value)
+end
 function GetCVarBool(name) return GetCVar(name) == "1" end
 function GetCVarDefault() return "0" end
 C_CVar = {
@@ -274,6 +287,10 @@ C_CVar = {
     SetCVar = SetCVar,
     GetCVarBool = GetCVarBool,
     GetCVarDefault = GetCVarDefault,
+    GetCVarInfo = function(name)
+        local value = GetCVar(name)
+        if value ~= nil then return value, GetCVarDefault(name) end
+    end,
 }
 
 function GetBuildInfo() return "1.16.0", "60000", "Oct 1 2026", 16001 end
