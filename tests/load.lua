@@ -277,6 +277,41 @@ local function CheckThreatMeter()
     if not ok then Fail("threat meter", err) end
 end
 
+-- Window placement on a fake RestedXP: applying moves the guide window, undo puts it back where it was
+local function CheckPlacement()
+    local A = ns.modules and ns.modules.addons
+    if not A then return Fail("placement", "the addons module is missing") end
+    local point = { "CENTER", nil, "CENTER", 0, 0 }
+    local frame = {
+        GetNumPoints = function() return 1 end,
+        GetPoint = function() return point[1], point[2], point[3], point[4], point[5] end,
+        GetScale = function() return 1 end,
+        ClearAllPoints = function() end,
+        SetPoint = function(_, p, rel, relPoint, x, y) point = { p, rel, relPoint, x, y } end,
+    }
+    local api = _G.C_AddOns
+    local savedLoaded, savedFrame, savedSettings = api.IsAddOnLoaded, _G.RXPFrame, _G.RXPSettings
+    api.IsAddOnLoaded = function(name) return name == "MLZ_UI" or name == "RXPGuides" end
+    _G.RXPFrame = frame
+    _G.RXPSettings = { profileKeys = { ["Tester - Test"] = "Default" }, profiles = { Default = {} } }
+    local ok, err = pcall(function()
+        local items = {}
+        for _, item in ipairs(A:Preview()) do
+            if item.id == "RXPGuides:guide_position" and not item.unavailable then items[1] = item end
+        end
+        if #items == 0 then error("the guide window row is not offered", 0) end
+        local snap = A:Backup(items)
+        A:Apply(items)
+        if point[1] ~= "TOPLEFT" or point[5] ~= -418 then Fail("placement", "the guide window did not move") end
+        A:Restore(snap)
+        if point[1] ~= "CENTER" or point[4] ~= 0 or point[5] ~= 0 then
+            Fail("placement", "undo did not put the guide window back")
+        end
+    end)
+    api.IsAddOnLoaded, _G.RXPFrame, _G.RXPSettings = savedLoaded, savedFrame, savedSettings
+    if not ok then Fail("placement", err) end
+end
+
 -- Applies the wizard with its suggested rows, then undoes it: CVars and bindings must be back as before
 local function CheckApplyUndo()
     local I = ns.Installer
@@ -443,6 +478,7 @@ local changed = CheckApplyUndo() or 0
 local presets = CheckPresets() or 0
 local plates = CheckPlates() or 0
 CheckThreatMeter()
+CheckPlacement()
 CheckMigration()
 
 if verbose then

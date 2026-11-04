@@ -32,6 +32,10 @@
 --             A row can have its own `root`. Instead of path/value a row can set several keys at
 --             once: set = { { path = {...}, value = ... }, ... } and show = "%s %s" (format for the
 --             wizard, one %s per key in order).
+--             Placement rows move an addon window instead: want = function(metrics, inset) return pos end,
+--             plus get/set functions or frame = "GlobalName" (see Modules/Addons.lua). `metrics` are the
+--             layout numbers from Data/Layout.lua and `inset` the ultrawide margin, so windows line up with
+--             the bars on every screen. pos = { point, relPoint, x, y, w, h } in UIParent units.
 --
 -- Keys come from each addon's own SavedVariables / defaults, so they only apply to the version
 -- you have installed. Rows whose key doesn't exist are skipped with "not available".
@@ -117,6 +121,75 @@ local function DetailsStyle(what)
           desc = "The icons at the top of the window dim to 30% until you hover them.",
           set = { { path = { "menu_alpha", "enabled" }, value = true },
                   { path = { "menu_alpha", "onleave" }, value = 0.3 } } },
+    }
+end
+
+-- Details window position. libwindow = { point, x, y, scale }: x/y in UIParent units from the same point of
+-- UIParent (core/windows.lua RestoreLibWindow). Windows that were never moved have no libwindow yet and use the
+-- older center offset in posicao.normal, so get() reports that and set() can put it back on undo.
+local DETAILS_TITLE = 24 -- the title bar sits above the window frame Details positions
+
+local function DetailsPlace(id, label, desc, want)
+    return {
+        id = "position", label = label, desc = desc, want = want,
+        get = function()
+            local d = DetailsReady()
+            local w = d and d:GetInstance(id)
+            local normal = w and w.posicao and w.posicao.normal
+            if not (normal and w.libwindow) then return nil end
+            local lw = w.libwindow
+            if lw.x then
+                return { point = lw.point, relPoint = lw.point, x = lw.x, y = lw.y, w = normal.w, h = normal.h }
+            end
+            return { point = "CENTER", relPoint = "CENTER", x = normal.x or 0, y = normal.y or 0, w = normal.w, h = normal.h }
+        end,
+        set = function(pos)
+            local d = DetailsReady()
+            local w = d and d:GetInstance(id)
+            local normal = w and w.posicao and w.posicao.normal
+            if not normal then return end
+            normal.w, normal.h = pos.w or normal.w, pos.h or normal.h
+            if pos.point == "CENTER" then
+                -- back to the older center offset (a window that was never moved)
+                w.libwindow = {}
+                normal.x, normal.y = pos.x, pos.y
+            else
+                w.libwindow = { point = pos.point, x = pos.x, y = pos.y, scale = w.window_scale or 1 }
+            end
+            if w.baseframe and w.RestoreMainWindowPosition then w:RestoreMainWindowPosition() end
+        end,
+    }
+end
+
+-- Bottom right column, above bags and micro menu (the same spot as Blizzard's meter in Data/Layout.lua)
+local METER_W, METER_H, THREAT_H = 230, 140, 90
+local function MeterPos(m, inset)
+    return { point = "BOTTOMRIGHT", relPoint = "BOTTOMRIGHT", x = -(m.METER_X + inset), y = m.METER_Y,
+             w = METER_W, h = METER_H }
+end
+local function ThreatPos(m, inset)
+    return { point = "BOTTOMRIGHT", relPoint = "BOTTOMRIGHT", x = -(m.METER_X + inset),
+             y = m.METER_Y + METER_H + DETAILS_TITLE + 4, w = METER_W, h = THREAT_H }
+end
+
+-- Bagnon frames: SetPoint(point, x, y) on UIParent's same point, offsets in the frame's own scale
+local function BagnonPlace(frame, label, desc, want)
+    local function Sets() return Bagnon_Sets and Bagnon_Sets.global and Bagnon_Sets.global[frame] end
+    return {
+        id = frame .. "_position", label = label, desc = desc, want = want,
+        missing = "Bagnon has not saved this window yet. Open it once and run this step again.",
+        get = function()
+            local t = Sets()
+            if not (t and t.point) then return nil end
+            local s = t.scale or 1
+            return { point = t.point, relPoint = t.point, x = (t.x or 0) * s, y = (t.y or 0) * s }
+        end,
+        set = function(pos)
+            local t = Sets()
+            if not t then return end
+            local s = t.scale or 1
+            t.point, t.x, t.y = pos.point, pos.x / s, pos.y / s
+        end,
     }
 end
 
@@ -215,6 +288,12 @@ ns.data.addons = {
         addon = "Bagnon", title = "Bagnon (bags)",
         root = BagnonGlobal,
         rows = {
+            BagnonPlace("inventory", "Bag window position",
+                "Your bags open in the bottom right corner, above the bag buttons, inside the middle of a wide screen.",
+                function(_, inset) return { point = "BOTTOMRIGHT", relPoint = "BOTTOMRIGHT", x = -(4 + inset), y = 90 } end),
+            BagnonPlace("bank", "Bank window position",
+                "The bank opens on the left, above the chat, so bags and bank sit side by side.",
+                function(_, inset) return { point = "LEFT", relPoint = "LEFT", x = 10 + inset, y = 100 } end),
             { id = "inv_columns", label = "Bag columns", desc = "12 slots per row in the backpack window, a compact block that fits above the action bars.",
               path = { "inventory", "columns" }, value = 12 },
             { id = "bank_columns", label = "Bank columns", desc = "12 slots per row in the bank, the same width as your bags.",
@@ -289,7 +368,17 @@ ns.data.addons = {
             end
             return profile and db.profiles[profile]
         end,
+        -- RXP reads its window positions back from the live frames at logout, so moving the frames is enough
         rows = {
+            { id = "guide_position", label = "Guide window position", frame = "RXPFrame",
+              desc = "Top left, right under the quest tracker and above the group frames. Not at the screen edge on a wide screen.",
+              want = function(_, inset) return { point = "TOPLEFT", relPoint = "TOPLEFT", x = 10 + inset, y = -418 } end },
+            { id = "target_position", label = "Target window position", frame = "RXPTargetFrame",
+              desc = "Right of the guide window instead of the middle of the screen.",
+              want = function(_, inset) return { point = "TOPLEFT", relPoint = "TOPLEFT", x = 10 + inset + 255, y = -418 } end },
+            { id = "item_position", label = "Quest item buttons position", frame = "RXPItemFrame",
+              desc = "Just above your target frame, next to the action bars, instead of the middle of the screen.",
+              want = function(m) return { point = "BOTTOMLEFT", relPoint = "BOTTOM", x = m.HALF + m.GAP, y = m.UNIT_Y + 110 } end },
             { id = "theme", label = "Dark theme", desc = "The guide window uses RestedXP's DarkMode theme, flat and dark like MLZ UI.",
               path = { "activeTheme" }, value = "DarkMode" },
             { id = "scale", label = "Guide window scale", desc = "Scale of the guide window. Off by default: tick it if you want 1.1.",
@@ -523,6 +612,9 @@ ns.data.addons = {
         rows = Join({
             { id = "minimap", label = "Hide minimap button", desc = "Keeps the minimap clean. Open Details with /details.",
               root = DetailsGlobal, path = { "minimap", "hide" }, value = true },
+            DetailsPlace(1, "Window position and size",
+                "Bottom right, above the bag buttons and below bars 4-5, 230x140. Moves in from the edge on a wide screen.",
+                MeterPos),
         }, DetailsStyle("Window 1"), {
             { id = "segments", label = "Fights kept", desc = "Saves the last 10 fights between sessions instead of 15, so the list stays short.",
               root = DetailsGlobal, path = { "segments_amount_to_save" }, value = 10 },
@@ -593,6 +685,8 @@ ns.data.addons = {
             { id = "show", label = "Show TinyThreat in window 2", show = "mode %s  %s",
               desc = "Window 2 shows everyone's threat on your target. Aggro moves to you at 100%.",
               set = { { path = { "modo" }, value = DETAILS_MODE_RAID }, { path = { "last_raid_plugin" }, value = TINY_THREAT } } },
+            DetailsPlace(2, "Window position and size",
+                "Right above the meter window, the same width, 90 high.", ThreatPos),
         }, DetailsStyle("The threat window"), {
             -- TinyThreat reads its options on every update, straight from its saved table
             { id = "class_colors", label = "Class colors", desc = "Each player's bar in their class color, so you spot the tank.",
@@ -646,6 +740,31 @@ ns.data.addons = {
             { id = "block", label = "Hide the coordinate box",
               desc = "Removes the small box with your coordinates. The minimap and the world map still show them.",
               path = { "block", "enable" }, value = false },
+            -- position = { point, nil, relPoint, x, y } in arrow units (the arrow has its own scale). TomTom only
+            -- reads it on login, so the live arrow is moved as well.
+            { id = "arrow_position", label = "Arrow position",
+              desc = "Near the top of the screen instead of the middle, so it never covers the fight.",
+              want = function() return { point = "TOP", relPoint = "TOP", x = 0, y = -140 } end,
+              get = function()
+                  local a = TomTom and TomTom.db and TomTom.db.profile and TomTom.db.profile.arrow
+                  if not a then return nil end
+                  local p, s = a.position, a.scale or 1
+                  if type(p) ~= "table" or not p[1] then
+                      return { point = "CENTER", relPoint = "CENTER", x = 0, y = 0 }
+                  end
+                  return { point = p[1], relPoint = p[3] or p[1], x = (p[4] or 0) * s, y = (p[5] or 0) * s }
+              end,
+              set = function(pos)
+                  local a = TomTom and TomTom.db and TomTom.db.profile and TomTom.db.profile.arrow
+                  if not a then return end
+                  local s = a.scale or 1
+                  a.position = { pos.point, nil, pos.relPoint, pos.x / s, pos.y / s }
+                  local f = _G.TomTomCrazyArrow
+                  if f and f.SetPoint then
+                      f:ClearAllPoints()
+                      f:SetPoint(pos.point, UIParent, pos.relPoint, pos.x / s, pos.y / s)
+                  end
+              end },
         },
     },
 }

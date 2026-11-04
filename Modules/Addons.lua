@@ -121,6 +121,81 @@ local function Matches(row, values)
     return true
 end
 
+------------------------------------------------------------------------
+-- Placement rows: where an addon window sits on screen. Instead of path/value they have
+--   want(metrics, inset) -> pos   the target, computed when previewed or applied (follows the screen size)
+--   get() -> pos | nil            the current position (nil = the window doesn't exist)
+--   set(pos)                      moves the window and stores it where the addon saves it
+-- or `frame = "GlobalName"` for a plain frame whose addon saves its position from the live frame.
+-- pos = { point, relPoint, x, y, w, h } in UIParent units (w/h optional).
+------------------------------------------------------------------------
+local function IsPlace(row) return row.want ~= nil end
+
+local function FrameGet(name)
+    local f = _G[name]
+    if not (f and f.GetPoint and f.GetNumPoints and f:GetNumPoints() > 0) then return nil end
+    local point, rel, relPoint, x, y = f:GetPoint(1)
+    local s = f:GetScale() or 1
+    local relName = rel and rel.GetName and rel:GetName() or nil
+    return { point = point, relPoint = relPoint, relTo = relName ~= "UIParent" and relName or nil,
+             x = (x or 0) * s, y = (y or 0) * s }
+end
+
+local function FrameSet(name, pos)
+    local f = _G[name]
+    if not (f and f.SetPoint) then return end
+    local s = f:GetScale() or 1
+    f:ClearAllPoints()
+    f:SetPoint(pos.point, pos.relTo and _G[pos.relTo] or UIParent, pos.relPoint or pos.point, pos.x / s, pos.y / s)
+end
+
+local function PlaceGet(row)
+    if row.get then
+        local ok, pos = ns.Try(row.get)
+        return ok and pos or nil
+    end
+    return row.frame and FrameGet(row.frame)
+end
+
+local function PlaceWant(row)
+    local inset = ns.SafeInset and math.floor(ns.SafeInset() + 0.5) or 0
+    local ok, pos = ns.Try(row.want, ns.data.layout and ns.data.layout.metrics or {}, inset)
+    return ok and pos or nil
+end
+
+-- Moving a window that holds secure buttons (RXP's item bar) is blocked in combat. All moves wait in one
+-- list, so a single "after combat" job (one chat line) runs them in order.
+local pendingMoves = {}
+
+local function PlaceSet(row, pos)
+    pendingMoves[#pendingMoves + 1] = { row = row, pos = pos }
+    ns.RunOutOfCombat(function()
+        local list = pendingMoves
+        pendingMoves = {}
+        for _, m in ipairs(list) do
+            if m.row.set then ns.Try(m.row.set, m.pos) elseif m.row.frame then ns.Try(FrameSet, m.row.frame, m.pos) end
+        end
+    end, "addon windows")
+end
+
+local function ShowPos(pos)
+    if not pos then return "default" end
+    local text = ("%s %+d,%+d"):format(pos.point or "?", math.floor((pos.x or 0) + 0.5), math.floor((pos.y or 0) + 0.5))
+    if pos.relTo then text = text .. " (" .. pos.relTo .. ")" end
+    if pos.w and pos.h then text = text .. ("  %dx%d"):format(math.floor(pos.w + 0.5), math.floor(pos.h + 0.5)) end
+    return text
+end
+
+-- Within 1 unit counts as the same spot (positions go through scale conversions)
+local function SamePos(a, b)
+    if not (a and b) then return false end
+    if a.point ~= b.point or (a.relPoint or a.point) ~= (b.relPoint or b.point) or a.relTo ~= b.relTo then return false end
+    for _, k in ipairs({ "x", "y", "w", "h" }) do
+        if b[k] and math.abs((a[k] or 0) - b[k]) > 1 then return false end
+    end
+    return true
+end
+
 local function Find(id)
     for _, entry in ipairs(ns.data.addons) do
         for _, row in ipairs(entry.rows) do
@@ -202,6 +277,23 @@ local function PreviewRow(entry, row)
         item.note = wrong:sub(1, 1):upper() .. wrong:sub(2) .. "."
         return item
     end
+    if IsPlace(row) then
+        local now, want = PlaceGet(row), PlaceWant(row)
+        item.enabled = ns.Enabled("addons", id, row.enabled ~= false)
+        item.new = ShowPos(want)
+        if now then
+            item.old = ShowPos(now)
+            item.alreadySet = SamePos(now, want)
+        elseif Preparable(entry, row) and Writable(entry) then
+            item.old = "-"
+            item.note = entry.prepareNote .. (row.desc and ("  " .. row.desc) or "")
+        else
+            item.old, item.new = "-", "not available"
+            item.enabled, item.unavailable = false, true
+            item.note = row.missing or "The window has not been created yet. Open it once and run this step again."
+        end
+        return item
+    end
     local values = Read(entry, row)
     if not values and Preparable(entry, row) and Writable(entry) then
         item.old = "-"
@@ -253,7 +345,10 @@ function Addons:Backup(items)
     local snap = {}
     for _, item in ipairs(items) do
         local entry, row = Find(item.id)
-        if entry then
+        if entry and IsPlace(row) then
+            local now = PlaceGet(row)
+            snap[item.id] = { pos = now and ns.CopyTable(now) or false }
+        elseif entry then
             local parts = {}
             for i, part in ipairs(Parts(row)) do
                 local parent, key = Resolve(entry, row, part.path)
@@ -285,7 +380,12 @@ function Addons:Apply(items)
                 prepared[entry] = true
                 ns.Try(entry.prepare)
             end
-            for _, part in ipairs(Parts(row)) do
+            if IsPlace(row) then
+                -- placement rows move the live window, so they never ask for a reload
+                local want = PlaceWant(row)
+                if want then PlaceSet(row, want) changed = changed + 1 else failed = failed + 1 end
+            end
+            for _, part in ipairs(IsPlace(row) and {} or Parts(row)) do
                 local parent, key = Resolve(entry, row, part.path, true)
                 if parent then
                     parent[key] = type(part.value) == "table" and ns.CopyTable(part.value) or part.value
@@ -333,9 +433,11 @@ function Addons:Restore(snap)
         elseif entry and Writable(entry) then
             done[#done + 1] = id
             Unlock(entry)
+            -- a window that didn't exist before has no old spot (pos = false); it is closed by unprepare
+            if IsPlace(row) and old.pos then PlaceSet(row, old.pos) end
             -- Older backups stored one { has, value } per row
             local saved = old.parts or { old }
-            for i, part in ipairs(Parts(row)) do
+            for i, part in ipairs(IsPlace(row) and {} or Parts(row)) do
                 local prev = saved[i]
                 if prev then
                     local parent, key = Resolve(entry, row, part.path)
@@ -380,6 +482,14 @@ function Addons:Summary()
                 local wrong = ForMe(row) and WrongVersion(entry, row)
                 if wrong then
                     s.missing[#s.missing + 1] = row.label .. " - " .. wrong
+                elseif ForMe(row) and IsPlace(row) then
+                    local now = PlaceGet(row)
+                    if now or Preparable(entry, row) then
+                        s.total = s.total + 1
+                        if not SamePos(now, PlaceWant(row)) then s.differ = s.differ + 1 end
+                    else
+                        s.missing[#s.missing + 1] = row.label .. " - window not created yet"
+                    end
                 elseif ForMe(row) then
                     local ok, values = pcall(Read, entry, row)
                     if ok and values then
