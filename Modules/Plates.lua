@@ -1,7 +1,9 @@
 -- MLZ UI: MLZ nameplates (our own engine)
--- Flat, calm nameplates drawn on our own frames: health bar, name, level when it matters, a cast bar
--- with spell icon, time left and who the spell is aimed at, quest marker, raid marker, your own debuffs,
--- crowd control from anyone, an execute range strip, a mouseover edge and threat colors per role.
+-- Modern, calm nameplates drawn on our own frames: a soft health bar with missing health in a dark shade
+-- and a chip that slides away when health is lost, name on the left, level and elite mark on the right,
+-- arrows on your target, a cast bar with spell icon, spark, time left, who the spell is aimed at and
+-- whether your interrupt is ready, quest and raid markers, your own debuffs with refresh timing, crowd
+-- control from anyone, an execute range strip, a paw when your pet holds the mob and threat colors.
 -- Modules/Nameplates.lua decides the mode and calls Plates.Configure; this file only draws.
 -- Values: Data/Nameplates.lua.
 --
@@ -36,7 +38,10 @@ local active = false
 local lastError
 local cfg = {
     mode = "solo", pvp = false, threat = false, friends = true, size = 1,
-    show = { healthText = true, castBar = true, quest = true, debuffs = true, level = true, execute = true, cc = true },
+    show = {
+        healthText = true, castBar = true, quest = true, debuffs = true, level = true, execute = true, cc = true,
+        refresh = true, kick = true, pet = true,
+    },
 }
 
 local frames = {}    -- [nameplate] = our frame (kept for reuse)
@@ -48,6 +53,8 @@ local questCache = {} -- [guid] = true/false
 local execPct        -- health fraction where your execute spell works, nil if your class has none or doesn't know it
 local ccNames        -- [spell name] = true for crowd control worth showing (built on first use, every rank matches)
 local held = {}      -- [our frame] = true while an interrupted cast is still shown
+local losing = {}    -- [our frame] = true while the chip of lost health slides away
+local kick           -- your interrupt: { names = { ... }, pet = true? }, nil if your class has none or knows none
 local hover          -- our frame under the mouse, if any
 local warned = {}    -- [our frame] = true once the threat sound played for this mob (reset below threatWarnAt)
 local Wake -- starts the OnUpdate (cast bars, debuff timers); set once the event frame exists
@@ -144,6 +151,21 @@ local function MakeBar(parent, height)
     bar.bg:SetAllPoints()
     local bg = Theme("input", { 0.06, 0.07, 0.085 })
     bar.bg:SetVertexColor(bg[1], bg[2], bg[3], BG_ALPHA)
+    -- the soft look without a gradient API: a sheen over the upper half and a shade over the lower half,
+    -- above the fill and below the text
+    local c = C()
+    bar.sheen = bar:CreateTexture(nil, "OVERLAY", nil, -8)
+    bar.sheen:SetTexture(TEX)
+    bar.sheen:SetPoint("TOPLEFT")
+    bar.sheen:SetPoint("TOPRIGHT")
+    bar.sheen:SetHeight(height / 2)
+    bar.sheen:SetVertexColor(unpack(c.sheen))
+    bar.shade = bar:CreateTexture(nil, "OVERLAY", nil, -8)
+    bar.shade:SetTexture(TEX)
+    bar.shade:SetPoint("BOTTOMLEFT")
+    bar.shade:SetPoint("BOTTOMRIGHT")
+    bar.shade:SetHeight(height / 2)
+    bar.shade:SetVertexColor(unpack(c.shade))
     return bar
 end
 
@@ -169,6 +191,77 @@ local function MakeAura(parent)
     return a
 end
 
+-- Target arrows: three columns of growing height make a small triangle that points at the bar.
+-- Drawn from the plain texture, so it looks the same on every client. side -1 = left of the bar, 1 = right.
+local ARROW = { { 2, 2 }, { 2, 6 }, { 2, 10 } } -- width, height per column, nearest the bar first
+local function MakeArrow(f, side)
+    local parts, x = {}, 2
+    for i, col in ipairs(ARROW) do
+        local t = f:CreateTexture(nil, "ARTWORK")
+        t:SetTexture(TEX)
+        t:SetSize(col[1], col[2])
+        if side < 0 then
+            t:SetPoint("RIGHT", f.health, "LEFT", -x, 0)
+        else
+            t:SetPoint("LEFT", f.health, "RIGHT", x, 0)
+        end
+        t:Hide()
+        x = x + col[1]
+        parts[i] = t
+    end
+    return parts
+end
+
+local function SetArrows(f, shown, color)
+    for _, list in ipairs({ f.arrowL, f.arrowR }) do
+        for _, t in ipairs(list) do
+            if shown then t:SetVertexColor(color[1], color[2], color[3]) end
+            t:SetShown(shown)
+        end
+    end
+end
+
+-- Elite and rare: a small diamond (a square turned 45 degrees) in gold or silver, a red skull for bosses.
+-- Clients without texture rotation get the old text marks instead (see LevelText).
+local SKULL = "Interface\\TargetingFrame\\UI-TargetingFrame-Skull"
+local function MakeMark(f)
+    local box = CreateFrame("Frame", nil, f)
+    box:SetSize(10, 10)
+    box.edge = box:CreateTexture(nil, "ARTWORK", nil, 1)
+    box.edge:SetTexture(TEX)
+    box.edge:SetSize(8, 8)
+    box.edge:SetPoint("CENTER")
+    box.gem = box:CreateTexture(nil, "ARTWORK", nil, 2)
+    box.gem:SetTexture(TEX)
+    box.gem:SetSize(5.5, 5.5)
+    box.gem:SetPoint("CENTER")
+    box.rotates = box.gem.SetRotation ~= nil and box.edge.SetRotation ~= nil
+    if box.rotates then
+        box.gem:SetRotation(math.pi / 4)
+        box.edge:SetRotation(math.pi / 4)
+    end
+    box.skull = box:CreateTexture(nil, "ARTWORK", nil, 2)
+    box.skull:SetTexture(SKULL)
+    box.skull:SetSize(12, 12)
+    box.skull:SetPoint("CENTER")
+    box:Hide()
+    return box
+end
+
+-- Your pet holds this mob: a small paw icon next to the level
+local PET_ICON = "Interface\\Icons\\Ability_Hunter_BeastCall"
+local function MakePet(f)
+    local box = CreateFrame("Frame", nil, f)
+    box:SetSize(11, 11)
+    box.icon = box:CreateTexture(nil, "ARTWORK")
+    box.icon:SetAllPoints()
+    box.icon:SetTexture(PET_ICON)
+    box.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    box.edge = Edge(box, box.icon)
+    box:Hide()
+    return box
+end
+
 local function Build(plate)
     local d = D()
     local f = CreateFrame("Frame", nil, plate)
@@ -187,54 +280,66 @@ local function Build(plate)
     Font(f.threatText, d.textSize)
     f.threatText:SetPoint("LEFT", 4, 0)
     f.threatText:Hide()
+    -- lost health: a light chip right of the fill that slides away (see SetChip). Above the dark
+    -- background, below the fill.
+    f.lost = f.health:CreateTexture(nil, "BACKGROUND", nil, 1)
+    f.lost:SetTexture(TEX)
+    f.lost:Hide()
 
-    -- target: accent edge plus a 3px strip on the left
-    f.strip = f:CreateTexture(nil, "ARTWORK")
-    f.strip:SetTexture(TEX)
-    f.strip:SetWidth(3)
-    f.strip:SetPoint("TOPRIGHT", f.health, "TOPLEFT", -3, 1)
-    f.strip:SetPoint("BOTTOMRIGHT", f.health, "BOTTOMLEFT", -3, -1)
-    f.strip:Hide()
+    -- target: arrows on both sides plus a light edge (see UpdateTarget)
+    f.arrowL = MakeArrow(f, -1)
+    f.arrowR = MakeArrow(f, 1)
 
-    -- execute range: an amber strip on the right, mirroring the target strip
+    -- execute range: an amber strip on the right, outside the target arrow
     f.exec = f:CreateTexture(nil, "ARTWORK")
     f.exec:SetTexture(TEX)
     f.exec:SetWidth(3)
-    f.exec:SetPoint("TOPLEFT", f.health, "TOPRIGHT", 3, 1)
-    f.exec:SetPoint("BOTTOMLEFT", f.health, "BOTTOMRIGHT", 3, -1)
+    f.exec:SetPoint("TOPLEFT", f.health, "TOPRIGHT", 10, 1)
+    f.exec:SetPoint("BOTTOMLEFT", f.health, "BOTTOMRIGHT", 10, -1)
     local amber = Theme("amber", { 1, 0.69, 0.25 })
     f.exec:SetVertexColor(amber[1], amber[2], amber[3])
     f.exec:Hide()
 
+    -- above the bar: the name on the left; mark, level and pet paw on the right (placed by LayoutTop)
     f.name = f:CreateFontString(nil, "OVERLAY")
     Font(f.name, d.nameSize)
-    f.name:SetPoint("BOTTOM", f.health, "TOP", 0, 4)
     f.name:SetWordWrap(false)
-    f.name:SetWidth(d.width + 40)
+    f.level = f:CreateFontString(nil, "OVERLAY")
+    Font(f.level, d.textSize)
+    f.level:Hide()
+    f.markBox = MakeMark(f)
+    f.petBox = MakePet(f)
 
     f.quest = f:CreateFontString(nil, "OVERLAY")
     Font(f.quest, d.nameSize + 3)
     f.quest:SetText("!")
     f.quest:SetTextColor(unpack(C().quest))
-    f.quest:SetPoint("LEFT", f.health, "RIGHT", 8, 0)
+    f.quest:SetPoint("LEFT", f.health, "RIGHT", 16, 0)
     f.quest:Hide()
 
     f.raid = f:CreateTexture(nil, "OVERLAY")
     f.raid:SetSize(16, 16)
-    f.raid:SetPoint("RIGHT", f.health, "LEFT", -8, 0)
+    f.raid:SetPoint("RIGHT", f.health, "LEFT", -12, 0)
     f.raid:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcons")
     f.raid:Hide()
 
-    -- cast bar: square spell icon on the left, spell name, time left on the right and, under the bar,
-    -- who the spell is aimed at. Everything hangs off the bar, so hiding the bar hides it all.
+    -- cast bar: square spell icon on the left, spell name, time left on the right, a spark at the edge
+    -- and, under the bar, who the spell is aimed at. Everything hangs off the bar, so hiding the bar
+    -- hides it all.
     f.cast = MakeBar(f, d.castHeight)
     f.cast:SetPoint("TOPLEFT", f.health, "BOTTOMLEFT", d.castHeight + 3, -3)
     f.cast:SetPoint("TOPRIGHT", f.health, "BOTTOMRIGHT", 0, -3)
+    f.castW = d.width - d.castHeight - 3
     f.castIcon = f.cast:CreateTexture(nil, "ARTWORK")
     f.castIcon:SetSize(d.castHeight, d.castHeight)
     f.castIcon:SetPoint("TOPLEFT", f.health, "BOTTOMLEFT", 0, -3)
     f.castIcon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
     f.castIcon.edge = Edge(f.cast, f.castIcon)
+    f.spark = f.cast:CreateTexture(nil, "OVERLAY", nil, -7)
+    f.spark:SetTexture(TEX)
+    f.spark:SetSize(2, d.castHeight + 2)
+    f.spark:SetVertexColor(unpack(C().spark))
+    f.spark:SetPoint("CENTER", f.cast, "LEFT", 0, 0)
     f.castTime = f.cast:CreateFontString(nil, "OVERLAY")
     Font(f.castTime, d.textSize)
     f.castTime:SetPoint("RIGHT", -4, 0)
@@ -260,6 +365,7 @@ local function Build(plate)
         else
             a:SetPoint("LEFT", f.auras[i - 1], "RIGHT", 3, 0)
         end
+        a.refresh = true -- your own debuffs: the timer shows when to refresh
         f.auras[i] = a
     end
 
@@ -267,11 +373,42 @@ local function Build(plate)
     f.cc = MakeAura(f)
     f.cc:SetSize(d.iconSize, d.iconSize)
     f.cc.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-    f.cc:SetPoint("RIGHT", f.health, "LEFT", -28, 0)
+    f.cc:SetPoint("RIGHT", f.health, "LEFT", -32, 0)
 
     f:Hide()
     frames[plate] = f
     return f
+end
+
+-- The row above the bar. Right to left: mark, level, pet paw, each only when shown. The name takes the
+-- rest of the width on the left and is cut off before it runs into them. Friendly name-only plates
+-- center the name instead.
+local function LayoutTop(f)
+    local d = D()
+    f.name:ClearAllPoints()
+    if f.nameOnly then
+        f.name:SetPoint("BOTTOM", f.health, "TOP", 0, 4)
+        f.name:SetWidth(d.width + 40)
+        f.name:SetJustifyH("CENTER")
+        return
+    end
+    local anchor, used = nil, 0
+    for _, w in ipairs({ f.markBox, f.level, f.petBox }) do
+        if w:IsShown() then
+            w:ClearAllPoints()
+            if anchor then
+                w:SetPoint("BOTTOMRIGHT", anchor, "BOTTOMLEFT", -3, 0)
+                used = used + 3
+            else
+                w:SetPoint("BOTTOMRIGHT", f.health, "TOPRIGHT", 0, 3)
+            end
+            used = used + ((w == f.level) and (f.level:GetStringWidth() or 0) or w:GetWidth())
+            anchor = w
+        end
+    end
+    f.name:SetPoint("BOTTOMLEFT", f.health, "TOPLEFT", 0, 3)
+    f.name:SetPoint("BOTTOMRIGHT", f.health, "TOPRIGHT", -(used > 0 and used + 4 or 0), 3)
+    f.name:SetJustifyH("LEFT")
 end
 
 ------------------------------------------------------------------------
@@ -364,9 +501,12 @@ end
 
 local CLASSIFICATION = { elite = "+", rareelite = "R+", rare = "R", worldboss = "B" }
 
-local function LevelText(unit)
+-- Returns the level text (or nil) and the classification for the mark (elite, rare, rareelite,
+-- worldboss or nil). textMarks = the client can't draw the diamond, so the marks go in the text.
+local function LevelText(unit, textMarks)
     local cls = UnitClassification and UnitClassification(unit)
-    local mark = CLASSIFICATION[cls or ""]
+    local kind = CLASSIFICATION[cls or ""] and cls or nil
+    local mark = textMarks and kind ~= "worldboss" and CLASSIFICATION[cls or ""] or nil
     local level = UnitEffectiveLevel and UnitEffectiveLevel(unit) or UnitLevel(unit)
     local text
     if cfg.show.level then
@@ -380,7 +520,35 @@ local function LevelText(unit)
         end
     end
     if mark then text = (text or "") .. ns.Paint("amber", mark) end
-    return text
+    return text, kind
+end
+
+-- The mark right of the level: gold diamond (elite), silver diamond (rare, gold edge when rare elite),
+-- red skull (boss). Returns true when it is shown.
+local function SetMark(f, kind)
+    local box = f.markBox
+    if not kind or (kind ~= "worldboss" and not box.rotates) then
+        box:Hide()
+        return false
+    end
+    local col = C()
+    local boss = kind == "worldboss"
+    box.skull:SetShown(boss)
+    box.gem:SetShown(not boss)
+    box.edge:SetShown(not boss)
+    if boss then
+        box.skull:SetVertexColor(col.boss[1], col.boss[2], col.boss[3])
+    else
+        local c = (kind == "rare" or kind == "rareelite") and col.rare or col.elite
+        box.gem:SetVertexColor(c[1], c[2], c[3])
+        if kind == "rareelite" then
+            box.edge:SetVertexColor(col.elite[1], col.elite[2], col.elite[3])
+        else
+            box.edge:SetVertexColor(unpack(EDGE))
+        end
+    end
+    box:Show()
+    return true
 end
 
 ------------------------------------------------------------------------
@@ -443,23 +611,75 @@ end
 local function UpdateName(f)
     local unit = f.unit
     local name = UnitName(unit) or ""
+    f.name:SetText(name)
     if f.nameOnly then
         local cc = UnitIsPlayer(unit) and ClassColor(unit) or C().friendly
-        f.name:SetText(name)
         f.name:SetTextColor(cc[1], cc[2], cc[3])
+        f.level:Hide()
+        f.markBox:Hide()
+        f.petBox:Hide()
+        LayoutTop(f)
         return
     end
-    local level = LevelText(unit)
-    f.name:SetText(level and (level .. " " .. name) or name)
+    local level, kind = LevelText(unit, not f.markBox.rotates)
+    f.level:SetText(level or "")
+    f.level:SetShown(level ~= nil)
+    SetMark(f, kind)
     local tc = Theme("text", { 0.93, 0.94, 0.96 })
     f.name:SetTextColor(tc[1], tc[2], tc[3])
+    LayoutTop(f)
+end
+
+-- The light chip of lost health, from the end of the fill up to top (a health fraction).
+-- Returns false and hides it when there is nothing to show.
+local function SetChip(f, top)
+    local frac = f.frac or 0
+    if not top or top <= frac + 0.002 then
+        f.lost:Hide()
+        return false
+    end
+    local w = D().width
+    f.lost:ClearAllPoints()
+    f.lost:SetPoint("TOPLEFT", f.health, "TOPLEFT", w * frac, 0)
+    f.lost:SetPoint("BOTTOMLEFT", f.health, "BOTTOMLEFT", w * frac, 0)
+    f.lost:SetWidth(w * (top - frac))
+    f.lost:Show()
+    return true
+end
+
+local function StopChip(f)
+    losing[f] = nil
+    f.chipTop = nil
+    f.lost:Hide()
+end
+
+-- Health went down: the chip starts at the old health (or where a running chip is now, so several
+-- hits in a row make one chip) and slides to the new health in the OnUpdate
+local function StartChip(f, prev)
+    f.chipFrom = losing[f] and f.chipTop or prev
+    f.chipTop = f.chipFrom
+    f.chipStart = GetTime()
+    losing[f] = true
+    SetChip(f, f.chipTop)
+    if Wake then Wake() end
 end
 
 local function UpdateHealth(f)
     local unit = f.unit
     local cur, max = UnitHealth(unit), UnitHealthMax(unit)
     if not max or max <= 0 then max = 1 end
-    f.health:SetValue(cur / max)
+    local frac = cur / max
+    local prev = f.frac
+    f.frac = frac
+    f.health:SetValue(frac)
+    if cur <= 0 then
+        StopChip(f)
+    elseif prev and frac < prev - 0.002 then
+        StartChip(f, prev)
+    elseif losing[f] then
+        -- healed while the chip runs: keep what is still lost, drop it once health is back above it
+        if not SetChip(f, f.chipTop) then StopChip(f) end
+    end
     if cfg.show.healthText and (f.isTarget or cur < max) and cur > 0 then
         f.healthText:SetText(math.ceil(cur / max * 100) .. "%")
         f.healthText:Show()
@@ -509,10 +729,27 @@ local function UpdateThreatText(f)
     f.threatText:Show()
 end
 
+-- Your pet holds this mob (it targets your pet): a paw next to the level. The bar keeps its color;
+-- the moment the mob turns to you, threat makes it red.
+local function UpdatePet(f)
+    local on = cfg.show.pet and not f.nameOnly and UnitExists("pet") and f.unit
+        and UnitIsUnit(f.unit .. "target", "pet") and true or false
+    if f.petBox:IsShown() == on then return end
+    f.petBox:SetShown(on)
+    LayoutTop(f)
+end
+
+-- Missing health is the bar color in a dark shade, the chip of lost health a light one
+local CHIP_LIGHT = 0.45
 local function UpdateColor(f)
     local c = BarColor(f.unit)
     f.health:SetStatusBarColor(c[1], c[2], c[3])
+    local s = D().missingShade or 0.25
+    f.health.bg:SetVertexColor(c[1] * s, c[2] * s, c[3] * s, BG_ALPHA)
+    f.lost:SetVertexColor(c[1] + (1 - c[1]) * CHIP_LIGHT, c[2] + (1 - c[2]) * CHIP_LIGHT,
+        c[3] + (1 - c[3]) * CHIP_LIGHT, 0.85)
     UpdateThreatText(f)
+    UpdatePet(f)
 end
 
 local function UpdateTarget(f)
@@ -520,12 +757,11 @@ local function UpdateTarget(f)
     local isTarget = UnitIsUnit(unit, "target")
     f.isTarget = isTarget
     local m = D().modes[cfg.mode] or D().modes.solo
-    local a = Accent()
-    f.strip:SetVertexColor(a[1], a[2], a[3])
-    f.strip:SetShown(isTarget and not f.nameOnly)
+    SetArrows(f, isTarget and not f.nameOnly, Accent())
     local hovered = f == hover
     if isTarget then
-        f.health.edge:SetVertexColor(a[1], a[2], a[3], 1)
+        local t = Theme("text", { 0.93, 0.94, 0.96 })
+        f.health.edge:SetVertexColor(t[1], t[2], t[3], 1)
     elseif hovered then
         -- the mob under the mouse gets a light edge, so you see what a click will target
         local t = Theme("muted", { 0.58, 0.61, 0.66 })
@@ -594,9 +830,43 @@ local function CCAura(unit)
     end
 end
 
+-- Time left on an aura icon. Your own debuffs (a.refresh) turn amber when it is time to refresh them
+-- and red in the last second, so a DoT never drops off by accident.
+local function TickTimer(a, now)
+    if not (a:IsShown() and a.expires) then return end
+    local left = a.expires - now
+    if left <= 0 then
+        a.time:SetText("")
+        return
+    elseif left < 10 then
+        a.time:SetFormattedText("%.0f", math.ceil(left))
+    elseif left < 60 then
+        a.time:SetFormattedText("%d", left)
+    else
+        a.time:SetFormattedText("%dm", math.ceil(left / 60))
+    end
+    local c
+    if a.refresh and cfg.show.refresh and left <= 1 then
+        c = Theme("red", { 1, 0.36, 0.36 })
+    elseif a.refresh and cfg.show.refresh and left <= (D().refreshAt or 3) then
+        c = Theme("amber", { 1, 0.69, 0.25 })
+    else
+        c = Theme("text", { 0.93, 0.94, 0.96 })
+    end
+    a.time:SetTextColor(c[1], c[2], c[3])
+end
+
 local function SetTimer(a, duration, expires)
     a.expires = (duration and duration > 0) and expires or nil
     a.time:SetText("")
+    TickTimer(a, GetTime())
+end
+
+-- GetSpellInfo(name) only answers for spells in your spellbook, so every rank counts
+local function Known(id, name)
+    local known = (IsSpellKnown and IsSpellKnown(id)) or (IsPlayerSpell and IsPlayerSpell(id))
+    if not known and name and GetSpellInfo then known = GetSpellInfo(name) ~= nil end
+    return known and true or false
 end
 
 -- Your class's execute spell, if you know it (any rank). Asked again when your spells change.
@@ -606,11 +876,79 @@ local function UpdateExecute()
     local data = class and ns.data.classes[class]
     local ex = data and data.execute
     if not ex then return end
-    local name = SpellName(ex.spell)
-    local known = (IsSpellKnown and IsSpellKnown(ex.spell)) or (IsPlayerSpell and IsPlayerSpell(ex.spell))
-    -- GetSpellInfo(name) only answers for spells in your spellbook, so every rank counts
-    if not known and name and GetSpellInfo then known = GetSpellInfo(name) ~= nil end
-    if known then execPct = ex.pct or 0.2 end
+    if Known(ex.spell, SpellName(ex.spell)) then execPct = ex.pct or 0.2 end
+end
+
+------------------------------------------------------------------------
+-- Interrupt ready: is any of your interrupts off cooldown before the cast ends?
+------------------------------------------------------------------------
+local function ClassInterrupt()
+    local class = select(2, UnitClass("player"))
+    return class and ns.data.classes[class] and ns.data.classes[class].interrupt
+end
+
+-- Your interrupts by name (any rank). A pet spell (Spell Lock) is read from the pet bar when needed,
+-- so it counts as long as the class has it. Asked again when your spells change.
+local function UpdateKick()
+    kick = nil
+    local list = ClassInterrupt()
+    if not list then return end
+    local names = {}
+    for _, id in ipairs(list) do
+        local name = SpellName(id)
+        if name and (list.pet or Known(id, name)) then names[#names + 1] = name end
+    end
+    if #names > 0 then kick = { names = names, pet = list.pet } end
+end
+
+function Plates.InterruptSpell()
+    local list = ClassInterrupt()
+    return list and list[1] and SpellName(list[1]) or nil
+end
+
+-- start and duration of one of your spells, or nil when the client doesn't say
+local function OwnCooldown(name)
+    if C_Spell and C_Spell.GetSpellCooldown then
+        local ok, info = pcall(C_Spell.GetSpellCooldown, name)
+        if ok and type(info) == "table" then return info.startTime, info.duration end
+    end
+    if GetSpellCooldown then
+        local ok, start, duration = pcall(GetSpellCooldown, name)
+        if ok then return start, duration end
+    end
+end
+
+-- start and duration of a spell on the pet bar, or nil when the pet doesn't have it (no felhunter out)
+local function PetCooldown(name)
+    if not (GetPetActionInfo and GetPetActionCooldown) then return nil end
+    for i = 1, NUM_PET_ACTION_SLOTS or 10 do
+        if GetPetActionInfo(i) == name then return GetPetActionCooldown(i) end
+    end
+end
+
+-- Seconds until a cooldown is over. The global cooldown (1.5s or less) counts as ready.
+local function Remaining(start, duration, now)
+    start, duration = Num(start), Num(duration)
+    if not start or start <= 0 or not duration or duration <= 1.5 then return 0 end
+    return start + duration - now
+end
+
+-- true when you have an interrupt but none of them is ready before the cast ends. Anything unknown
+-- (no pet out, a client without the API) counts as ready, so the bar looks like it always did.
+local function KickBlocked(castEnd)
+    if not kick then return false end
+    local now = GetTime()
+    local need = (castEnd or now) - now
+    local found = false
+    for _, name in ipairs(kick.names) do
+        local start, duration
+        if kick.pet then start, duration = PetCooldown(name) else start, duration = OwnCooldown(name) end
+        if start then
+            found = true
+            if Remaining(start, duration, now) < need then return false end
+        end
+    end
+    return found
 end
 
 function Plates.ExecuteSpell()
@@ -621,7 +959,7 @@ end
 
 local function UpdateAuras(f)
     local m = D().modes[cfg.mode] or D().modes.solo
-    local want = cfg.show.debuffs and not f.nameOnly and (f.isTarget or m.debuffsAll)
+    local want = cfg.show.debuffs and not f.nameOnly and (f.isTarget or m.debuffsAll or cfg.dotsAll)
     local n = 0
     if want then
         for i = 1, 40 do
@@ -631,8 +969,8 @@ local function UpdateAuras(f)
             local a = f.auras[n]
             a.icon:SetTexture(icon)
             a.count:SetText((count and count > 1) and count or "")
+            a:Show() -- before SetTimer, which only paints a shown icon
             SetTimer(a, duration, expires)
-            a:Show()
             if n >= #f.auras then break end
         end
     end
@@ -642,8 +980,8 @@ local function UpdateAuras(f)
     if cfg.show.cc and not f.nameOnly then ccIcon, ccDuration, ccExpires = CCAura(f.unit) end
     if ccIcon then
         f.cc.icon:SetTexture(ccIcon)
-        SetTimer(f.cc, ccDuration, ccExpires)
         f.cc:Show()
+        SetTimer(f.cc, ccDuration, ccExpires)
     else
         f.cc:Hide()
     end
@@ -677,6 +1015,20 @@ local function UpdateCastTarget(f)
     f.castTarget:SetTextColor(c[1], c[2], c[3])
 end
 
+-- Blue: you can kick it now. Slate: it can be kicked, but none of your interrupts is ready before the
+-- cast ends. Grey: it can't be interrupted at all.
+local function CastColor(f)
+    local c
+    if f.castLocked then
+        c = C().castLocked
+    elseif cfg.show.kick and KickBlocked(f.castEnd) then
+        c = C().castCooldown or C().cast
+    else
+        c = C().cast
+    end
+    f.cast:SetStatusBarColor(c[1], c[2], c[3])
+end
+
 local function UpdateCast(f)
     local name, icon, startMS, endMS, locked, channel
     if cfg.show.castBar and not f.nameOnly then
@@ -690,13 +1042,14 @@ local function UpdateCast(f)
     end
     held[f] = nil
     f.castStart, f.castEnd, f.castChannel = startMS / 1000, endMS / 1000, channel
-    local c = locked and C().castLocked or C().cast
-    f.cast:SetStatusBarColor(c[1], c[2], c[3])
+    f.castLocked = locked
+    CastColor(f)
     f.castText:SetText(name)
     f.castTime:SetText("")
     f.castIcon:SetTexture(icon)
     f.castIcon:SetShown(icon ~= nil)
     f.castIcon.edge:SetShown(icon ~= nil)
+    f.spark:Show()
     f.cast:Show()
     casting[f] = true
     UpdateCastTarget(f)
@@ -711,6 +1064,7 @@ local function CastInterrupted(f)
     local r = Theme("red", { 1, 0.36, 0.36 })
     f.cast:SetStatusBarColor(r[1], r[2], r[3])
     f.cast:SetValue(1)
+    f.spark:Hide()
     f.castText:SetText(INTERRUPTED or "Interrupted")
     f.castTime:SetText("")
     f.castTarget:SetText("")
@@ -751,8 +1105,12 @@ local function UnitAdded(unit)
     for u, other in pairs(byUnit) do if other == f then byUnit[u] = nil end end
     f.unit = unit
     byUnit[unit] = f
+    f.frac = nil -- a new unit: no chip from the health of the last one
+    f.chipTop = nil
+    f.lost:Hide()
     held[f] = nil
     warned[f] = nil
+    losing[f] = nil
     if hover == f then hover = nil end
     HideBlizzard(plate)
     UpdateAll(f)
@@ -766,6 +1124,7 @@ local function UnitRemoved(unit)
     casting[f] = nil
     held[f] = nil
     warned[f] = nil
+    losing[f] = nil
     if hover == f then hover = nil end
     f.unit = nil
     f:Hide()
@@ -802,9 +1161,10 @@ local function QuestChanged()
     end)
 end
 
--- Execute range depends on what you know: check at login and whenever your spells change
+-- Execute range and your interrupts depend on what you know: check at login and whenever your spells change
 local function ExecuteChanged()
     UpdateExecute()
+    UpdateKick()
     if active then ForEach(function(f) if not f.nameOnly then UpdateHealth(f) end end) end
 end
 ns.On("PLAYER_LOGIN", ExecuteChanged)
@@ -860,6 +1220,18 @@ for _, ev in ipairs({
 end
 handlers.UNIT_SPELLCAST_INTERRUPTED = OnUnit(CastInterrupted)
 
+-- Your interrupt went on or came off cooldown: running cast bars change between blue and slate
+local function RecolorCasts()
+    for f in pairs(casting) do CastColor(f) end
+end
+handlers.SPELL_UPDATE_COOLDOWN = RecolorCasts
+handlers.PET_BAR_UPDATE_COOLDOWN = RecolorCasts
+-- your pet came or went: the paw on the plates follows
+handlers.UNIT_PET = function(unit)
+    if unit ~= "player" then return end
+    ForEach(function(f) if not f.nameOnly then UpdateColor(f) end end)
+end
+
 -- The client says when the mouse moves onto a unit, not when it leaves: OnUpdate clears the hover
 local function SetHover(f)
     if hover == f then return end
@@ -889,19 +1261,6 @@ end)
 -- One OnUpdate for cast bars (every frame) and debuff timers (4 times a second).
 -- It stops itself when nothing is casting and no plate has a timer; Wake starts it again.
 local auraClock = 0
-local function TickTimer(a, now)
-    if not (a:IsShown() and a.expires) then return end
-    local left = a.expires - now
-    if left <= 0 then
-        a.time:SetText("")
-    elseif left < 10 then
-        a.time:SetFormattedText("%.0f", math.ceil(left))
-    elseif left < 60 then
-        a.time:SetFormattedText("%d", left)
-    else
-        a.time:SetFormattedText("%dm", math.ceil(left / 60))
-    end
-end
 
 Wake = function()
     if active and not events:IsShown() then events:Show() end
@@ -914,12 +1273,27 @@ events:SetScript("OnUpdate", function(self, elapsed)
             f.cast:Hide()
             casting[f] = nil
         else
+            local v
             if f.castChannel then
-                f.cast:SetValue((f.castEnd - now) / total)
+                v = (f.castEnd - now) / total
             else
-                f.cast:SetValue((now - f.castStart) / total)
+                v = (now - f.castStart) / total
             end
+            f.cast:SetValue(v)
+            f.spark:SetPoint("CENTER", f.cast, "LEFT", f.castW * v, 0)
             f.castTime:SetFormattedText("%.1f", f.castEnd - now)
+        end
+    end
+    -- the light chip of lost health slides to the new health, fast at first (ease out)
+    local fade = D().lossFade or 0.4
+    for f in pairs(losing) do
+        local t = fade > 0 and (now - f.chipStart) / fade or 1
+        if t >= 1 or not f.frac then
+            StopChip(f)
+        else
+            local e = 1 - (1 - t) * (1 - t)
+            f.chipTop = f.chipFrom - (f.chipFrom - f.frac) * e
+            if not SetChip(f, f.chipTop) then StopChip(f) end
         end
     end
     for f, untilTime in pairs(held) do
@@ -932,6 +1306,8 @@ events:SetScript("OnUpdate", function(self, elapsed)
     if auraClock < 0.25 then return end
     auraClock = 0
     if hover and not (hover.unit and UnitIsUnit(hover.unit, "mouseover")) then SetHover(nil) end
+    -- a cooldown can run out without an event on some clients: check running casts 4 times a second
+    RecolorCasts()
     local timers = false
     for _, f in pairs(byUnit) do
         if f.hasTimers then
@@ -940,7 +1316,9 @@ events:SetScript("OnUpdate", function(self, elapsed)
             TickTimer(f.cc, now)
         end
     end
-    if not timers and not next(casting) and not next(held) and not hover then self:Hide() end
+    if not timers and not next(casting) and not next(held) and not next(losing) and not hover then
+        self:Hide()
+    end
 end)
 events:Hide() -- OnUpdate only runs while shown, i.e. while active
 
@@ -1029,6 +1407,7 @@ local function Disable()
     wipe(casting)
     wipe(held)
     wipe(warned)
+    wipe(losing)
     hover = nil
     for plate in pairs(frames) do ShowBlizzard(plate) end
 end
@@ -1051,6 +1430,10 @@ function Plates.Configure(on, opts)
             if opts.show and opts.show[k] ~= nil then cfg.show[k] = opts.show[k] and true or false end
         end
     end
+    -- DoT classes (casters, hunters) see their debuffs on every mob in DPS and Solo mode
+    local all = D().archetypeDebuffsAll or {}
+    local arch = ns.Archetype and ns.Archetype()
+    cfg.dotsAll = (cfg.mode == "dps" or cfg.mode == "solo") and arch and all[arch] and true or false
     local ok, err = pcall(function()
         if on then Enable() else Disable() end
         if active then ForEach(UpdateAll) end

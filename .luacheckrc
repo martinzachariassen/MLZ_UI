@@ -44,7 +44,7 @@ read_globals = {
 
     -- Constants
     "COMBATLOG_OBJECT_AFFILIATION_MINE", "DEFAULT_CHATFRAME_ALPHA", "INVSLOT_MAINHAND", "INVSLOT_OFFHAND",
-    "LE_ITEM_CLASS_WEAPON", "LE_PARTY_CATEGORY_INSTANCE", "MAX_PLAYER_LEVEL", "NUM_BAG_SLOTS",
+    "LE_ITEM_CLASS_WEAPON", "LE_PARTY_CATEGORY_INSTANCE", "MAX_PLAYER_LEVEL", "NUM_BAG_SLOTS", "NUM_PET_ACTION_SLOTS",
     "NUM_CHAT_WINDOWS", "RAID_CLASS_COLORS", "STANDARD_TEXT_FONT", "INTERRUPTED",
 
     -- Functions
@@ -57,9 +57,9 @@ read_globals = {
     "GetInventoryItemCount", "GetInventoryItemDurability", "GetInventoryItemID", "GetInventoryItemTexture",
     "GetInventorySlotInfo", "GetItemCount", "GetItemIcon", "GetItemInfo", "GetItemInfoInstant",
     "GetMacroInfo", "GetMaxPlayerLevel", "GetMoney", "GetNetStats", "GetNumBindings",
-    "GetNumShapeshiftForms", "GetNumSkillLines", "GetNumTalentTabs", "GetPetActionInfo",
+    "GetNumShapeshiftForms", "GetNumSkillLines", "GetNumTalentTabs", "GetPetActionCooldown", "GetPetActionInfo",
     "GetPhysicalScreenSize", "GetQuestDifficultyColor", "GetRaidTargetIndex", "GetRealmName",
-    "GetRepairAllCost", "GetScreenHeight", "GetScreenWidth", "GetShapeshiftForm", "GetShapeshiftFormID",
+    "GetRepairAllCost", "GetScreenHeight", "GetScreenWidth", "GetShapeshiftForm", "GetShapeshiftFormID", "GetSpellCooldown",
     "GetShapeshiftFormInfo", "GetSkillLineInfo", "GetSpellInfo", "GetSpellLink", "GetSpellTexture",
     "GetTalentTabInfo", "GetTime", "GetWeaponEnchantInfo", "GetXPExhaustion", "HasAction", "HideUIPanel",
     "InCombatLockdown", "InterfaceOptions_AddCategory", "IsActionInRange", "IsAddOnLoaded", "IsInGroup",

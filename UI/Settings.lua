@@ -1138,18 +1138,42 @@ PAGES[#PAGES + 1] = { key = "nameplates", title = "Nameplates", icon = "Interfac
             if why then return why end
             if not ns.Plates.ExecuteSpell() then return "Your class has no execute spell" end
         end
+        local function HasKick()
+            local why = MLZOnly()
+            if why then return why end
+            if not ns.Plates.InterruptSpell() then return "Your class has no interrupt" end
+        end
+        local function HasPet()
+            local why = MLZOnly()
+            if why then return why end
+            local class = select(2, UnitClass("player"))
+            local data = class and ns.data.classes[class]
+            if not (data and data.pet) then return "Your class has no pet" end
+        end
         ShowToggle("healthText", "Health percent", "Inside the bar, on your target and on mobs that are hurt.")
         ShowToggle("castBar", "Cast bar", "Under the health bar. Blue can be interrupted, grey can't.")
+        ShowToggle("kick", "Interrupt ready",
+            "The cast bar turns slate when " .. (ns.Plates.InterruptSpell() or "your interrupt") .. " is on cooldown.",
+            "Blue: your interrupt is ready before the cast ends. Slate: it is on cooldown until after the cast. "
+                .. "Grey: the cast can't be interrupted. A warlock's Spell Lock is read from the felhunter.", HasKick)
         ShowToggle("quest", "Quest marker", "A yellow ! next to mobs you still need for a quest.",
             "Read from the mob's tooltip and remembered per mob, so it costs nothing in a fight.")
-        ShowToggle("debuffs", "Your debuffs", "Only your own, with time left. On your target, or on every mob in Tank mode.")
+        ShowToggle("debuffs", "Your debuffs", "Only your own, with time left. On your target, or on every mob in Tank mode.",
+            "On every mob in Tank mode. Casters and hunters see them on every mob in DPS and Solo mode too, "
+                .. "so you can keep several mobs dotted.")
+        ShowToggle("refresh", "Refresh timing", "Your debuff timers turn amber at 3 seconds left and red at 1.",
+            "Amber means refresh it now, so the DoT never drops off. Only your own debuffs change color.")
         ShowToggle("cc", "Crowd control", "Polymorph, Sap, Fear and the like from anyone, next to the bar, so you don't break it.",
             "Polymorph, Sap, Gouge, Blind, Shackle Undead, Hibernate, Freezing Trap, Seduction, Banish, Fear, "
                 .. "Repentance and more. On every enemy plate, with the time left.")
         ShowToggle("execute", "Execute range",
             "An amber strip on the right when " .. (ns.Plates.ExecuteSpell() or "your execute spell") .. " can finish the mob.",
             "Warrior: Execute. Paladin: Hammer of Wrath. Only once you know the spell. Under 20% health.", HasExecute)
-        ShowToggle("level", "Level", "Only when it is 3 or more levels from yours, or ??. Elite and rare marks always show.")
+        ShowToggle("pet", "Pet holds it", "A paw next to the level when the mob is attacking your pet.",
+            "The bar keeps its calm color while your pet tanks. When the mob turns to you, the paw goes away "
+                .. "and the bar turns red.", HasPet)
+        ShowToggle("level", "Level", "Only when it is 3 or more levels from yours, or ??. Elite and rare marks always show.",
+            "Elite: a gold diamond. Rare: a silver one. Rare elite: silver with a gold edge. World boss: a red skull.")
         p:Step("Size", "Width and text size of the plates. Your target is a bit bigger on top of this.", SIZE_OPTIONS, 140,
             NP.Size, NP.SetSize, { avail = MLZOnly })
     end

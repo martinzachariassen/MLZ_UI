@@ -49,6 +49,7 @@ end
 
 local SHOW_DEFAULTS = {
     healthText = true, castBar = true, quest = true, debuffs = true, level = true, execute = true, cc = true,
+    refresh = true, kick = true, pet = true,
 }
 NP.SHOW_KEYS = SHOW_DEFAULTS -- read only: Profile.lua validates imported show options against it
 

@@ -141,7 +141,9 @@ local function Copy(t)
 end
 
 -- MLZ nameplates on one fake enemy plate: a warrior (the stub's class) sees the execute strip at 15% health
--- and a Polymorph from someone else. Turning the options off hides both. The client API is swapped in for the
+-- and a Polymorph from someone else. Turning the options off hides both. The plate is your target (arrows),
+-- your DoT has 2 seconds left (amber), your interrupt is on cooldown (slate cast bar) and the mob attacks your
+-- pet (paw). The client API is swapped in for the
 -- test only and put back afterwards.
 local function CheckPlates()
     local P = ns.Plates
@@ -157,7 +159,13 @@ local function CheckPlates()
         UnitIsFriend = function(_, u) return u ~= "nameplate1" end,
         UnitAura = function(u, i, filter)
             if u == "nameplate1" and i == 1 and filter == "HARMFUL" then return poly, 136071, 0, nil, 50, 60 end
+            -- your own DoT with 2 seconds left: time to refresh it
+            if u == "nameplate1" and i == 1 and filter == "HARMFUL|PLAYER" then
+                return "Rend", 132155, 0, nil, 15, stub.time + 2
+            end
         end,
+        -- your interrupt has 10 seconds of cooldown left: it is not ready before a 2.5 second cast ends
+        GetSpellCooldown = function() return stub.time, 10, 1 end,
         CreateFrame = function(kind, name, parent)
             local f = saved.CreateFrame(kind, name, parent)
             if parent == plate and not ours and f ~= plate.UnitFrame then ours = f end
@@ -168,6 +176,13 @@ local function CheckPlates()
     local threatApi = { "UnitDetailedThreatSituation", "UnitAffectingCombat", "IsInGroup", "PlaySound", "UnitCastingInfo" }
     for _, k in ipairs(threatApi) do saved[k] = _G[k] end
     stub.units.nameplate1 = { health = 15 }
+    stub.units.nameplate1target = {}
+    stub.units.pet = {}
+    -- nameplate1 is your target, and it attacks your pet
+    stub.same.nameplate1, stub.same.nameplate1target = "target", "pet"
+    local function Same(a, b)
+        return math.abs(a[1] - b[1]) < 0.01 and math.abs(a[2] - b[2]) < 0.01 and math.abs(a[3] - b[3]) < 0.01
+    end
     local function Opts(show)
         return { mode = "dps", show = show or { execute = true, cc = true }, size = 1 }
     end
@@ -181,6 +196,27 @@ local function CheckPlates()
         P.Configure(true, Opts({ execute = false, cc = false }))
         if ours.exec:IsShown() then Fail("plates", "the execute strip shows while it is turned off") end
         if ours.cc:IsShown() then Fail("plates", "crowd control shows while it is turned off") end
+
+        -- your target: arrows on both sides. Your DoT at 2 seconds turns amber. The paw shows for your pet.
+        local colors = ns.data.nameplates.plates.colors
+        P.Configure(true, Opts({ debuffs = true, refresh = true, pet = true }))
+        if not (ours.arrowL[1]:IsShown() and ours.arrowR[1]:IsShown()) then
+            Fail("plates", "the target arrows are hidden on your target")
+        end
+        if ours.strip then Fail("plates", "the old target strip is still built") end
+        local dot = ours.auras[1]
+        if not dot:IsShown() then Fail("plates", "your DoT does not show on your target") end
+        local amber = ns.W.T.amber
+        if not Same({ dot.time:GetTextColor() }, amber) then
+            Fail("plates", "a DoT with 2 seconds left is not amber")
+        end
+        if not ours.petBox:IsShown() then Fail("plates", "the paw is hidden while the mob attacks your pet") end
+        P.Configure(true, Opts({ debuffs = true, refresh = false, pet = false }))
+        if Same({ dot.time:GetTextColor() }, amber) then
+            Fail("plates", "the DoT timer stays amber with refresh timing off")
+        end
+        if ours.petBox:IsShown() then Fail("plates", "the paw shows while it is turned off") end
+        P.Configure(true, Opts({ execute = false, cc = false }))
 
         -- threat as DPS in a group: 85% of what pulls aggro shows in the bar, the sound plays once at 90%
         local pct, sounds = 85, 0
@@ -207,6 +243,15 @@ local function CheckPlates()
         stub.Fire("UNIT_SPELLCAST_START", "nameplate1")
         if not ours.cast:IsShown() then Fail("plates", "the cast bar is hidden during a cast") end
         if ours.castText:GetText() ~= "Frostbolt" then Fail("plates", "cast bar text is " .. ours.castText:GetText()) end
+        if not Same({ ours.cast:GetStatusBarColor() }, colors.castCooldown) then
+            Fail("plates", "the cast bar is not slate while your interrupt is on cooldown")
+        end
+        opts.show = { kick = false }
+        P.Configure(true, opts)
+        stub.Fire("UNIT_SPELLCAST_START", "nameplate1")
+        if not Same({ ours.cast:GetStatusBarColor() }, colors.cast) then
+            Fail("plates", "the cast bar is not blue with interrupt ready turned off")
+        end
         _G.UnitCastingInfo = function() end
         stub.Fire("UNIT_SPELLCAST_INTERRUPTED", "nameplate1")
         if not ours.cast:IsShown() then Fail("plates", "an interrupted cast is not shown") end
@@ -218,6 +263,9 @@ local function CheckPlates()
     for k in pairs(fakes) do _G[k] = saved[k] end
     for _, k in ipairs(threatApi) do _G[k] = saved[k] end
     stub.units.nameplate1 = nil
+    stub.units.nameplate1target = nil
+    stub.units.pet = nil
+    stub.same.nameplate1, stub.same.nameplate1target = nil, nil
     if not ok then Fail("plates", err) end
     return ok and ours and 1 or 0
 end

@@ -104,17 +104,22 @@ ns.data.nameplates = {
     -- /mlz np load uses it if no copy is saved in-game. Leave as nil if you don't want that.
     profileString = nil,
 
-    -- MLZ nameplates (our own engine, Modules/Plates.lua). Flat and calm, in the MLZ UI palette.
+    -- MLZ nameplates (our own engine, Modules/Plates.lua). Modern and calm, in the MLZ UI palette:
+    -- name on the left above the bar, level and elite mark on the right, missing health in a dark shade
+    -- of the bar color, a light chip where health was just lost, arrows on both sides of your target.
     plates = {
-        width = 140,          -- health bar size at size 100%
-        height = 14,          -- thick enough to read health at a glance in a big pull
-        castHeight = 14,      -- also the size of the square spell icon left of the cast bar
+        width = 150,          -- health bar size at size 100%
+        height = 12,          -- thick enough to read health at a glance in a big pull
+        castHeight = 12,      -- also the size of the square spell icon left of the cast bar
         nameSize = 11,
         textSize = 10,        -- health percent, spell name, cast time, cast target
-        iconSize = 20,        -- debuff icons
+        iconSize = 22,        -- debuff icons (your DoTs)
         debuffLimit = 6,
         interruptedHold = 0.6, -- seconds an interrupted cast stays on the plate (red, "Interrupted")
         levelDiff = 3,        -- show the level only when it differs this much from yours (or is ??)
+        missingShade = 0.25,  -- missing health = the bar color at this brightness (dark red on a red bar)
+        lossFade = 0.4,       -- seconds the light chip of lost health takes to slide away
+        refreshAt = 3,        -- your debuff timer turns amber at this many seconds left (refresh now), red at 1
         threatWarnAt = 80,    -- DPS, healer, solo: amber once your threat reaches this % of what pulls aggro
         threatSoundAt = 90,   -- one warning sound per mob at this % (only in a group, only with threat colors on)
 
@@ -150,6 +155,8 @@ ns.data.nameplates = {
             dps    = { nonTarget = 0.8, targetScale = 1.1,  debuffsAll = false },
             solo   = { nonTarget = 0.9, targetScale = 1.1,  debuffsAll = false },
         },
+        -- DoT classes keep several mobs dotted at once: in DPS and Solo mode their debuffs show on every mob
+        archetypeDebuffsAll = { CASTER = true, RANGED = true },
         pvp = { nonTarget = 1 },
 
         colors = {
@@ -162,9 +169,18 @@ ns.data.nameplates = {
             transition = { 1.00, 0.55, 0.15 },
             safe       = { 0.20, 0.55, 1.00 },
             offtank    = { 0.20, 0.80, 0.75 },
-            cast       = { 0.20, 0.63, 1.00 },   -- interruptible: accent blue
+            cast       = { 0.20, 0.63, 1.00 },   -- interruptible and your interrupt is ready: accent blue
+            castCooldown = { 0.30, 0.40, 0.52 }, -- interruptible, but your interrupt is on cooldown: slate
             castLocked = { 0.45, 0.47, 0.52 },   -- can't be interrupted
             quest      = { 1.00, 0.82, 0.00 },
+            -- marks right of the level
+            elite      = { 1.00, 0.82, 0.00 },   -- gold
+            rare       = { 0.78, 0.80, 0.83 },   -- silver
+            boss       = { 1.00, 0.36, 0.36 },   -- red skull
+            -- the soft bar: a light sheen over the upper half, a shade over the lower half
+            sheen      = { 1, 1, 1, 0.08 },
+            shade      = { 0, 0, 0, 0.15 },
+            spark      = { 1, 1, 1, 0.8 },       -- the edge of a running cast
         },
     },
 }

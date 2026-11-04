@@ -17,6 +17,8 @@
 --   pet      = has a pet bar (keys BONUSACTIONBUTTON1-3)
 --   execute  = a finishing spell that only works on low health: first rank id and the health fraction.
 --              MLZ nameplates show an amber strip on the right once a mob is in range (if you know the spell)
+--   interrupt = spells that stop a cast (first rank ids). MLZ nameplates color a cast bar slate while all of
+--              them are on cooldown. pet = true: a pet spell (felhunter), read from the pet bar
 
 local _, ns = ...
 
@@ -24,6 +26,7 @@ ns.data.classes = {
     WARRIOR = {
         tabs = { "MELEE", "MELEE", "TANK" }, dps = "MELEE", resource = "Rage", stance = 3,
         execute = { spell = 5308, pct = 0.2 },  -- Execute
+        interrupt = { 6552, 72 },               -- Pummel, Shield Bash
     },
     PALADIN = {
         tabs = { "HEALER", "TANK", "MELEE" }, dpsTabs = { [2] = "MELEE" }, dps = "MELEE", resource = "Mana", stance = 3,
@@ -34,18 +37,23 @@ ns.data.classes = {
     },
     ROGUE = {
         dps = "MELEE", pureDps = true, resource = "Energy", stance = 1,
+        interrupt = { 1766 },                   -- Kick
     },
     PRIEST = {
         tabs = { "HEALER", "HEALER", "CASTER" }, dps = "CASTER", resource = "Mana", stance = 1, stanceNeedsForms = true,
+        interrupt = { 15487 },                  -- Silence (talent)
     },
     SHAMAN = {
         tabs = { "CASTER", "MELEE", "HEALER" }, dps = "MELEE", resource = "Mana",
+        interrupt = { 8042 },                   -- Earth Shock
     },
     MAGE = {
         dps = "CASTER", pureDps = true, resource = "Mana",
+        interrupt = { 2139 },                   -- Counterspell
     },
     WARLOCK = {
         dps = "CASTER", pureDps = true, resource = "Mana", pet = true,
+        interrupt = { 19244, pet = true },      -- Spell Lock (felhunter)
     },
     DRUID = {
         tabs = { "CASTER", "TANK", "HEALER" }, dpsTabs = { [2] = "MELEE" }, dps = "MELEE", resource = "Mana", stance = 5,

@@ -118,6 +118,11 @@ function methods:Show() self.__shown = true end
 function methods:Hide() self.__shown = false end
 function methods:SetShown(v) self.__shown = v and true or false end
 function methods:IsShown() return self.__shown ~= false end
+-- colors are kept, so a test can check that a timer turned amber or a cast bar slate
+function methods:SetTextColor(r, g, b, a) self.__textColor = { r, g, b, a } end
+function methods:GetTextColor() return unpack(self.__textColor or { 1, 1, 1, 1 }) end
+function methods:SetStatusBarColor(r, g, b, a) self.__bar = { r, g, b, a } end
+function methods:GetStatusBarColor() return unpack(self.__bar or { 1, 1, 1, 1 }) end
 function methods:IsVisible() return self.__shown ~= false end
 function methods:SetScript(name, fn) self.__scripts[name] = fn end
 function methods:GetScript(name) return self.__scripts[name] end
@@ -152,7 +157,6 @@ function methods:GetCenter() return 50, 10 end
 function methods:GetSize() return 100, 20 end
 function methods:GetRect() return 0, 0, 100, 20 end
 function methods:GetFont() return "Fonts\\FRIZQT__.TTF", 12, "" end
-function methods:GetTextColor() return 1, 1, 1, 1 end
 function methods:GetVertexColor() return 1, 1, 1, 1 end
 function methods:GetShadowOffset() return 0, 0 end
 function methods:GetRegions() end
@@ -322,7 +326,9 @@ function UnitEffectiveLevel() return 60 end
 stub.units = {}
 function UnitExists(u) return u == "player" or stub.units[u] ~= nil end
 function UnitGUID(u) return u == "player" and "Player-1-0001" or nil end
-function UnitIsUnit(a, b) return a == b end
+-- stub.same.nameplate1 = "target" makes two tokens the same unit (read at call time, like stub.units)
+stub.same = {}
+function UnitIsUnit(a, b) return a == b or stub.same[a] == b or stub.same[b] == a end
 function UnitIsPlayer(u) return u == "player" end
 function UnitAffectingCombat() return false end
 function UnitIsDeadOrGhost() return false end
