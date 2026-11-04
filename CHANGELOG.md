@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- MLZ nameplates look sharper: thicker bars in Roboto, a cast bar with the spell icon, time left and who
+  the spell is aimed at, a red "Interrupted" when a cast is kicked, and a light edge on the mob under
+  your mouse.
+- Threat colors on the nameplates are now on by default, also for healers and solo. As DPS, healer or
+  solo the bar turns amber at 80% of what pulls aggro and red once the mob is on you. Your threat % shows
+  inside the bar, and in a group a warning sound plays once per mob near 90%. If you turned threat colors
+  off before, they stay off.
+- Other addons: Details! TinyThreat as a threat meter in Details window 2, in the MLZ look and hidden when
+  you are not in a group. The window is opened for you, and undo closes it again.
 - Ready-made setups on Profiles & backup: Minimal, Balanced and Informative set faded frames, nameplate
   options and reminders in one click (or `/mlz preset minimal`). Keybinds and scale stay as they are.
   A backup is taken first, so undo puts it back. "In use" shows which setup your choices match, and

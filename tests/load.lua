@@ -165,6 +165,8 @@ local function CheckPlates()
         end,
     }
     for k, v in pairs(fakes) do saved[k] = _G[k]; _G[k] = v end
+    local threatApi = { "UnitDetailedThreatSituation", "UnitAffectingCombat", "IsInGroup", "PlaySound", "UnitCastingInfo" }
+    for _, k in ipairs(threatApi) do saved[k] = _G[k] end
     stub.units.nameplate1 = { health = 15 }
     local function Opts(show)
         return { mode = "dps", show = show or { execute = true, cc = true }, size = 1 }
@@ -179,12 +181,100 @@ local function CheckPlates()
         P.Configure(true, Opts({ execute = false, cc = false }))
         if ours.exec:IsShown() then Fail("plates", "the execute strip shows while it is turned off") end
         if ours.cc:IsShown() then Fail("plates", "crowd control shows while it is turned off") end
+
+        -- threat as DPS in a group: 85% of what pulls aggro shows in the bar, the sound plays once at 90%
+        local pct, sounds = 85, 0
+        _G.UnitDetailedThreatSituation = function(_, u) if u == "nameplate1" then return false, 0, pct, pct, 1 end end
+        _G.UnitAffectingCombat = function() return true end
+        _G.IsInGroup = function() return true end
+        _G.PlaySound = function() sounds = sounds + 1 end
+        local opts = Opts()
+        opts.threat = true
+        P.Configure(true, opts)
+        if not ours.threatText:IsShown() then Fail("plates", "the threat % is hidden at 85% in a group") end
+        if ours.threatText:GetText() ~= "85%" then Fail("plates", "threat text is " .. ours.threatText:GetText()) end
+        if sounds ~= 0 then Fail("plates", "the threat sound played below 90%") end
+        pct = 95
+        stub.Fire("UNIT_THREAT_LIST_UPDATE", "nameplate1")
+        stub.Fire("UNIT_THREAT_LIST_UPDATE", "nameplate1")
+        if sounds ~= 1 then Fail("plates", "the threat sound played " .. sounds .. " times at 95% (want 1)") end
+
+        -- cast bar: spell name and time left, then "Interrupted" when it is kicked
+        local now = stub.time * 1000
+        _G.UnitCastingInfo = function(u)
+            if u == "nameplate1" then return "Frostbolt", "", 135846, now, now + 2500, false, 1, false end
+        end
+        stub.Fire("UNIT_SPELLCAST_START", "nameplate1")
+        if not ours.cast:IsShown() then Fail("plates", "the cast bar is hidden during a cast") end
+        if ours.castText:GetText() ~= "Frostbolt" then Fail("plates", "cast bar text is " .. ours.castText:GetText()) end
+        _G.UnitCastingInfo = function() end
+        stub.Fire("UNIT_SPELLCAST_INTERRUPTED", "nameplate1")
+        if not ours.cast:IsShown() then Fail("plates", "an interrupted cast is not shown") end
+        if ours.castText:GetText() ~= (INTERRUPTED or "Interrupted") then
+            Fail("plates", "interrupted cast text is " .. ours.castText:GetText())
+        end
         P.Configure(false, Opts())
     end)
     for k in pairs(fakes) do _G[k] = saved[k] end
+    for _, k in ipairs(threatApi) do _G[k] = saved[k] end
     stub.units.nameplate1 = nil
     if not ok then Fail("plates", err) end
     return ok and ours and 1 or 0
+end
+
+-- Details! TinyThreat on a fake Details with only window 1: applying opens window 2 with the threat meter
+-- and the plugin options, undo closes it again and puts everything back.
+local function CheckThreatMeter()
+    local A = ns.modules and ns.modules.addons
+    if not A then return Fail("threat meter", "the addons module is missing") end
+    local function Window(open)
+        return { ativa = open, modo = 2, hide_on_context = { [3] = { enabled = false, value = 100 } },
+            row_info = {}, menu_alpha = {},
+            IsEnabled = function(w) return w.ativa end, Shutdown = function(w) w.ativa = false end }
+    end
+    local opts = { useclasscolors = false, hide_pull_bar = false, absolute_mode = false }
+    local fake = {
+        windows = { Window(true) }, minimap = {}, plugin_database = { DETAILS_PLUGIN_TINY_THREAT = opts },
+        GetInstance = function(d, id) return d.windows[id] end,
+        GetNumInstances = function(d) return #d.windows end,
+        CreateInstance = function(d, id)
+            if id == true then d.windows[#d.windows + 1] = Window(true)
+            elseif d.windows[id] then d.windows[id].ativa = true end
+        end,
+        RaidTables = {
+            EnableRaidMode = function(_, w, name) w.current_raid_plugin = name end,
+            DisableRaidMode = function(_, w) w.current_raid_plugin = nil end,
+        },
+    }
+    local loaded = { MLZ_UI = true, Details = true, Details_TinyThreat = true }
+    local api = _G.C_AddOns -- through _G: luacheck treats C_AddOns as read-only
+    local savedLoaded, savedDetails = api.IsAddOnLoaded, _G.Details
+    api.IsAddOnLoaded = function(name) return loaded[name] == true end
+    _G.Details = fake
+    local ok, err = pcall(function()
+        local items = {}
+        for _, item in ipairs(A:Preview()) do
+            if item.id:find("^Details_TinyThreat:") and item.enabled and not item.unavailable then
+                items[#items + 1] = item
+            end
+        end
+        if #items == 0 then error("no TinyThreat rows offered while window 2 is missing", 0) end
+        local snap = A:Backup(items)
+        A:Apply(items)
+        local w = fake.windows[2]
+        if not w then error("window 2 was not created", 0) end
+        if not (w.ativa and w.modo == 4 and w.last_raid_plugin == "DETAILS_PLUGIN_TINY_THREAT") then
+            Fail("threat meter", "window 2 does not show TinyThreat")
+        end
+        if not w.hide_on_context[3].enabled then Fail("threat meter", "window 2 is not hidden when solo") end
+        if opts.useclasscolors ~= true then Fail("threat meter", "TinyThreat class colors are not on") end
+        A:Restore(snap)
+        if w.ativa then Fail("threat meter", "undo left window 2 open") end
+        if w.modo ~= 2 or w.last_raid_plugin ~= nil then Fail("threat meter", "undo left TinyThreat in window 2") end
+        if opts.useclasscolors ~= false then Fail("threat meter", "undo did not put TinyThreat class colors back") end
+    end)
+    api.IsAddOnLoaded, _G.Details = savedLoaded, savedDetails
+    if not ok then Fail("threat meter", err) end
 end
 
 -- Applies the wizard with its suggested rows, then undoes it: CVars and bindings must be back as before
@@ -352,6 +442,7 @@ local pages = CheckSettings() or 0
 local changed = CheckApplyUndo() or 0
 local presets = CheckPresets() or 0
 local plates = CheckPlates() or 0
+CheckThreatMeter()
 CheckMigration()
 
 if verbose then

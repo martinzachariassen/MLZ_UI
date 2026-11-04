@@ -1096,10 +1096,11 @@ PAGES[#PAGES + 1] = { key = "nameplates", title = "Nameplates", icon = "Interfac
     p:Card("Options")
     p:Toggle("Friendly names for healers", "In Healer mode friendly players get a name above their head, but it can't be clicked, so it never steals a click.",
         NP.HealerFriends, NP.SetHealerFriends, { avail = NPNotReady })
-    p:Toggle("Threat colors per role", "Tank: red = a mob is not on you. DPS: red = a mob is on you. Off for healers and when solo.",
+    p:Toggle("Threat colors per role", "Tank: red = a mob is not on you. Others: amber = close to pulling, red = it is on you.",
         NP.Threat, NP.SetThreat, { avail = NPNotReady,
         tip = "Tank: blue = securely on you, orange = aggro is changing hands, red = a mob is on someone else, teal = on the other tank. "
-            .. "DPS: orange = you are close to pulling aggro, red = the mob is on you." })
+            .. "DPS, healer and solo: orange = your threat is 80% or more of what pulls aggro (the % shows in the bar), "
+            .. "red = the mob is on you. In a group a warning sound plays once per mob near 90%." })
     p:Toggle("PvP tweak", "In battlegrounds and arenas: every enemy fully visible, no threat colors.",
         NP.PvP, NP.SetPvP, { avail = NPNotReady })
 

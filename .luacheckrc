@@ -45,7 +45,7 @@ read_globals = {
     -- Constants
     "COMBATLOG_OBJECT_AFFILIATION_MINE", "DEFAULT_CHATFRAME_ALPHA", "INVSLOT_MAINHAND", "INVSLOT_OFFHAND",
     "LE_ITEM_CLASS_WEAPON", "LE_PARTY_CATEGORY_INSTANCE", "MAX_PLAYER_LEVEL", "NUM_BAG_SLOTS",
-    "NUM_CHAT_WINDOWS", "RAID_CLASS_COLORS", "STANDARD_TEXT_FONT",
+    "NUM_CHAT_WINDOWS", "RAID_CLASS_COLORS", "STANDARD_TEXT_FONT", "INTERRUPTED",
 
     -- Functions
     "ActionButton_UpdateHotkeys", "ActionButton_UpdateUsable", "CanGuildBankRepair", "CanMerchantRepair",
@@ -72,7 +72,7 @@ read_globals = {
     "UnitHealth", "UnitHealthMax", "UnitIsConnected", "UnitIsDeadOrGhost", "UnitIsFriend", "UnitIsGroupAssistant", "UnitIsGroupLeader", "UnitIsPlayer", "UnitIsQuestBoss",
     "UnitIsTapDenied", "UnitIsUnit", "UnitLevel", "UnitName", "UnitNameplateShowsWidgetsOnly", "UnitOnTaxi",
     "UnitPlayerOrPetInParty", "UnitPlayerOrPetInRaid", "UnitPower", "UnitPowerMax", "UnitPowerType",
-    "UnitReaction", "UnitThreatSituation", "UnitXP", "UnitXPMax", "UseContainerItem",
+    "UnitReaction", "UnitThreatSituation", "UnitDetailedThreatSituation", "PlaySound", "SOUNDKIT", "UnitXP", "UnitXPMax", "UseContainerItem",
 
     -- Quests, popups, summons and pets (Modules/Automate.lua, Modules/Reminders.lua)
     "AcceptQuest", "AcceptResurrect", "C_GossipInfo", "C_SummonInfo", "CancelDuel", "CompleteQuest",

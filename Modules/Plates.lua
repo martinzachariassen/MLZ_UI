@@ -1,8 +1,9 @@
 -- MLZ UI: MLZ nameplates (our own engine)
--- Flat, calm nameplates drawn on our own frames: health bar, name, level when it matters, cast bar,
--- quest marker, raid marker, your own debuffs, crowd control from anyone, an execute range strip
--- and threat colors per role. Modules/Nameplates.lua
--- decides the mode and calls Plates.Configure; this file only draws. Values: Data/Nameplates.lua.
+-- Flat, calm nameplates drawn on our own frames: health bar, name, level when it matters, a cast bar
+-- with spell icon, time left and who the spell is aimed at, quest marker, raid marker, your own debuffs,
+-- crowd control from anyone, an execute range strip, a mouseover edge and threat colors per role.
+-- Modules/Nameplates.lua decides the mode and calls Plates.Configure; this file only draws.
+-- Values: Data/Nameplates.lua.
 --
 -- Taint safety: Blizzard's own plate (nameplate.UnitFrame) is only made invisible with SetAlpha(0)
 -- and shown again with SetAlpha(1). We never Hide, move or reparent it. Our frame is a child of the
@@ -46,6 +47,9 @@ local hooked = setmetatable({}, { __mode = "k" })
 local questCache = {} -- [guid] = true/false
 local execPct        -- health fraction where your execute spell works, nil if your class has none or doesn't know it
 local ccNames        -- [spell name] = true for crowd control worth showing (built on first use, every rank matches)
+local held = {}      -- [our frame] = true while an interrupted cast is still shown
+local hover          -- our frame under the mouse, if any
+local warned = {}    -- [our frame] = true once the threat sound played for this mob (reset below threatWarnAt)
 local Wake -- starts the OnUpdate (cast bars, debuff timers); set once the event frame exists
 
 ------------------------------------------------------------------------
@@ -99,9 +103,25 @@ end
 ------------------------------------------------------------------------
 -- Building our frame
 ------------------------------------------------------------------------
+-- Roboto Bold (the MLZ UI font) reads cleaner than the game font at small sizes. When the file can't
+-- be loaded the font string has no font (GetFont returns nil), then the game font is used.
 local function Font(fs, size)
-    fs:SetFont(STANDARD_TEXT_FONT, size, "OUTLINE")
+    local path = ns.W and ns.W.FONT
+    if path then fs:SetFont(path, size, "OUTLINE") end
+    if not (path and fs:GetFont()) then
+        fs:SetFont(STANDARD_TEXT_FONT, size, "OUTLINE")
+    end
     fs:SetShadowOffset(0, 0)
+end
+
+-- A 1px dark edge behind a texture, so it reads on any background
+local function Edge(owner, target, layer)
+    local e = owner:CreateTexture(nil, layer or "BACKGROUND", nil, -2)
+    e:SetTexture(TEX)
+    e:SetPoint("TOPLEFT", target, "TOPLEFT", -1, 1)
+    e:SetPoint("BOTTOMRIGHT", target, "BOTTOMRIGHT", 1, -1)
+    e:SetVertexColor(unpack(EDGE))
+    return e
 end
 
 local function Accent()
@@ -140,10 +160,10 @@ local function MakeAura(parent)
     a.icon:SetAllPoints()
     a.icon:SetTexCoord(0.08, 0.92, 0.2, 0.8)
     a.time = a:CreateFontString(nil, "OVERLAY")
-    Font(a.time, 9)
+    Font(a.time, 10)
     a.time:SetPoint("CENTER", a, "BOTTOM", 0, 1)
     a.count = a:CreateFontString(nil, "OVERLAY")
-    Font(a.count, 9)
+    Font(a.count, 10)
     a.count:SetPoint("TOPRIGHT", 2, 2)
     a:Hide()
     return a
@@ -160,8 +180,13 @@ local function Build(plate)
     f.health = MakeBar(f, d.height)
     f.health:SetAllPoints()
     f.healthText = f.health:CreateFontString(nil, "OVERLAY")
-    Font(f.healthText, 10)
-    f.healthText:SetPoint("RIGHT", -3, 0)
+    Font(f.healthText, d.textSize)
+    f.healthText:SetPoint("RIGHT", -4, 0)
+    -- your threat in % (DPS, healer, solo in combat), left inside the bar, opposite the health
+    f.threatText = f.health:CreateFontString(nil, "OVERLAY")
+    Font(f.threatText, d.textSize)
+    f.threatText:SetPoint("LEFT", 4, 0)
+    f.threatText:Hide()
 
     -- target: accent edge plus a 3px strip on the left
     f.strip = f:CreateTexture(nil, "ARTWORK")
@@ -200,15 +225,31 @@ local function Build(plate)
     f.raid:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcons")
     f.raid:Hide()
 
+    -- cast bar: square spell icon on the left, spell name, time left on the right and, under the bar,
+    -- who the spell is aimed at. Everything hangs off the bar, so hiding the bar hides it all.
     f.cast = MakeBar(f, d.castHeight)
-    f.cast:SetPoint("TOPLEFT", f.health, "BOTTOMLEFT", 0, -3)
+    f.cast:SetPoint("TOPLEFT", f.health, "BOTTOMLEFT", d.castHeight + 3, -3)
     f.cast:SetPoint("TOPRIGHT", f.health, "BOTTOMRIGHT", 0, -3)
+    f.castIcon = f.cast:CreateTexture(nil, "ARTWORK")
+    f.castIcon:SetSize(d.castHeight, d.castHeight)
+    f.castIcon:SetPoint("TOPLEFT", f.health, "BOTTOMLEFT", 0, -3)
+    f.castIcon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    f.castIcon.edge = Edge(f.cast, f.castIcon)
+    f.castTime = f.cast:CreateFontString(nil, "OVERLAY")
+    Font(f.castTime, d.textSize)
+    f.castTime:SetPoint("RIGHT", -4, 0)
+    f.castTime:SetJustifyH("RIGHT")
     f.castText = f.cast:CreateFontString(nil, "OVERLAY")
-    Font(f.castText, 10)
-    f.castText:SetPoint("LEFT", 3, 0)
-    f.castText:SetPoint("RIGHT", -3, 0)
+    Font(f.castText, d.textSize)
+    f.castText:SetPoint("LEFT", 4, 0)
+    f.castText:SetPoint("RIGHT", f.castTime, "LEFT", -4, 0)
     f.castText:SetJustifyH("LEFT")
     f.castText:SetWordWrap(false)
+    f.castTarget = f.cast:CreateFontString(nil, "OVERLAY")
+    Font(f.castTarget, d.textSize)
+    f.castTarget:SetPoint("TOPRIGHT", f.cast, "BOTTOMRIGHT", 0, -3)
+    f.castTarget:SetJustifyH("RIGHT")
+    f.castTarget:SetWordWrap(false)
     f.cast:Hide()
 
     f.auras = {}
@@ -253,13 +294,42 @@ local function InGroupUnit(unit)
     return false
 end
 
-local function ThreatColor(unit)
-    if not cfg.threat or cfg.pvp or not UnitThreatSituation then return nil end
+-- Threat values can be secret in combat on newer clients; a secret number is treated as unknown
+local issecretvalue = issecretvalue
+local function Num(v)
+    if v == nil or (issecretvalue and issecretvalue(v)) then return nil end
+    return v
+end
+
+local function InGroup()
+    return IsInGroup and IsInGroup() and true or false
+end
+
+-- Your threat on a mob: status (0-3) and percent of what pulls aggro (nil when the client doesn't say)
+local function ThreatOf(unit)
+    if UnitDetailedThreatSituation then
+        local tanking, status, pct = UnitDetailedThreatSituation("player", unit)
+        status, pct = Num(status), Num(pct)
+        if Num(tanking) == true then status = 3 end
+        return status, pct
+    end
+    if UnitThreatSituation then return Num(UnitThreatSituation("player", unit)), nil end
+end
+
+-- Threat matters to non-tanks only in combat and outside PvP
+local function ThreatRule(unit)
+    if not cfg.threat or cfg.pvp then return nil end
     local rule = ns.data.nameplates.threat[cfg.mode]
     if not rule or (rule.tanksOnly and cfg.mode ~= "tank") then return nil end
     if UnitAffectingCombat and not UnitAffectingCombat(unit) then return nil end
+    return rule
+end
+
+local function ThreatColor(unit)
+    local rule = ThreatRule(unit)
+    if not rule then return nil end
     local on, col = rule.enabled, C()
-    local status = UnitThreatSituation("player", unit)
+    local status, pct = ThreatOf(unit)
     if cfg.mode == "tank" then
         if status == 3 then return on.safe and col.safe or nil end
         if status == 1 or status == 2 then return on.transition and col.transition or nil end
@@ -271,8 +341,9 @@ local function ThreatColor(unit)
         if InGroupUnit(tgt) then return on.warning and col.warning or nil end
         return nil
     end
-    if status == 3 then return on.warning and col.warning or nil end
-    if status == 1 or status == 2 then return on.transition and col.transition or nil end
+    -- DPS, healer, solo: red = the mob is on you, amber = you are close to pulling it
+    if status == 3 or status == 2 then return on.warning and col.warning or nil end
+    if status == 1 or (pct and pct >= D().threatWarnAt) then return on.transition and col.transition or nil end
     return nil
 end
 
@@ -399,9 +470,49 @@ local function UpdateHealth(f)
         and UnitCanAttack and UnitCanAttack("player", unit) and true or false)
 end
 
+local THREAT_SOUND = 8959 -- SOUNDKIT.RAID_WARNING, used when the client has no SOUNDKIT table
+
+-- One warning sound per mob as you get close to pulling it, only in a group (solo there is no tank)
+local function ThreatSound(f, pct)
+    local d = D()
+    if pct < d.threatWarnAt then warned[f] = nil return end
+    if warned[f] or pct < d.threatSoundAt or not InGroup() or not PlaySound then return end
+    warned[f] = true
+    ns.Try(PlaySound, SOUNDKIT and SOUNDKIT.RAID_WARNING or THREAT_SOUND, "Master")
+end
+
+-- Threat % for DPS, healers and solo: in a group, or solo with a pet that is meant to hold the mob
+local function UpdateThreatText(f)
+    local unit = f.unit
+    local rule = cfg.mode ~= "tank" and ThreatRule(unit)
+    local status, pct
+    if rule then status, pct = ThreatOf(unit) end
+    if not pct then
+        f.threatText:Hide()
+        return
+    end
+    ThreatSound(f, pct)
+    if pct <= 0 or not (InGroup() or (UnitExists and UnitExists("pet"))) then
+        f.threatText:Hide()
+        return
+    end
+    local t
+    if status == 3 or status == 2 or pct >= 100 then
+        t = Theme("red", { 1, 0.35, 0.35 })
+    elseif pct >= D().threatWarnAt then
+        t = Theme("amber", { 1, 0.69, 0.25 })
+    else
+        t = Theme("text", { 0.9, 0.91, 0.93 })
+    end
+    f.threatText:SetTextColor(t[1], t[2], t[3])
+    f.threatText:SetFormattedText("%d%%", math.floor(pct + 0.5))
+    f.threatText:Show()
+end
+
 local function UpdateColor(f)
     local c = BarColor(f.unit)
     f.health:SetStatusBarColor(c[1], c[2], c[3])
+    UpdateThreatText(f)
 end
 
 local function UpdateTarget(f)
@@ -412,13 +523,18 @@ local function UpdateTarget(f)
     local a = Accent()
     f.strip:SetVertexColor(a[1], a[2], a[3])
     f.strip:SetShown(isTarget and not f.nameOnly)
+    local hovered = f == hover
     if isTarget then
         f.health.edge:SetVertexColor(a[1], a[2], a[3], 1)
+    elseif hovered then
+        -- the mob under the mouse gets a light edge, so you see what a click will target
+        local t = Theme("muted", { 0.58, 0.61, 0.66 })
+        f.health.edge:SetVertexColor(t[1], t[2], t[3], 1)
     else
         f.health.edge:SetVertexColor(unpack(EDGE))
     end
     local nonTarget = cfg.pvp and D().pvp.nonTarget or m.nonTarget
-    f:SetAlpha((UnitExists("target") and not isTarget) and nonTarget or 1)
+    f:SetAlpha((UnitExists("target") and not isTarget and not hovered) and nonTarget or 1)
     f:SetScale(cfg.size * (isTarget and m.targetScale or 1))
 end
 
@@ -536,34 +652,68 @@ local function UpdateAuras(f)
 end
 
 -- Cast info works across client versions: the "can't interrupt" flag is the first boolean after
--- the times, if the client sends one at all.
+-- the times, if the client sends one at all. Returns name, icon, startMS, endMS, locked, channel.
 local function CastInfo(unit)
     if UnitCastingInfo then
-        local name, _, _, startMS, endMS, _, _, a = UnitCastingInfo(unit)
-        if name then return name, startMS, endMS, a == true, false end
+        local name, _, icon, startMS, endMS, _, _, a = UnitCastingInfo(unit)
+        if name then return name, icon, startMS, endMS, a == true, false end
     end
     if UnitChannelInfo then
-        local name, _, _, startMS, endMS, _, a = UnitChannelInfo(unit)
-        if name then return name, startMS, endMS, a == true, true end
+        local name, _, icon, startMS, endMS, _, a = UnitChannelInfo(unit)
+        if name then return name, icon, startMS, endMS, a == true, true end
     end
 end
 
-local function UpdateCast(f)
-    local name, startMS, endMS, locked, channel
-    if cfg.show.castBar and not f.nameOnly then
-        name, startMS, endMS, locked, channel = CastInfo(f.unit)
-    end
-    if not name or not startMS or not endMS or endMS <= startMS then
-        f.cast:Hide()
-        casting[f] = nil
+-- Who the cast is aimed at (the caster's target), in class color for players. Mobs turn to the player
+-- they cast on, so a healer sees who is about to take the hit.
+local function UpdateCastTarget(f)
+    local tgt = f.unit and (f.unit .. "target")
+    if not (tgt and casting[f] and UnitExists(tgt)) or UnitIsUnit(tgt, f.unit) then
+        f.castTarget:SetText("")
         return
     end
+    local c = UnitIsPlayer(tgt) and ClassColor(tgt) or Theme("text", { 0.93, 0.94, 0.96 })
+    f.castTarget:SetText(UnitName(tgt) or "")
+    f.castTarget:SetTextColor(c[1], c[2], c[3])
+end
+
+local function UpdateCast(f)
+    local name, icon, startMS, endMS, locked, channel
+    if cfg.show.castBar and not f.nameOnly then
+        name, icon, startMS, endMS, locked, channel = CastInfo(f.unit)
+    end
+    if not name or not startMS or not endMS or endMS <= startMS then
+        casting[f] = nil
+        -- an interrupted cast stays up for a moment: the stop event that follows must not hide it
+        if not held[f] then f.cast:Hide() end
+        return
+    end
+    held[f] = nil
     f.castStart, f.castEnd, f.castChannel = startMS / 1000, endMS / 1000, channel
     local c = locked and C().castLocked or C().cast
     f.cast:SetStatusBarColor(c[1], c[2], c[3])
     f.castText:SetText(name)
+    f.castTime:SetText("")
+    f.castIcon:SetTexture(icon)
+    f.castIcon:SetShown(icon ~= nil)
+    f.castIcon.edge:SetShown(icon ~= nil)
     f.cast:Show()
     casting[f] = true
+    UpdateCastTarget(f)
+    if Wake then Wake() end
+end
+
+-- Interrupted: the bar fills, turns red and says so for a moment, so you see that the kick landed
+local function CastInterrupted(f)
+    if not (cfg.show.castBar and not f.nameOnly and f.cast:IsShown()) then return end
+    casting[f] = nil
+    held[f] = GetTime() + (D().interruptedHold or 0.6)
+    local r = Theme("red", { 1, 0.36, 0.36 })
+    f.cast:SetStatusBarColor(r[1], r[2], r[3])
+    f.cast:SetValue(1)
+    f.castText:SetText(INTERRUPTED or "Interrupted")
+    f.castTime:SetText("")
+    f.castTarget:SetText("")
     if Wake then Wake() end
 end
 
@@ -601,6 +751,9 @@ local function UnitAdded(unit)
     for u, other in pairs(byUnit) do if other == f then byUnit[u] = nil end end
     f.unit = unit
     byUnit[unit] = f
+    held[f] = nil
+    warned[f] = nil
+    if hover == f then hover = nil end
     HideBlizzard(plate)
     UpdateAll(f)
     f:Show()
@@ -611,6 +764,9 @@ local function UnitRemoved(unit)
     if not f then return end
     byUnit[unit] = nil
     casting[f] = nil
+    held[f] = nil
+    warned[f] = nil
+    if hover == f then hover = nil end
     f.unit = nil
     f:Hide()
 end
@@ -675,7 +831,11 @@ handlers.UNIT_LEVEL = OnUnit(UpdateName)
 handlers.UNIT_CLASSIFICATION_CHANGED = OnUnit(UpdateName)
 handlers.UNIT_FACTION = OnUnit(UpdateAll)
 handlers.UNIT_FLAGS = OnUnit(function(f) if not f.nameOnly then UpdateColor(f) end end)
-handlers.UNIT_TARGET = handlers.UNIT_FLAGS
+handlers.UNIT_TARGET = OnUnit(function(f)
+    if f.nameOnly then return end
+    UpdateColor(f)
+    if casting[f] then UpdateCastTarget(f) end
+end)
 handlers.UNIT_THREAT_LIST_UPDATE = handlers.UNIT_FLAGS
 handlers.UNIT_THREAT_SITUATION_UPDATE = function() ForEach(function(f) if not f.nameOnly then UpdateColor(f) end end) end
 handlers.PLAYER_REGEN_ENABLED = handlers.UNIT_THREAT_SITUATION_UPDATE
@@ -697,6 +857,26 @@ for _, ev in ipairs({
     "UNIT_SPELLCAST_CHANNEL_UPDATE", "UNIT_SPELLCAST_INTERRUPTIBLE", "UNIT_SPELLCAST_NOT_INTERRUPTIBLE",
 }) do
     handlers[ev] = OnUnit(UpdateCast)
+end
+handlers.UNIT_SPELLCAST_INTERRUPTED = OnUnit(CastInterrupted)
+
+-- The client says when the mouse moves onto a unit, not when it leaves: OnUpdate clears the hover
+local function SetHover(f)
+    if hover == f then return end
+    local old = hover
+    hover = f
+    if old and old.unit then UpdateTarget(old) end
+    if f then
+        UpdateTarget(f)
+        if Wake then Wake() end
+    end
+end
+handlers.UPDATE_MOUSEOVER_UNIT = function()
+    local found
+    for unit, f in pairs(byUnit) do
+        if not f.nameOnly and UnitIsUnit(unit, "mouseover") then found = f break end
+    end
+    SetHover(found)
 end
 
 events:SetScript("OnEvent", function(_, event, ...)
@@ -733,15 +913,25 @@ events:SetScript("OnUpdate", function(self, elapsed)
         if now >= f.castEnd then
             f.cast:Hide()
             casting[f] = nil
-        elseif f.castChannel then
-            f.cast:SetValue((f.castEnd - now) / total)
         else
-            f.cast:SetValue((now - f.castStart) / total)
+            if f.castChannel then
+                f.cast:SetValue((f.castEnd - now) / total)
+            else
+                f.cast:SetValue((now - f.castStart) / total)
+            end
+            f.castTime:SetFormattedText("%.1f", f.castEnd - now)
+        end
+    end
+    for f, untilTime in pairs(held) do
+        if now >= untilTime then
+            held[f] = nil
+            if not casting[f] then f.cast:Hide() end
         end
     end
     auraClock = auraClock + elapsed
     if auraClock < 0.25 then return end
     auraClock = 0
+    if hover and not (hover.unit and UnitIsUnit(hover.unit, "mouseover")) then SetHover(nil) end
     local timers = false
     for _, f in pairs(byUnit) do
         if f.hasTimers then
@@ -750,7 +940,7 @@ events:SetScript("OnUpdate", function(self, elapsed)
             TickTimer(f.cc, now)
         end
     end
-    if not timers and not next(casting) then self:Hide() end
+    if not timers and not next(casting) and not next(held) and not hover then self:Hide() end
 end)
 events:Hide() -- OnUpdate only runs while shown, i.e. while active
 
@@ -825,6 +1015,9 @@ local function Disable()
         f:Hide()
     end
     wipe(casting)
+    wipe(held)
+    wipe(warned)
+    hover = nil
     for plate in pairs(frames) do ShowBlizzard(plate) end
 end
 

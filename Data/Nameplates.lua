@@ -67,15 +67,15 @@ ns.data.nameplates = {
     },
 
     -- Threat colors on the enemy health bar, per mode. Only written when "Threat colors" is on
-    -- (it's off until you turn it on). Platynator flips the meaning for tanks itself: for a tank
+    -- (on by default). Platynator flips the meaning for tanks itself: for a tank
     -- "warning" = a mob is NOT on you, for everyone else "warning" = a mob IS on you.
     --   warning = red   transition = orange (aggro changing hands)   safe = blue   offtank = teal
     -- tanksOnly = true turns the colors off completely unless you are the tank.
     threat = {
         tank   = { enabled = { warning = true, transition = true, safe = true,  offtank = true  }, tanksOnly = false },
         dps    = { enabled = { warning = true, transition = true, safe = false, offtank = false }, tanksOnly = false },
-        healer = { enabled = { warning = true, transition = true, safe = false, offtank = false }, tanksOnly = true },
-        solo   = { enabled = { warning = true, transition = true, safe = false, offtank = false }, tanksOnly = true },
+        healer = { enabled = { warning = true, transition = true, safe = false, offtank = false }, tanksOnly = false },
+        solo   = { enabled = { warning = true, transition = true, safe = false, offtank = false }, tanksOnly = false },
     },
 
     -- Design used for enemies when it can't be read from Platynator's design assignments
@@ -106,13 +106,17 @@ ns.data.nameplates = {
 
     -- MLZ nameplates (our own engine, Modules/Plates.lua). Flat and calm, in the MLZ UI palette.
     plates = {
-        width = 128,          -- health bar size at size 100%
-        height = 10,
-        castHeight = 11,      -- fits the 10 pt spell name
-        nameSize = 10,
-        iconSize = 18,        -- debuff icons
+        width = 140,          -- health bar size at size 100%
+        height = 14,          -- thick enough to read health at a glance in a big pull
+        castHeight = 14,      -- also the size of the square spell icon left of the cast bar
+        nameSize = 11,
+        textSize = 10,        -- health percent, spell name, cast time, cast target
+        iconSize = 20,        -- debuff icons
         debuffLimit = 6,
+        interruptedHold = 0.6, -- seconds an interrupted cast stays on the plate (red, "Interrupted")
         levelDiff = 3,        -- show the level only when it differs this much from yours (or is ??)
+        threatWarnAt = 80,    -- DPS, healer, solo: amber once your threat reaches this % of what pulls aggro
+        threatSoundAt = 90,   -- one warning sound per mob at this % (only in a group, only with threat colors on)
 
         -- Crowd control shown on every enemy plate, from anyone, so nobody breaks it by accident.
         -- First rank ids: names are used, so every rank matches. Ids the client doesn't know are skipped.

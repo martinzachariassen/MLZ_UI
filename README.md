@@ -120,7 +120,7 @@ If the guess is wrong, set your role by hand with `/mlz role`, on the Your role 
 - Action buttons colored by range, mana and usability, with short hotkey labels
 - Role detection (talents, spec, form, group or your choice; DPS until your talents decide) that drives the layouts and nameplates, with melee, ranged and caster DPS told apart
 - Class-aware key hints, extra form keys, pet keys, and reminders for all 9 classes
-- Our own flat nameplates: health, cast bar, quest marker, your debuffs, crowd control from anyone, execute range and threat colors per role. Platynator is optional
+- Our own flat nameplates: health, cast bar with spell icon and target, quest marker, your debuffs, crowd control from anyone, execute range, and threat colors and threat % per role. Platynator is optional
 - Auto-repair, sell greys, a mana tick bar and an interrupt announce
 - Fewer clicks (all off until you turn them on): accept and turn in quests, accept summons and resurrections, confirm bind on pickup loot when solo, decline duels
 - Group and raid: a buff check on ready check (only in your own chat) and a pull timer on `/mlz pull` or a key
@@ -136,7 +136,7 @@ If the guess is wrong, set your role by hand with `/mlz role`, on the Your role 
 - One tip at a time on the overview, based on what you have turned on
 
 **Ecosystem**
-- Recommended settings for 15 addons, many of them per role: a healer and a tank do not get the same Questie, DBM or Details setup
+- Recommended settings for 16 addons, many of them per role: a healer and a tank do not get the same Questie, DBM or Details setup
 - Optional: Platynator as the nameplate engine, with modes per role and archetype and a clean style
 - Ready-made setups (Minimal, Balanced, Informative), role and situation profiles, one export string for all your MLZ UI choices, and an addon overview (loaded, switched off, missing, version)
 
@@ -205,7 +205,7 @@ MLZ UI **configures** these addons when they are installed and loaded. It does n
 | [Bagnon](https://www.curseforge.com/wow/addons/bagnon) | Columns, darker background, softer item glow, fewer auto-opens |
 | [Baganator](https://www.curseforge.com/wow/addons/baganator) (needs Syndicator) | Junk greyed out, unusable items marked, fewer auto-opens, no flashing new items |
 | [Deadly Boss Mods](https://www.curseforge.com/wow/addons/deadly-boss-mods) | Warnings top center, timers and info frames on the right, slimmer bars, quiet chat, no flash on minor warnings. Healers hide interrupt warnings. Optional for DPS: interrupts for target and focus only, range radar for ranged and casters |
-| [Details!](https://www.curseforge.com/wow/addons/details) | Hidden when solo, class colors, bar height, fewer saved fights, hidden minimap button |
+| [Details!](https://www.curseforge.com/wow/addons/details) | Hidden when solo, class colors, bar height, fewer saved fights, hidden minimap button. With TinyThreat: a threat meter in window 2, hidden when solo |
 | [Questie](https://www.curseforge.com/wow/addons/questie) | Hidden minimap button, finished objectives hidden. The tracker is hidden in combat for healers and ranged classes, and shrunk for tanks and melee |
 | [Clique](https://www.curseforge.com/wow/addons/clique) | Your click bindings shown in unit frame tooltips. Your bindings are never touched |
 | [TomTom](https://www.curseforge.com/wow/addons/tomtom) | Locked arrow, no arrival time, same-zone waypoints only, optional hidden coordinate box |

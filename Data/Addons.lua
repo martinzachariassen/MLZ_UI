@@ -1,5 +1,5 @@
 -- MLZ UI: Settings for other addons (Prat, Auctionator, AtlasLoot, WhatsTraining, Bagnon, Baganator,
--- RXPGuides, Questie, Deadly Boss Mods, Leatrix Plus, Leatrix Maps, Details!, Clique, TomTom)
+-- RXPGuides, Questie, Deadly Boss Mods, Leatrix Plus, Leatrix Maps, Details!, TinyThreat, Clique, TomTom)
 -- Edit this file to change what the wizard step "Other addons" sets. MLZ UI never downloads or
 -- updates these addons; it only configures the ones that are installed and loaded.
 --
@@ -14,6 +14,10 @@
 --   writeNote = (optional) one muted line under the heading in the wizard, when the rows can be written
 --   refresh = (optional) function that redraws the addon from its new settings. Return true if it did,
 --             and no reload is asked for.
+--   state, canPrepare, prepare, unprepare, prepareNote = (optional) for settings on something that may not
+--             exist yet (Details window 2). state() is saved with the backup, prepare() runs before the rows are
+--             written (returns true when it worked), unprepare(state) runs after undo. While the target is
+--             missing, rows are offered when canPrepare() is true, with prepareNote as the reason.
 --   tested  = (optional) the newest version of the addon these rows were checked against. A newer installed
 --             version is pointed out on the Other addons page (rows still run; missing keys are skipped).
 --   title   = heading in the wizard
@@ -52,6 +56,75 @@ local function PratModule(name)
         local space = db:GetNamespace("Prat_" .. name, true) or db:GetNamespace(name, true)
         return space and space.profile
     end
+end
+
+-- Details! windows. Details copies its live settings over the saved profile at logout, so we write the
+-- live window objects (and `Details` for global options). Window 1 is the meter, window 2 the threat meter.
+local TINY_THREAT = "DETAILS_PLUGIN_TINY_THREAT"
+local DETAILS_MODE_GROUP = 2 -- Details' normal mode: bars for your group
+local DETAILS_MODE_RAID = 4  -- Details' plugin mode: the window shows a raid plugin instead of bars
+
+local function DetailsReady()
+    local d = Details
+    if d and d.GetInstance and (not d.IsLoaded or d.IsLoaded()) then return d end
+end
+
+local function DetailsGlobal() return DetailsReady() end
+
+local function DetailsWindow(id)
+    return function()
+        local d = DetailsReady()
+        return d and d:GetInstance(id)
+    end
+end
+
+local function TinyThreatOptions()
+    local d = DetailsReady()
+    return d and d.plugin_database and d.plugin_database[TINY_THREAT]
+end
+
+-- The MLZ look for one Details window: hidden when not in a group, flat dark bars, Roboto, quiet toolbar.
+-- `what` names the window in the descriptions ("Window 1").
+local function DetailsStyle(what)
+    return {
+        -- hide_on_context[3] = "not in a group"; `value` is the alpha in percent while the rule is active
+        { id = "solo", label = "Hide when solo", show = "%s  alpha %s%%",
+          desc = what .. " is hidden when you play alone and shows again in a party or raid.",
+          set = { { path = { "hide_on_context", 3, "enabled" }, value = true },
+                  { path = { "hide_on_context", 3, "value" }, value = 0 } } },
+        -- The Minimalistic skin already uses class colors and 21 pixel bars
+        { id = "bar_height", label = "Bar height", desc = "18 pixels per bar instead of 21, so more players fit in the window.",
+          path = { "row_info", "height" }, value = 18 },
+        { id = "bar_flat", label = "Flat bars", show = "%s  class bg: %s",
+          desc = "Plain flat bars, with a dark MLZ color behind them instead of a class colored one.",
+          set = { { path = { "row_info", "texture_custom" }, value = "Buttons\\WHITE8X8" },
+                  { path = { "row_info", "texture_background_class_color" }, value = false } } },
+        { id = "bar_bg", label = "Dark bar background", desc = "The empty part of each bar uses the MLZ background color.",
+          path = { "row_info", "fixed_texture_background_color" }, value = Alpha(THEME.bg, 0.6) },
+        { id = "window_bg", label = "Dark window background", show = "%s %s %s  alpha %s",
+          desc = "The window behind the bars uses the MLZ background color.",
+          set = { { path = { "bg_r" }, value = THEME.bg[1] }, { path = { "bg_g" }, value = THEME.bg[2] },
+                  { path = { "bg_b" }, value = THEME.bg[3] }, { path = { "bg_alpha" }, value = 0.85 } } },
+        { id = "font", label = "MLZ font on bars", show = "%s  size %s",
+          desc = "Bar text uses Roboto Bold at size 11.",
+          set = { { path = { "row_info", "font_face_file" }, value = THEME.font },
+                  { path = { "row_info", "font_size" }, value = 11 } } },
+        { id = "statusbar", label = "No status bar", desc = "Removes the empty strip at the bottom of the window.",
+          path = { "show_statusbar" }, value = false },
+        { id = "menu_fade", label = "Fade the toolbar", show = "%s  alpha %s",
+          desc = "The icons at the top of the window dim to 30% until you hover them.",
+          set = { { path = { "menu_alpha", "enabled" }, value = true },
+                  { path = { "menu_alpha", "onleave" }, value = 0.3 } } },
+    }
+end
+
+-- One row list from several
+local function Join(...)
+    local out = {}
+    for i = 1, select("#", ...) do
+        for _, row in ipairs((select(i, ...))) do out[#out + 1] = row end
+    end
+    return out
 end
 
 -- Bagnon keeps its settings in Bagnon_Sets. Frame settings live under .global.<frame>
@@ -438,52 +511,92 @@ ns.data.addons = {
               set = { { path = { "ScaleWorldMap" }, value = "On" }, { path = { "MapScale" }, value = 0.9 } } },
         },
     },
-    -- Details! copies its live settings over the saved profile at logout, so we write the live objects:
-    -- `Details` for global options and window 1 for per-window options. Needs /reload to redraw.
+    -- Details! (meter): window 1 and global options. Needs /reload to redraw.
     {
         addon = "Details", title = "Details! (meter)",
-        root = function()
-            local d = Details
-            if not (d and d.GetInstance and (not d.IsLoaded or d.IsLoaded())) then return nil end
-            return d:GetInstance(1)
-        end,
-        rows = {
+        root = DetailsWindow(1),
+        rows = Join({
             { id = "minimap", label = "Hide minimap button", desc = "Keeps the minimap clean. Open Details with /details.",
-              root = function() return Details end, path = { "minimap", "hide" }, value = true },
-            -- hide_on_context[3] = "not in a group"; `value` is the alpha in percent while the rule is active
-            { id = "solo", label = "Hide when solo", show = "%s  alpha %s%%",
-              desc = "Window 1 is hidden when you play alone and shows again in a party or raid. Same idea as the damage meter under Minimalism.",
-              set = { { path = { "hide_on_context", 3, "enabled" }, value = true },
-                      { path = { "hide_on_context", 3, "value" }, value = 0 } } },
-            -- The Minimalistic skin already uses class colors and 21 pixel bars
-            { id = "bar_height", label = "Bar height", desc = "18 pixels per bar instead of 21, so more players fit in the window.",
-              path = { "row_info", "height" }, value = 18 },
-            { id = "bar_flat", label = "Flat bars", show = "%s  class bg: %s",
-              desc = "Plain flat bars, with a dark MLZ color behind them instead of a class colored one.",
-              set = { { path = { "row_info", "texture_custom" }, value = "Buttons\\WHITE8X8" },
-                      { path = { "row_info", "texture_background_class_color" }, value = false } } },
-            { id = "bar_bg", label = "Dark bar background", desc = "The empty part of each bar uses the MLZ background color.",
-              path = { "row_info", "fixed_texture_background_color" }, value = Alpha(THEME.bg, 0.6) },
-            { id = "window_bg", label = "Dark window background", show = "%s %s %s  alpha %s",
-              desc = "The window behind the bars uses the MLZ background color.",
-              set = { { path = { "bg_r" }, value = THEME.bg[1] }, { path = { "bg_g" }, value = THEME.bg[2] },
-                      { path = { "bg_b" }, value = THEME.bg[3] }, { path = { "bg_alpha" }, value = 0.85 } } },
-            { id = "font", label = "MLZ font on bars", show = "%s  size %s",
-              desc = "Bar text uses Roboto Bold at size 11.",
-              set = { { path = { "row_info", "font_face_file" }, value = THEME.font }, { path = { "row_info", "font_size" }, value = 11 } } },
-            { id = "statusbar", label = "No status bar", desc = "Removes the empty strip at the bottom of the window.",
-              path = { "show_statusbar" }, value = false },
-            { id = "menu_fade", label = "Fade the toolbar", show = "%s  alpha %s",
-              desc = "The icons at the top of the window dim to 30% until you hover them.",
-              set = { { path = { "menu_alpha", "enabled" }, value = true }, { path = { "menu_alpha", "onleave" }, value = 0.3 } } },
-            -- Details copies live settings over its profile at logout, so writing the live Details table persists
+              root = DetailsGlobal, path = { "minimap", "hide" }, value = true },
+        }, DetailsStyle("Window 1"), {
             { id = "segments", label = "Fights kept", desc = "Keeps the last 10 fights instead of 15, so the list stays short.",
-              root = function() return Details end, path = { "segments_amount_to_save" }, value = 10 },
+              root = DetailsGlobal, path = { "segments_amount_to_save" }, value = 10 },
             { id = "trash", label = "Remove trash fights", desc = "Old trash fights are dropped from the list when a boss fight is added.",
-              root = function() return Details end, path = { "trash_auto_remove" }, value = true },
+              root = DetailsGlobal, path = { "trash_auto_remove" }, value = true },
             { id = "animations", label = "No bar animations", desc = "Bars jump to their new length instead of sliding.",
-              root = function() return Details end, path = { "use_row_animations" }, value = false },
-        },
+              root = DetailsGlobal, path = { "use_row_animations" }, value = false },
+        }),
+    },
+    -- Details! TinyThreat in Details window 2, so you see how close you are to pulling aggro. The window is
+    -- opened (or created, with window 1's look) when the rows are applied, and closed again by /mlz undo.
+    -- Hidden when not in a group: solo there is no tank to compare with.
+    {
+        addon = "Details_TinyThreat", requires = "Details", title = "Details! (threat meter)",
+        root = DetailsWindow(2),
+        prepareNote = "Opens Details window 2 for this.",
+        -- what the backup remembers about window 2 before we touch it: "open", "closed" or "missing"
+        state = function()
+            local d = DetailsReady()
+            local w = d and d:GetInstance(2)
+            if not w then return "missing" end
+            return w:IsEnabled() and "open" or "closed"
+        end,
+        -- true when window 2 is missing or closed but Details can open it
+        canPrepare = function()
+            local d = DetailsReady()
+            if not (d and d.CreateInstance and d.GetNumInstances) then return false end
+            return d:GetInstance(2) ~= nil or d:GetNumInstances() == 1
+        end,
+        -- opens window 2 before the rows are written. Returns true when it is there.
+        prepare = function()
+            local d = DetailsReady()
+            if not (d and d.CreateInstance and d.GetNumInstances) then return false end
+            local w = d:GetInstance(2)
+            if w then
+                if not w:IsEnabled() then d:CreateInstance(2) end
+            elseif d:GetNumInstances() == 1 then
+                d:CreateInstance(true) -- the next window, styled like window 1
+            end
+            return d:GetInstance(2) ~= nil
+        end,
+        -- closes window 2 again on undo when it wasn't open before
+        unprepare = function(was)
+            if was == "open" then return end
+            local d = DetailsReady()
+            local w = d and d:GetInstance(2)
+            if not w then return end
+            if was == "missing" then
+                -- a window we made: back to Details' normal bars, so opening it later shows the usual meter
+                local raid = d.RaidTables
+                if raid and raid.DisableRaidMode and w.current_raid_plugin then raid:DisableRaidMode(w) end
+                w.modo, w.last_raid_plugin = DETAILS_MODE_GROUP, nil
+            end
+            if w:IsEnabled() and w.Shutdown then w:Shutdown() end
+        end,
+        -- shows the threat meter right away. The look and "hide when solo" still need a /reload.
+        refresh = function()
+            local d = DetailsReady()
+            local w = d and d:GetInstance(2)
+            local raid = d and d.RaidTables
+            if w and w:IsEnabled() and w.modo == DETAILS_MODE_RAID and w.last_raid_plugin == TINY_THREAT
+                and raid and raid.EnableRaidMode then
+                raid:EnableRaidMode(w, TINY_THREAT)
+            end
+            return false
+        end,
+        rows = Join({
+            { id = "show", label = "Show TinyThreat in window 2", show = "mode %s  %s",
+              desc = "Window 2 shows everyone's threat on your target. Aggro moves to you at 100%.",
+              set = { { path = { "modo" }, value = DETAILS_MODE_RAID }, { path = { "last_raid_plugin" }, value = TINY_THREAT } } },
+        }, DetailsStyle("The threat window"), {
+            -- TinyThreat reads its options on every update, straight from its saved table
+            { id = "class_colors", label = "Class colors", desc = "Each player's bar in their class color, so you spot the tank.",
+              root = TinyThreatOptions, path = { "useclasscolors" }, value = true },
+            { id = "pull_bar", label = "Show the pull line", desc = "A bar shows how much threat pulls aggro from the tank.",
+              root = TinyThreatOptions, path = { "hide_pull_bar" }, value = false },
+            { id = "weighted", label = "Percent of what pulls aggro", desc = "You pull aggro when your bar reaches 100%.",
+              root = TinyThreatOptions, path = { "absolute_mode" }, value = false },
+        }),
     },
     -- Clique 5.x: per-character options in Clique.settings (db.char). Bindings are left alone on purpose:
     -- they depend on your spells, so you set them up in Clique itself.

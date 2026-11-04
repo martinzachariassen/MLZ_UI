@@ -9,7 +9,7 @@ ns.version = "0.8.0"
 ns.modules = {}       -- registered modules, in load order (see MLZ_UI.toc), also indexed by key
 ns.data = {}          -- data tables (Data/*.lua)
 
-local DB_VERSION = 7
+local DB_VERSION = 8
 
 ------------------------------------------------------------------------
 -- Output
@@ -569,6 +569,12 @@ local migrations = {
         for _, key in ipairs({ "automate", "group" }) do
             if db[key] ~= nil and type(db[key]) ~= "table" then db[key] = nil end
         end
+    end,
+    -- v8: threat colors on the nameplates are on by default. nameplates.threat = nil now means on;
+    -- an explicit false (you turned them off) stays off, so nothing to convert.
+    [8] = function(db)
+        local np = db.nameplates
+        if type(np) == "table" and np.threat ~= nil and type(np.threat) ~= "boolean" then np.threat = nil end
     end,
 }
 

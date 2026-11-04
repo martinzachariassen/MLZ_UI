@@ -176,6 +176,15 @@ local function Refresh(entry)
     return ok and done == true
 end
 
+-- True when a row's target doesn't exist yet but the entry can make it when applied (Details window 2)
+local function Preparable(entry, row)
+    if row.root or not entry.canPrepare then return false end
+    local ok, can = ns.Try(entry.canPrepare)
+    return ok and can == true
+end
+
+local function PrepareKey(entry) return "@" .. entry.addon end
+
 local function PreviewRow(entry, row)
     local id = entry.addon .. ":" .. row.id
     local item = { id = id, group = entry.title, label = row.label, note = row.desc }
@@ -194,6 +203,13 @@ local function PreviewRow(entry, row)
         return item
     end
     local values = Read(entry, row)
+    if not values and Preparable(entry, row) and Writable(entry) then
+        item.old = "-"
+        item.new = Format(row, function(_, part) return part.value end)
+        item.enabled = ns.Enabled("addons", id, row.enabled ~= false)
+        item.note = entry.prepareNote .. (row.desc and ("  " .. row.desc) or "")
+        return item
+    end
     if not values then
         item.old, item.new = "-", "not available"
         item.enabled, item.unavailable = false, true
@@ -247,6 +263,12 @@ function Addons:Backup(items)
                 end
             end
             snap[item.id] = { parts = parts }
+            -- once per entry: what its prepare() step will change (e.g. whether Details window 2 was open)
+            local key = PrepareKey(entry)
+            if entry.state and snap[key] == nil then
+                local ok, state = ns.Try(entry.state)
+                if ok then snap[key] = { state = state } end
+            end
         end
     end
     return snap
@@ -254,11 +276,15 @@ end
 
 function Addons:Apply(items)
     local changed, failed = 0, 0
-    local touched = {}
+    local touched, prepared = {}, {}
     for _, item in ipairs(items) do
         local entry, row = Find(item.id)
         if entry and not item.unavailable and Writable(entry) then
             Unlock(entry)
+            if entry.prepare and not prepared[entry] then
+                prepared[entry] = true
+                ns.Try(entry.prepare)
+            end
             for _, part in ipairs(Parts(row)) do
                 local parent, key = Resolve(entry, row, part.path, true)
                 if parent then
@@ -287,9 +313,21 @@ end
 -- Rows of an addon that is not loaded stay in `snap` and Restore errors, so Backup:Undo keeps them for
 -- another /mlz undo once the addon is back. Writing them now would create stray tables or globals.
 function Addons:Restore(snap)
-    local touched, done, waiting = {}, {}, {}
+    local touched, done, waiting, unprepare = {}, {}, {}, {}
+    for _, entry in ipairs(ns.data.addons) do
+        local key = PrepareKey(entry)
+        if snap[key] and entry.unprepare and Writable(entry) then
+            if Loaded(entry) then
+                unprepare[entry] = snap[key].state
+                done[#done + 1] = key
+            else
+                waiting[entry.title:gsub("%s*%b()$", "")] = true
+            end
+        end
+    end
     for id, old in pairs(snap) do
         local entry, row = Find(id)
+        -- prepare states ("@addon") match no row, so they skip this loop
         if entry and Writable(entry) and not Loaded(entry) then
             waiting[entry.title:gsub("%s*%b()$", "")] = true
         elseif entry and Writable(entry) then
@@ -309,6 +347,8 @@ function Addons:Restore(snap)
             end
         end
     end
+    -- after the rows, so e.g. Details window 2 gets its old values back before it is closed again
+    for entry, state in pairs(unprepare) do ns.Try(entry.unprepare, state) end
     for entry in pairs(touched) do
         if not entry.live and not Refresh(entry) then ns.MarkReload("addon settings") end
     end
@@ -345,6 +385,8 @@ function Addons:Summary()
                     if ok and values then
                         s.total = s.total + 1
                         if not Matches(row, values) then s.differ = s.differ + 1 end
+                    elseif ok and Preparable(entry, row) then
+                        s.total, s.differ = s.total + 1, s.differ + 1
                     else
                         s.missing[#s.missing + 1] = row.label .. " - " .. (ok and Reason(entry, row) or tostring(values))
                     end

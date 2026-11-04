@@ -542,7 +542,7 @@ local function CaptureSituation()
     local tw = ns.modules.tweaks
     local snap = { fade = ns.CopyTable(ns.db.fade or {}), tracker = {}, time = date("%Y-%m-%d %H:%M") }
     for _, k in ipairs(TRACKER_KEYS) do snap.tracker[k] = tw and tw:IsOn(k) or false end
-    snap.threat = (ns.db.nameplates or {}).threat and true or false
+    snap.threat = (ns.db.nameplates or {}).threat ~= false -- nil = on (the default)
     return snap
 end
 
@@ -560,7 +560,7 @@ local function LoadSituation(snap)
         end
     end
     ns.db.nameplates = ns.db.nameplates or {}
-    if snap.threat ~= nil and (ns.db.nameplates.threat and true or false) ~= snap.threat then
+    if snap.threat ~= nil and (ns.db.nameplates.threat ~= false) ~= snap.threat then
         ns.db.nameplates.threat = snap.threat
         if ns.NP and ns.NP.Apply then ns.NP.Apply() end
         changed = true

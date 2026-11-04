@@ -36,6 +36,9 @@ local function DB()
     return ns.db.nameplates
 end
 
+-- Threat colors are on unless you turned them off (nil = never set = on, since DB version 8)
+local function ThreatOn(db) return db.threat ~= false end
+
 local ENGINES = { mlz = true, platynator = true, off = true }
 NP.ENGINE_TEXT = { mlz = "MLZ", platynator = "Platynator", off = "Blizzard" }
 
@@ -379,7 +382,7 @@ local function Build(mode, inPvP)
 
     local name = EnemyDesignName(live)
     local hadStash = db.stash and db.stash[name] ~= nil
-    if not (db.style or db.threat or hadStash) then return profile end
+    if not (db.style or ThreatOn(db) or hadStash) then return profile end
     if name:sub(1, 1) == "_" then
         name = AdoptBuiltin(profile, name)
         if not name then return profile, "builtin" end
@@ -389,7 +392,7 @@ local function Build(mode, inPvP)
 
     local stash = GetStash(name)
     if db.style then StyleDesign(design, stash, inPvP) else UnstyleDesign(design, stash) end
-    TuneThreat(design, mode, stash, db.threat and true or false, inPvP)
+    TuneThreat(design, mode, stash, ThreatOn(db), inPvP)
     if StashEmpty(stash) then db.stash[name] = nil end
     return profile
 end
@@ -439,7 +442,7 @@ local function Refresh(force)
     -- MLZ nameplates: our own frames, safe to change at any time (also in combat)
     local mlzOn = engine == "mlz" and Ready()
     ns.Plates.Configure(mlzOn, {
-        mode = mode, pvp = inPvP, threat = db.threat, friends = db.healerFriends ~= false,
+        mode = mode, pvp = inPvP, threat = ThreatOn(db), friends = db.healerFriends ~= false,
         show = Show(), size = db.size or 1,
     })
     if engine == "off" then
@@ -469,7 +472,7 @@ local function Refresh(force)
         return false
     end
     pending = nil
-    local key = table.concat({ mode, tostring((ns.LiveArchetype())), tostring(db.style), tostring(db.threat),
+    local key = table.concat({ mode, tostring((ns.LiveArchetype())), tostring(db.style), tostring(ThreatOn(db)),
         tostring(inPvP), tostring(db.healerFriends ~= false), tostring(PLATYNATOR_CURRENT_PROFILE) }, "|")
     if not force and key == db.lastKey then
         current = mode
@@ -580,7 +583,7 @@ function NP.LastError() return lastError end
 function NP.InPvP() return InPvP() end
 function NP.Auto() return DB().auto and true or false end
 function NP.Style() return DB().style and true or false end
-function NP.Threat() return DB().threat and true or false end
+function NP.Threat() return ThreatOn(DB()) end
 function NP.PvP() return DB().pvp and true or false end
 function NP.HealerFriends() return DB().healerFriends ~= false end
 function NP.HasSnapshot() return DB().snapshot ~= nil end
@@ -739,17 +742,17 @@ function Nameplates:Preview()
             note = "Minimal enemy nameplates: name and percent inside the bar, cast bar, crowd control and only your own debuffs. Everything removed is remembered, so turning it off puts it back." }
     end
 
-    local threat = db.threat and true or false
+    local threat = ThreatOn(db)
     items[#items + 1] = { id = "threat", group = "Nameplates", label = "Threat colors per role", flag = "threat",
         old = threat and "on" or "off", new = "on", toggle = true, isOn = threat, offText = "off",
-        enabled = threat or ns.Enabled("nameplates", "threat", false),
-        note = "Colors the enemy health bar by threat: as tank, red = a mob is not on you; as DPS, red = a mob is on you. Off for healers and when solo." }
+        enabled = threat or ns.Enabled("nameplates", "threat", true),
+        note = "Colors the enemy health bar by threat. As tank, red = a mob is not on you. As DPS, healer or solo, amber = you are close to pulling it (your threat % shows in the bar) and red = it is on you. In a group a sound plays once near 90%." }
     return items
 end
 
 function Nameplates:Backup()
     local db = DB()
-    local snap = { style = db.style and true or false, threat = db.threat and true or false,
+    local snap = { style = db.style and true or false, threat = ThreatOn(db),
         stash = db.stash and ns.CopyTable(db.stash) or nil, hasStash = true,
         engine = db.engine, hasEngine = true }
     if CanImport(true) then snap.profile = ProfileString() end
