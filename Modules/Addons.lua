@@ -356,8 +356,14 @@ function Addons:Backup(items)
             for i, part in ipairs(Parts(row)) do
                 local parent, key = Resolve(entry, row, part.path)
                 if parent then
+                    -- rawget: a value that only comes from the addon's defaults (a metatable, as in Bagnon and
+                    -- AceDB) is not saved, so undo clears our value and the default shows again
+                    -- (a proxy table with __newindex stores nothing itself, so there the read value counts)
                     local current = parent[key]
-                    parts[i] = { has = current ~= nil, value = type(current) == "table" and ns.CopyTable(current) or current }
+                    local mt = getmetatable(parent)
+                    local proxy = type(mt) == "table" and mt.__newindex ~= nil
+                    parts[i] = { has = (proxy and current ~= nil) or rawget(parent, key) ~= nil,
+                                 value = type(current) == "table" and ns.CopyTable(current) or current }
                 else
                     -- the path doesn't exist yet: Apply creates it, so undo has to clear the value again
                     parts[i] = { has = false }

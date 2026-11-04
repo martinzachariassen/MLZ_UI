@@ -14,6 +14,19 @@
 - An imported setup can't change `ESCAPE` or the left and right mouse buttons.
 - The nameplates page is no longer built twice when you change the engine.
 - Fading also picks up frames that appear later when the row already found some of its frames.
+- WoW Forever 1.60.1: the swing timer gets the same size as the game's own (it was half size and wider).
+- WoW Forever 1.60.1: nameplates work where the game hides health, casts and auras. Health and the cast bar
+  still fill. The target shows its health percent, and the execute mark and cast time are left out there.
+- WoW Forever 1.60.1: the interrupt message works again. It now uses the game's interrupt event for your
+  target, your focus and mobs with a nameplate. Where the game hides who interrupted, nothing is posted.
+- Spell, item and buff checks (vendor, reminders, buff check, cooking, key map) use the newer game
+  functions first, so they keep working when the older ones are gone.
+- Details!: windows with their own scale are placed at the right size.
+- Bagnon: settings go to the profile Bagnon uses for this character. Undo removes values that were only
+  defaults.
+- Auctionator: the small tabs setting is skipped when your version doesn't have it.
+- RestedXP: the guide window scale applies right away and the window stays in place.
+- Platynator: the MLZ UI enemy design stays in use after import on profiles from older versions.
 
 ## 0.9.0
 

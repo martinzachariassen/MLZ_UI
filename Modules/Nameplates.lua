@@ -374,6 +374,9 @@ local function AdoptBuiltin(profile, name)
     for _, a in ipairs(profile.design_assignments or {}) do
         if a.style == name then a.style = own end
     end
+    -- On import Platynator replaces a style that is not in designs (every built-in one) with an older value,
+    -- which can point the enemy assignment back at it. Our own copy is in designs, so it stays.
+    profile.style = own
     return own
 end
 

@@ -138,17 +138,22 @@ local function DetailsPlace(id, label, desc, want)
             local normal = w and w.posicao and w.posicao.normal
             if not normal then return nil end
             local lw = w.libwindow or {}
+            -- w/h are in the window's own scale (Details sets baseframe:SetScale(window_scale)): report UIParent units
+            local s = w.window_scale or 1
+            local ww, wh = normal.w and normal.w * s, normal.h and normal.h * s
             if lw.x then
-                return { point = lw.point, relPoint = lw.point, x = lw.x, y = lw.y, w = normal.w, h = normal.h }
+                return { point = lw.point, relPoint = lw.point, x = lw.x, y = lw.y, w = ww, h = wh }
             end
-            return { point = "CENTER", relPoint = "CENTER", x = normal.x or 0, y = normal.y or 0, w = normal.w, h = normal.h }
+            return { point = "CENTER", relPoint = "CENTER", x = normal.x or 0, y = normal.y or 0, w = ww, h = wh }
         end,
         set = function(pos)
             local d = DetailsReady()
             local w = d and d:GetInstance(id)
             local normal = w and w.posicao and w.posicao.normal
             if not normal then return end
-            normal.w, normal.h = pos.w or normal.w, pos.h or normal.h
+            local s = w.window_scale or 1
+            if pos.w then normal.w = pos.w / s end
+            if pos.h then normal.h = pos.h / s end
             if pos.point == "CENTER" then
                 -- back to the older center offset (a window that was never moved)
                 w.libwindow = {}
@@ -172,9 +177,22 @@ local function ThreatPos(m, inset)
              y = m.METER_Y + METER_H + DETAILS_TITLE + 4, w = METER_W, h = THREAT_H }
 end
 
+-- Bagnon keeps its settings in Bagnon_Sets. Frame settings (inventory, bank, vault, guild) live in the
+-- character's profile (Bagnon_Sets.profiles[realm][character]) when it has one, else in .global. Bagnon.player.profile
+-- is the one it uses. The rest sit directly on Bagnon_Sets.
+local function BagnonRoot() return Bagnon_Sets end
+local function BagnonGlobal()
+    local player = Bagnon and Bagnon.player
+    if player and type(player.profile) == "table" then return player.profile end
+    return Bagnon_Sets and Bagnon_Sets.global
+end
+
 -- Bagnon frames: SetPoint(point, x, y) on UIParent's same point, offsets in the frame's own scale
 local function BagnonPlace(frame, label, desc, want)
-    local function Sets() return Bagnon_Sets and Bagnon_Sets.global and Bagnon_Sets.global[frame] end
+    local function Sets()
+        local t = BagnonGlobal()
+        return t and t[frame]
+    end
     return {
         id = frame .. "_position", label = label, desc = desc, want = want,
         missing = "Bagnon has not saved this window yet. Open it once and run this step again.",
@@ -202,10 +220,20 @@ local function Join(...)
     return out
 end
 
--- Bagnon keeps its settings in Bagnon_Sets. Frame settings live under .global.<frame>
--- (inventory, bank, vault, guild); the rest sit directly on Bagnon_Sets.
-local function BagnonRoot() return Bagnon_Sets end
-local function BagnonGlobal() return Bagnon_Sets and Bagnon_Sets.global end
+-- RestedXP profile table (see the RXPGuides entry below)
+local function RXPProfile()
+    local db = _G.RXPSettings
+    local keys = db and db.profileKeys
+    if type(keys) ~= "table" or type(db.profiles) ~= "table" then return nil end
+    local name = UnitName("player")
+    local profile = keys[name] or keys[name .. " - " .. (GetRealmName() or "")]
+    if not profile then
+        for key, value in pairs(keys) do
+            if key:sub(1, #name + 1) == name .. " " then profile = value break end
+        end
+    end
+    return profile and db.profiles[profile]
+end
 
 ns.data.addons = {
     {
@@ -252,7 +280,13 @@ ns.data.addons = {
             -- 0 none, 1 shopping, 2 selling, 3 cancelling, 4 Auctionator options
             { id = "default_tab", label = "Open on the Selling tab", desc = "The auction house opens on Auctionator's Selling tab.",
               path = { "default_tab" }, value = 2 },
+            -- Only the modern auction house build of Auctionator has small tabs (Config.Options.SMALL_TABS)
             { id = "small_tabs", label = "Smaller tabs", desc = "Auctionator's tabs take less room at the bottom of the window.",
+              root = function()
+                  local opts = Auctionator and Auctionator.Config and Auctionator.Config.Options
+                  if not (opts and opts.SMALL_TABS) then return nil end
+                  return AUCTIONATOR_CHARACTER_CONFIG or AUCTIONATOR_CONFIG
+              end,
               path = { "small_tabs" }, value = true },
             { id = "mail_tooltips", label = "No mailbox tooltips", desc = "Mail item tooltips stay short.",
               path = { "mailbox_tooltips" }, value = false },
@@ -355,18 +389,21 @@ ns.data.addons = {
     -- is the character name, and AceDB adds the realm on some realms, so the key is matched by its start.
     {
         addon = "RXPGuides", title = "RestedXP Guides",
-        root = function()
-            local db = _G.RXPSettings
-            local keys = db and db.profileKeys
-            if type(keys) ~= "table" or type(db.profiles) ~= "table" then return nil end
-            local name = UnitName("player")
-            local profile = keys[name] or keys[name .. " - " .. (GetRealmName() or "")]
-            if not profile then
-                for key, value in pairs(keys) do
-                    if key:sub(1, #name + 1) == name .. " " then profile = value break end
-                end
+        root = RXPProfile,
+        -- The guide window scale is set live (keeping the window where it is on screen), so its position and
+        -- the scale don't fight until the next /reload. The other settings still need one.
+        refresh = function()
+            local f, p = _G.RXPFrame, RXPProfile()
+            local scale = p and tonumber(p.windowScale)
+            if not (f and f.GetScale and scale and scale > 0) or InCombatLockdown() then return false end
+            local old = f:GetScale() or 1
+            if math.abs(old - scale) > 0.001 and f:GetNumPoints() > 0 then
+                local point, rel, relPoint, x, y = f:GetPoint(1)
+                f:SetScale(scale)
+                f:ClearAllPoints()
+                f:SetPoint(point, rel or UIParent, relPoint, (x or 0) * old / scale, (y or 0) * old / scale)
             end
-            return profile and db.profiles[profile]
+            return false
         end,
         -- RXP reads its window positions back from the live frames at logout, so moving the frames is enough
         rows = {
