@@ -35,7 +35,14 @@ local function SpellIcon(id)
     return GetSpellTexture and GetSpellTexture(id)
 end
 
+-- id can be a list: known when any of them is (several spells that use the same reagent)
 local function Knows(id)
+    if type(id) == "table" then
+        for _, one in ipairs(id) do
+            if Knows(one) then return true end
+        end
+        return false
+    end
     if IsSpellKnown and IsSpellKnown(id) then return true end
     if IsPlayerSpell and IsPlayerSpell(id) then return true end
     return false

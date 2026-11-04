@@ -507,6 +507,15 @@ local function CheckSettings()
     if #keys == 0 then Fail("settings", "no pages registered") end
     Step("Settings:Open", S.Open, S)
     for _, key in ipairs(keys) do Step("Settings:Select " .. key, S.Select, S, key) end
+    -- CLAUDE.md: every setting row has a tooltip with the details, not only the description
+    local untipped = {}
+    for _, key in ipairs(keys) do
+        local page = S.pages[key].page
+        for _, e in ipairs(page and page.index or {}) do
+            if e.control and (e.tip == nil or e.tip == "") then untipped[#untipped + 1] = key .. ": " .. tostring(e.label) end
+        end
+    end
+    if #untipped > 0 then Fail("settings", "rows without a tooltip:\n  " .. table.concat(untipped, "\n  ")) end
     Step("slash /mlz", SlashCmdList.MLZUI, "")
     Step("slash /mlz help", SlashCmdList.MLZUI, "help")
     stub.FlushTimers(function(err) Fail("settings timer", err) end)

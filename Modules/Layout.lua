@@ -189,7 +189,8 @@ function Layout:Preview()
     end
     local raw, _, active = self:GetInfo()
     if not raw or not active then
-        return { { id = "na", label = "Edit Mode", old = "-", new = "could not read layouts", enabled = false, unavailable = true } }
+        return { { id = "na", label = "Edit Mode", old = "-", new = "could not read layouts", enabled = false, unavailable = true,
+                   note = "Open Edit Mode once (ESC, Edit Mode), close it, then run this step again." } }
     end
 
     local items = {}

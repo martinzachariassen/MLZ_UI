@@ -32,14 +32,19 @@ local COLORS = {
 
 local OPTIONS = {
     { id = "range", label = "Red when out of range",
+      tip = "Checked 5 times a second. Blizzard only colors the hotkey text, this colors the whole icon.",
       desc = "The whole icon turns red when the target is too far away, not just the hotkey text." },
     { id = "mana", label = "Blue when low on mana",
+      tip = "Uses the game's own check, so it works for mana, rage and energy alike.",
       desc = "Clearer blue tint when you lack mana, energy or rage." },
     { id = "unusable", label = "Dark grey when unusable",
+      tip = "Shows that a press will do nothing right now, so you don't spam a button that can't fire.",
       desc = "For example the wrong form or stance, a missing reagent, or no target." },
     { id = "hotkeys", label = "Short hotkeys",
+      tip = "Bar 4 shows SWU or CWU (SHIFT or CTRL plus the mouse wheel). Keys you set yourself are shortened the same way.",
       desc = "A short key in the top right of every button: 1 on bar 1, S1 for SHIFT-1 on bar 2, C1 for CTRL-1 on bar 3. The mouse wheel shows as WU and WD." },
     { id = "macroNames", label = "Hide macro names",
+      tip = "Only the name text is hidden. The macro and its icon work as before.",
       desc = "Macro names are not shown on the button (the icon is enough)." },
 }
 

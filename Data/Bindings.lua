@@ -49,9 +49,9 @@ B.roles = {
 -- Missing entries fall back to B.roles.
 B.classRoles = {
     WARRIOR = { [7] = "Interrupt (Pummel)", [10] = "Mobility (Charge)", [12] = "Taunt / utility" },
-    PALADIN = { [7] = "Interrupt (Hammer of Justice)", [8] = "Defensive (Divine Shield)",
+    PALADIN = { [7] = "Stun (Hammer of Justice)", [8] = "Defensive (Divine Shield)",
         [10] = "Utility (Freedom)", [12] = "Dispel (Cleanse)" },
-    HUNTER  = { [7] = "Interrupt (Concussive Shot)", [9] = "Main cooldown (Rapid Fire)", [10] = "Mobility (Disengage)",
+    HUNTER  = { [7] = "Slow (Concussive Shot)", [9] = "Main cooldown (Rapid Fire)", [10] = "Mobility (Disengage)",
         [11] = "CC (Freezing Trap)", [12] = "Utility (Feign Death)" },
     ROGUE   = { [7] = "Interrupt (Kick)", [8] = "Defensive (Evasion)", [10] = "Mobility (Sprint)",
         [11] = "CC (Gouge, Sap)", [12] = "Utility (Vanish)" },
@@ -63,7 +63,7 @@ B.classRoles = {
         [11] = "CC (Polymorph)", [12] = "Utility (Remove Curse)" },
     WARLOCK = { [7] = "Interrupt (Spell Lock)", [8] = "Defensive (Death Coil)", [11] = "CC (Fear)",
         [12] = "Utility (Healthstone)" },
-    DRUID   = { [7] = "Interrupt (Bash)", [8] = "Defensive (Barkskin)", [9] = "Main cooldown (Innervate)",
+    DRUID   = { [7] = "Interrupt (Bash, Feral Charge)", [8] = "Defensive (Barkskin)", [9] = "Main cooldown (Innervate)",
         [10] = "Mobility (Dash)", [11] = "CC (Roots)", [12] = "Dispel (Remove Curse)" },
 }
 
@@ -78,7 +78,8 @@ B.layers = {
 -- Extra keys for classes with stances or forms. They go to bar 5 buttons 1-N (MULTIACTIONBAR4 = right bar 2).
 -- The player drags forms (or anything) onto those buttons and so picks which key does what. Bar 5 does not
 -- change page when you shift, bar 1 does, so a form stays on the same key.
--- A class only gets the first N of them (`stance` in Data/Classes.lua): warrior 3, druid 5, rogue 1.
+-- A class only gets the first N of them (`stance` in Data/Classes.lua): warrior 3, paladin 3,
+-- druid 5, rogue 1, priest 1 (only with Shadowform).
 -- WASD: SHIFT-1/2/3 are taken, so bar 2 buttons 1-3 move to the keys in B.extraRelocate.
 --       Keys 4-5 are G and V, which are free.
 -- ESDF: the 1 key is free in every layer (it's not a base key), so 1 / SHIFT-1 / CTRL-1 are free.

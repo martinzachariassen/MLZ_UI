@@ -31,9 +31,11 @@ ns.data.classes = {
     PALADIN = {
         tabs = { "HEALER", "TANK", "MELEE" }, dpsTabs = { [2] = "MELEE" }, dps = "MELEE", resource = "Mana", stance = 3,
         execute = { spell = 24275, pct = 0.2 }, -- Hammer of Wrath
+        -- no interrupt: Hammer of Justice is a stun, it doesn't stop a cast for its lockout
     },
     HUNTER = {
         dps = "RANGED", pureDps = true, resource = "Mana", pet = true,
+        -- no interrupt in Classic (Scatter Shot and Intimidation are crowd control, not a kick)
     },
     ROGUE = {
         dps = "MELEE", pureDps = true, resource = "Energy", stance = 1,
@@ -57,6 +59,7 @@ ns.data.classes = {
     },
     DRUID = {
         tabs = { "CASTER", "TANK", "HEALER" }, dpsTabs = { [2] = "MELEE" }, dps = "MELEE", resource = "Mana", stance = 5,
+        interrupt = { 16979 },                  -- Feral Charge (bear form talent)
     },
 }
 

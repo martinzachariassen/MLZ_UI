@@ -71,7 +71,8 @@ ns.data.reminders = {
         { class = "MAGE", spell = 23028, item = 17020, min = 5, label = "Arcane Powder" },     -- Arcane Brilliance
         { class = "PRIEST", spell = 21564, item = 17029, min = 5, label = "Sacred Candle", group = "fort" }, -- Prayer of Fortitude 2
         { class = "PRIEST", spell = 21562, item = 17028, min = 5, label = "Holy Candle", group = "fort" },   -- Prayer of Fortitude 1
-        { class = "PALADIN", spell = 25782, item = 21177, min = 10, label = "Symbol of Kings" }, -- Greater Blessing of Might
+        { class = "PALADIN", spell = { 25782, 25894, 25898, 25895, 25890, 25899 }, item = 21177, min = 10,
+          label = "Symbol of Kings" }, -- any Greater Blessing (Might, Wisdom, Kings, Salvation, Light, Sanctuary)
         { class = "PALADIN", spell = 19752, item = 17033, min = 1, label = "Symbol of Divinity" }, -- Divine Intervention
         { class = "DRUID", spell = 21850, item = 17026, min = 5, label = "Wild Thornroot", group = "gotw" }, -- Gift of the Wild 2
         { class = "DRUID", spell = 21849, item = 17021, min = 5, label = "Wild Berries", group = "gotw" },   -- Gift of the Wild 1

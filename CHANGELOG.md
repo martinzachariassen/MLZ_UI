@@ -87,6 +87,14 @@
 - A contributing guide, a code of conduct, a security policy, and issue and pull request templates.
 - The control center search also finds text in cards ("How it works", chat commands).
 
+- Every setting in the control center has a tooltip with the details. Rows that can't be used say why in
+  amber: fade rows for frames this client doesn't have, action button colors without buttons, and the
+  interrupt announce for a class without an interrupt.
+- Druids: Feral Charge counts as an interrupt, so a bear tank gets the "Interrupt ready" cast bar.
+- Key hints: hunter button 7 is "Slow (Concussive Shot)" and paladin button 7 is "Stun (Hammer of
+  Justice)". Neither is an interrupt.
+- Reagent reminders: Symbol of Kings is checked for every Greater Blessing, not only Might.
+
 **Fixes**
 - Reagent reminders: Prayer of Fortitude rank 1 checks Holy Candles and Gift of the Wild rank 1 checks Wild
   Berries. With rank 2 learned you are only reminded about Sacred Candles or Wild Thornroot.

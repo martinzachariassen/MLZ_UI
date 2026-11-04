@@ -305,6 +305,7 @@ local function PreviewRow(entry, row)
     if not values then
         item.old, item.new = "-", "not available"
         item.enabled, item.unavailable = false, true
+        item.note = row.missing or "This setting is not in your version of the addon, so it is skipped."
         return item
     end
     item.old = Format(row, function(i) return values[i].v end)

@@ -29,6 +29,12 @@ local function FadeModeText(mode)
     local t = ns.modules.fade.MODE_TEXT[mode] or tostring(mode)
     return t:sub(1, 1):upper() .. t:sub(2)
 end
+local FADE_TIP = {
+    mouseover = "Move the mouse over the spot to see it. Keybinds keep working while it is hidden.",
+    combat = "Fully visible in combat and on mouseover, dimmed the rest of the time.",
+    hideInCombat = "Hidden while you fight, back as soon as combat ends.",
+    group = "Hidden while you play solo, shown in a party or raid.",
+}
 local AB_SHORT = { range = "range", mana = "mana", unusable = "unusable", hotkeys = "short keys", macroNames = "no macro names" }
 local TW_SHORT = { trackerHeader = "no tracker header", trackerHide = "tracker hidden", fps = "FPS counter", cleanCombatFont = "combat font",
     tooltipClass = "class colored tooltips", tooltipTarget = "tooltip target", chatClassNames = "class colors in chat",
@@ -594,30 +600,35 @@ function Page:Toggle(label, desc, get, set, opts)
         end)
     end, function(t) t:SetOn(get()) end)
     row.search.get = get -- search results show On or Off
+    row.search.control = true
     return row, control
 end
 
 -- Segmented choice: options = { { value, text, tip }, ... }
 function Page:Choice(label, desc, options, get, set, segW, opts)
-    return self:Row(Opts(opts, label, desc), function(row)
+    local row, control = self:Row(Opts(opts, label, desc), function(row)
         return W.Segmented(row, options, function(v)
             set(v)
             S:Refresh()
         end, segW)
     end, function(s) s:SetValue(get()) end)
+    row.search.control = true -- tests/load.lua checks that every control has a tooltip
+    return row, control
 end
 
 function Page:Step(label, desc, options, width, get, set, opts)
-    return self:Row(Opts(opts, label, desc), function(row)
+    local row, control = self:Row(Opts(opts, label, desc), function(row)
         return W.Stepper(row, width, options, function(v)
             set(v)
             S:Refresh()
         end)
     end, function(s) s:SetValue(get()) end)
+    row.search.control = true -- tests/load.lua checks that every control has a tooltip
+    return row, control
 end
 
 function Page:Slider(label, desc, minV, maxV, step, fmt, get, onChange, onCommit, opts)
-    return self:Row(Opts(opts, label, desc), function(row)
+    local row, control = self:Row(Opts(opts, label, desc), function(row)
         return W.Slider(row, 250, minV, maxV, step, fmt, onChange, function(v)
             onCommit(v)
             S:Refresh()
@@ -627,6 +638,8 @@ function Page:Slider(label, desc, minV, maxV, step, fmt, get, onChange, onCommit
         if s.IsDraggingThumb and s:IsDraggingThumb() then return end
         h:SetValue(get())
     end)
+    row.search.control = true -- tests/load.lua checks that every control has a tooltip
+    return row, control
 end
 
 -- Read-only value on the right
@@ -1014,7 +1027,8 @@ PAGES[#PAGES + 1] = { key = "layout", title = "Layout & scale", icon = "Interfac
     Labels()
     p:OnRefresh(Labels)
     p:Step("Scale mode", "Lower number = smaller UI and more of the world. Applies at once (waits for combat to end).",
-        modes, 280, function() return sc:Mode() end, function(v) sc:SetMode(v) end)
+        modes, 280, function() return sc:Mode() end, function(v) sc:SetMode(v) end,
+        { tip = "Auto picks the sharpest scale for your screen (pixel perfect). The other steps make everything smaller or bigger from there." })
     p:Value("Right now", "The scale the game uses at this moment.", function()
         local w, h = GetPhysicalScreenSize()
         return ("%.3f on a %dx%d screen%s"):format(UIParent:GetScale(), w or 0, h or 0, sc:IsApplied() and "" or C.grey .. " (Blizzard's own scale)" .. C.r)
@@ -1088,7 +1102,8 @@ PAGES[#PAGES + 1] = { key = "nameplates", title = "Nameplates", icon = "Interfac
 
     p:Card("Mode", "Auto: Tank while you tank (Defensive Stance or Bear Form with tank talents, or the group's tank). "
         .. "Healer or DPS in a group, depending on your role. Solo when you are not in a group.")
-    p:Choice("Mode", "Picking a mode turns Auto off.", NP_OPTIONS, GetNPChoice, SetNPChoice, 62, { avail = NPNotReady })
+    p:Choice("Mode", "Picking a mode turns Auto off.", NP_OPTIONS, GetNPChoice, SetNPChoice, 62, { avail = NPNotReady,
+        tip = "Auto follows your role: tank, healer, DPS in a group, or solo. Pick Auto again to go back to that." })
     p:Value("Active mode", function()
         if NP.Auto() then return "Picked automatically: " .. (NP.Reason() or "-") .. "." end
         local m, why = NP.Suggested()
@@ -1105,14 +1120,16 @@ PAGES[#PAGES + 1] = { key = "nameplates", title = "Nameplates", icon = "Interfac
 
     p:Card("Options")
     p:Toggle("Friendly names for healers", "In Healer mode friendly players get a name above their head, but it can't be clicked, so it never steals a click.",
-        NP.HealerFriends, NP.SetHealerFriends, { avail = NPNotReady })
+        NP.HealerFriends, NP.SetHealerFriends, { avail = NPNotReady,
+        tip = "Only in Healer mode. You see where people stand without the names taking your clicks on the world or the raid frames." })
     p:Toggle("Threat colors per role", "Tank: red = a mob is not on you. Others: amber = close to pulling, red = it is on you.",
         NP.Threat, NP.SetThreat, { avail = NPNotReady,
         tip = "Tank: blue = securely on you, orange = aggro is changing hands, red = a mob is on someone else, teal = on the other tank. "
             .. "DPS, healer and solo: orange = your threat is 80% or more of what pulls aggro (the % shows in the bar), "
             .. "red = the mob is on you. In a group a warning sound plays once per mob near 90%." })
     p:Toggle("PvP tweak", "In battlegrounds and arenas: every enemy fully visible, no threat colors.",
-        NP.PvP, NP.SetPvP, { avail = NPNotReady })
+        NP.PvP, NP.SetPvP, { avail = NPNotReady,
+        tip = "Only inside battlegrounds and arenas. In the open world your normal mode is used, also against players." })
 
     -- The engine decides which of the next two cards has rows. The other one is a single amber line,
     -- and the page is rebuilt when the engine changes (here, from the minimap menu or a Platynator load).
@@ -1175,7 +1192,8 @@ PAGES[#PAGES + 1] = { key = "nameplates", title = "Nameplates", icon = "Interfac
         ShowToggle("level", "Level", "Only when it is 3 or more levels from yours, or ??. Elite and rare marks always show.",
             "Elite: a gold diamond. Rare: a silver one. Rare elite: silver with a gold edge. World boss: a red skull.")
         p:Step("Size", "Width and text size of the plates. Your target is a bit bigger on top of this.", SIZE_OPTIONS, 140,
-            NP.Size, NP.SetSize, { avail = MLZOnly })
+            NP.Size, NP.SetSize, { avail = MLZOnly,
+            tip = "Scales the whole plate: bar, cast bar, text and icons. 100% is a 150 px wide bar." })
     end
 
     p:Card("Platynator", "MLZ UI saves a copy of your Platynator profile before it changes anything. Restore puts that copy back.")
@@ -1205,7 +1223,8 @@ PAGES[#PAGES + 1] = { key = "healer", title = "Your role", icon = "Interface\\Ic
     p:Title("Your role", "Your role drives the nameplate mode and the layouts. When you heal, group frames move to the middle of the screen. Casters and hunters lose the melee swing timers.")
 
     p:Card("My role")
-    p:Choice("My role", RoleDesc, ROLE_OPTIONS, GetRoleChoice, SetRoleChoice, 62, { descLines = 2 })
+    p:Choice("My role", RoleDesc, ROLE_OPTIONS, GetRoleChoice, SetRoleChoice, 62, { descLines = 2,
+        tip = "Auto reads your talents, form or stance and the group role. Pick a role to keep it, whatever your talents say." })
 
     p:Card("Your class", "MLZ UI adapts to all 9 classes in WoW Forever. Role is tank, healer or DPS. DPS is split into melee, ranged and caster.")
     p:Value("Playing as now", "Follows your talents and your form or stance.", function() return S.ClassText() end, { width = 260 })
@@ -1258,20 +1277,14 @@ PAGES[#PAGES + 1] = { key = "fade", title = "Minimalism", icon = "Interface\\Ico
 
     p:Card("Hide until needed", "Keybinds keep working when a bar is invisible. Show me around (on About & help) points them out.")
     p:Toggle("Pause all fading", "Shows everything again until you turn this off or reload.",
-        function() return ns.fadePaused end, function(on) fade:SetPaused(on) end)
-    local missing = {}
+        function() return ns.fadePaused end, function(on) fade:SetPaused(on) end,
+        { tip = "Handy while you set things up or take a screenshot. Your choices below are kept." })
     for _, row in ipairs(ns.data.fade) do
-        if fade:Exists(row) then
-            local how = FadeModeText(row.mode)
-            if row.alpha then how = how .. " (" .. math.floor(row.alpha * 100) .. "%)" end
-            p:Toggle(row.label, how .. ". " .. (row.desc or ""),
-                function() return fade:IsOn(row.id) end, function(on) fade:SetRow(row.id, on) end)
-        else
-            missing[#missing + 1] = row.label
-        end
-    end
-    if #missing > 0 then
-        p:Text(#missing .. " more are not shown because those frames do not exist in this client: " .. table.concat(missing, ", ") .. ".")
+        local how = FadeModeText(row.mode)
+        if row.alpha then how = how .. " (" .. math.floor(row.alpha * 100) .. "%)" end
+        p:Toggle(row.label, how .. ". " .. (row.desc or ""),
+            function() return fade:IsOn(row.id) end, function(on) fade:SetRow(row.id, on) end,
+            { tip = FADE_TIP[row.mode], avail = function() if not fade:Exists(row) then return "Not in this client" end end })
     end
 end }
 
@@ -1280,8 +1293,10 @@ PAGES[#PAGES + 1] = { key = "buttons", title = "Bars & interface", icon = "Inter
     p:Title("Bars & interface", "See at a glance why a button doesn't work, plus small tweaks that declutter the screen.")
 
     p:Card("Action buttons", C.red .. "Red" .. C.r .. " = out of range, " .. C.blue .. "blue" .. C.r .. " = not enough mana, dark grey = can't be used right now.")
+    local function NoButtons() if not _G.ActionButton1 then return "No action buttons found" end end
     for _, o in ipairs(ab.options) do
-        p:Toggle(o.label, o.desc, function() return ab:IsOn(o.id) end, function(on) ab:Set(o.id, on) end)
+        p:Toggle(o.label, o.desc, function() return ab:IsOn(o.id) end, function(on) ab:Set(o.id, on) end,
+            { tip = o.tip, avail = NoButtons })
     end
 
     -- the tweaks of one group, in the order Tweaks lists them
@@ -1289,7 +1304,7 @@ PAGES[#PAGES + 1] = { key = "buttons", title = "Bars & interface", icon = "Inter
         for _, o in ipairs(tw.options) do
             if (o.group or "Quest tracker") == group then
                 p:Toggle(o.label, o.desc, function() return tw:IsOn(o.id) end, function(on) tw:Set(o.id, on) end,
-                    o.avail and { avail = o.avail } or nil)
+                    { avail = o.avail, tip = o.tip })
             end
         end
     end
@@ -1302,7 +1317,8 @@ PAGES[#PAGES + 1] = { key = "buttons", title = "Bars & interface", icon = "Inter
 
     p:Card("Chat")
     p:Toggle("Clean chat", ("Chat lines fade after %ds (scroll or hover to see them again). Tabs and background only show on mouseover."):format(ns.data.chat.fadeAfter),
-        function() return ns.db.chatTweaks end, function(on) fade:SetChat(on) end)
+        function() return ns.db.chatTweaks end, function(on) fade:SetChat(on) end,
+        { tip = "Applies to every chat window. New lines always show, and the input box works as before." })
     Tweaks("Chat")
 
     -- Edit Mode can't be saved in combat: SaveMap keeps the size and saves it when combat ends
@@ -1321,7 +1337,8 @@ PAGES[#PAGES + 1] = { key = "buttons", title = "Bars & interface", icon = "Inter
         function() return tw.MapSize() end,
         function(v) tw.PreviewMap(v) end,
         function(v) SaveMap(v, "Minimap size saved") end,
-        { avail = function() return NoEditMode() or (tw.MapAvail and tw.MapAvail()) end })
+        { avail = function() return NoEditMode() or (tw.MapAvail and tw.MapAvail()) end,
+          tip = "The size is stored in the MLZ UI Edit Mode layout, so it survives a reload. Undo puts the old size back." })
     Tweaks("Minimap")
     p:Toggle("Show the minimap button", "Left-click opens this window, right-click opens a quick menu, SHIFT-click reloads when a reload is needed. Drag it to move it around the minimap.",
         function() return not (ns.db.minimap and ns.db.minimap.hide) end,
@@ -1329,7 +1346,7 @@ PAGES[#PAGES + 1] = { key = "buttons", title = "Bars & interface", icon = "Inter
             if not ns.MinimapButton then return end
             ns.MinimapButton:SetHidden(not on)
             if not on then S:Notify("Type /mlz to open this window again.", "info") end
-        end)
+        end, { tip = "Hidden, /mlz still opens this window. Turn this on again to bring the button back." })
     p:Buttons({
         { text = "Reset to " .. tw.MAP_DEFAULT .. "%", width = 140, fn = function() SaveMap(tw.MAP_DEFAULT, "Minimap size reset") end,
           avail = NoEditMode, tip = "Puts the minimap back to the size MLZ UI uses and saves it in the layout." },
@@ -1345,13 +1362,16 @@ PAGES[#PAGES + 1] = { key = "qol", title = "Helpers", icon = "Interface\\Icons\\
 
     p:Card("Merchants", "Hold SHIFT while you talk to a merchant to skip this once.")
     p:Toggle("Repair automatically", "Repairs all your gear when you open a merchant who can repair.",
-        function() return V.Get("repair") end, function(on) V.Set("repair", on) end)
+        function() return V.Get("repair") end, function(on) V.Set("repair", on) end,
+        { tip = "One chat line with the cost. Hold SHIFT at the merchant to skip it once." })
     p:Toggle("Use guild bank money first", "When your guild lets you repair with guild money, that is used before your own gold.",
         function() return V.Get("guild") end, function(on) V.Set("guild", on) end,
-        { avail = function() if not V.Get("repair") then return "Needs auto-repair" end end })
+        { avail = function() if not V.Get("repair") then return "Needs auto-repair" end end,
+          tip = "Falls back to your own gold when the guild limit is reached or you may not use guild money." })
     p:Toggle("Sell grey items", "Sells every grey (poor quality) item in your bags. One line in chat says what you got for them.",
         function() return V.Get("sell") end, function(on) V.Set("sell", on) end,
-        { avail = function() if V.LeatrixSells() then return "Leatrix Plus already sells junk" end end })
+        { avail = function() if V.LeatrixSells() then return "Leatrix Plus already sells junk" end end,
+          tip = "Only grey items. White and better items are never sold. Hold SHIFT at the merchant to skip it once." })
 
     local AU = ns.Automate
     if AU then
@@ -1386,7 +1406,8 @@ PAGES[#PAGES + 1] = { key = "qol", title = "Helpers", icon = "Interface\\Icons\\
         { tip = "Dead and offline players are left out. Type /mlz buffs to check at any time." })
     p:Toggle("All class buffs when I lead", "As leader or raid assistant the line covers every class buff the group "
         .. "can give, not just yours.", function() return G.Get("leaderAll") end, function(on) G.Set("leaderAll", on) end,
-        { avail = function() if not G.Get("buffCheck") then return "Turn on the buff check first" end end })
+        { avail = function() if not G.Get("buffCheck") then return "Turn on the buff check first" end end,
+          tip = "Without lead or assist you only see the buffs you can cast yourself. The line stays in your own chat." })
     p:Value("Pull timer key", "Press it in a group to start a 10 second pull timer.", function()
         local key = GetBindingKey and GetBindingKey("MLZUI_PULL")
         return key and (C.blue .. key .. C.r) or (C.grey .. "Not set (Key Bindings > AddOns > MLZ UI)" .. C.r)
@@ -1405,9 +1426,11 @@ PAGES[#PAGES + 1] = { key = "qol", title = "Helpers", icon = "Interface\\Icons\\
     p:Card("Mana and energy", "A thin bar under your player frame.")
     p:Toggle("Five-second rule and tick bar", "After you spend mana the bar fills in orange over 5 seconds (no spirit regen until it is full), "
         .. "then shows the 2-second regen tick in blue. Rogues and druids in Cat Form see the energy tick in yellow.",
-        MT.IsOn, MT.SetOn, { avail = NoTick })
+        MT.IsOn, MT.SetOn, { avail = NoTick,
+        tip = "Orange: the five-second rule after you spend mana. Blue: the next 2-second mana tick. Yellow: the energy tick." })
     p:Toggle("Move the bar", "Shows a test bar you can drag with the left mouse button. Turn this off when you are done.",
-        MT.IsMoving, MT.SetMoving, { avail = NoTick })
+        MT.IsMoving, MT.SetMoving, { avail = NoTick,
+        tip = "The position is saved per character. Reset position puts it back under the player frame." })
     p:Buttons({
         { text = "Reset position", width = 140, style = "subtle", fn = function()
             MT.ResetPosition()
@@ -1432,7 +1455,12 @@ PAGES[#PAGES + 1] = { key = "qol", title = "Helpers", icon = "Interface\\Icons\\
 
     p:Card("Interrupts")
     p:Choice("Announce my interrupts", "\"Interrupted <mob>'s <spell>\" when you or your pet interrupt a cast. Say and Group only post while you are in a group.",
-        IA.CHANNELS, IA.Get, IA.Set, 62)
+        IA.CHANNELS, IA.Get, IA.Set, 62, {
+        tip = "One line per interrupt, never more. Off posts nothing. Your pet's interrupts (Spell Lock) count too.",
+        avail = function()
+            local data = ns.data.classes and ns.data.classes[ns.PlayerClass() or ""]
+            if not (data and data.interrupt) then return "Your class has no interrupt" end
+        end })
 
     local X = ns.XPRate
     if X then
@@ -1460,7 +1488,8 @@ PAGES[#PAGES + 1] = { key = "reminders", title = "Reminders", icon = "Interface\
     p:Card("What to check")
     p:Toggle("Missing self buffs", "Inner Fire, Arcane Intellect, aspects, poisons, weapon imbues and similar. "
         .. "Not shown in cities and inns.",
-        function() return R.Get("buffs") end, function(on) R.Set("buffs", on) end)
+        function() return R.Get("buffs") end, function(on) R.Set("buffs", on) end,
+        { tip = "Only buffs you know and can cast on yourself. Each one can be turned off below." })
     local entries = R.Entries()
     local function HasKind(kind)
         for _, e in ipairs(entries) do
@@ -1470,9 +1499,11 @@ PAGES[#PAGES + 1] = { key = "reminders", title = "Reminders", icon = "Interface\
     end
     p:Toggle("Low reagents and ammo", "Ammo, soul shards, ankhs, powders and candles for the spells you know.",
         function() return R.Get("reagents") end, function(on) R.Set("reagents", on) end,
-        { avail = function() if not HasKind("reagent") then return "Nothing to check for your class" end end })
+        { avail = function() if not HasKind("reagent") then return "Nothing to check for your class" end end,
+          tip = "Only for spells you know. Each reagent can be turned off in the list below." })
     p:Toggle("Worn gear", ("An icon and one chat line when your most worn item drops to %d%% durability."):format(R.DurabilityLimit()),
-        function() return R.Get("durability") end, function(on) R.Set("durability", on) end)
+        function() return R.Get("durability") end, function(on) R.Set("durability", on) end,
+        { tip = "The chat line shows once, and again only after you have repaired. A reload does not repeat it." })
     p:Toggle("Food while leveling", "Solo and below max level: an icon when you are not Well Fed, for the extra XP.",
         function() return R.Get("levelFood") end, function(on) R.Set("levelFood", on) end,
         { tip = "Only when you are not in a group and still earn XP. Never at max level, and not in cities and inns.",
@@ -1505,7 +1536,7 @@ PAGES[#PAGES + 1] = { key = "reminders", title = "Reminders", icon = "Interface\
                 desc = desc .. " Only as " .. RoleNames(e.roles) .. "."
             end
             p:Toggle(e.name, desc, function() return not R.IsMuted(e.key) end, function(on) R.SetMuted(e.key, not on) end,
-                { avail = function()
+                { tip = "Off hides only this reminder. The others keep working.", avail = function()
                     local known = e.known
                     for _, cur in ipairs(R.Entries()) do
                         if cur.key == e.key then known = cur.known end
@@ -1636,7 +1667,8 @@ PAGES[#PAGES + 1] = { key = "profiles", title = "Profiles & backup", icon = "Int
     local RP = ns.RoleProfiles
     p:Card("Role profiles (this character)", "Save your nameplate options, faded frames, tick bar and interrupt announce once per role. "
         .. "With switching on, the right profile is loaded when your role changes (respec or dual spec).")
-    p:Toggle("Switch profile with my role", "Only loads a role that has a saved profile.", RP.Auto, RP.SetAuto)
+    p:Toggle("Switch profile with my role", "Only loads a role that has a saved profile.", RP.Auto, RP.SetAuto,
+        { tip = "When your role changes (talents, form, group role), the saved profile for that role loads. Roles without one are left alone." })
     for _, role in ipairs({ "TANK", "HEALER", "DAMAGER" }) do
         p:Value(ns.ROLE_TEXT[role] .. " profile", "Nameplate options, faded frames, tick bar and interrupt announce.", function()
             local t = RP.Time(role)
@@ -1823,7 +1855,7 @@ PAGES[#PAGES + 1] = { key = "about", title = "About & help", icon = "Interface\\
     p:Text(C.white .. "/mlz" .. C.r .. "   opens or closes this window\n"
         .. C.white .. "/mlz search" .. C.r .. "   finds a setting, for example /mlz search minimap\n"
         .. C.white .. "/mlz install" .. C.r .. "   opens the setup wizard\n"
-        .. C.white .. "/mlz undo" .. C.r .. "   undoes the last setup wizard run or import\n"
+        .. C.white .. "/mlz undo" .. C.r .. "   undoes the last wizard run, import or ready-made setup\n"
         .. C.white .. "/mlz role" .. C.r .. "   shows your role, or sets it: tank, healer, dps, auto\n"
         .. C.white .. "/mlz np" .. C.r .. "   nameplate mode and options\n"
         .. C.white .. "/mlz keys" .. C.r .. "   a map of your keybinds\n"
@@ -1835,7 +1867,8 @@ PAGES[#PAGES + 1] = { key = "about", title = "About & help", icon = "Interface\\
 
     p:Card("Troubleshooting")
     p:Toggle("Debug output", "Extra messages in chat. Only useful when something is wrong.",
-        function() return ns.db.debug end, function(on) ns.db.debug = on and true or false end)
+        function() return ns.db.debug end, function(on) ns.db.debug = on and true or false end,
+        { tip = "Shows why a step was skipped or failed. Same as /mlz debug. Turn it off again when you are done." })
     p:Buttons({
         { text = "Collect client info", width = 170, fn = function() ns.RunCommand("probe") end,
           tip = "Writes facts about your game client to MLZ UI's saved data after the next reload. Useful for bug reports." },
