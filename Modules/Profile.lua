@@ -103,10 +103,23 @@ local TUNE_AREAS = { plates = true, fade = true, chat = true, reminders = true, 
 -- Values a ready-made setup may set back to "the default", which is stored as no key at all
 local TUNE_DEFAULTS = { ["fade.alpha"] = 0.25 }
 
-local function TuneValue(v)
-    if type(v) == "boolean" then return true end
-    if type(v) == "number" then return v == v and v >= 0 and v <= 1000 end
-    return type(v) == "string" and #v <= 20 and v:match("^%a+$") ~= nil
+-- Each path has one type, so a bad string can't put text where the code does math
+local TUNE_BOOLEANS = { ["plates.threatSound"] = true, ["chat.hideTabs"] = true, ["chat.hideBackground"] = true }
+-- Shares (0-1), not counts or seconds
+local TUNE_SHARES = { ["fade.alpha"] = true }
+
+local function TuneValue(k, v)
+    if TUNE_BOOLEANS[k] or k:match("^plates%.debuffsAll%.") then return type(v) == "boolean" end
+    if k:match("^fade%.mode%.") then
+        local Fade = ns.modules.fade
+        for _, mode in ipairs(Fade and Fade.MODES or {}) do
+            if v == mode then return true end
+        end
+        return false
+    end
+    if type(v) ~= "number" or v ~= v or v < 0 then return false end
+    if TUNE_SHARES[k] or k:match("^plates%.nonTarget%.") then return v <= 1 end
+    return v <= 1000
 end
 
 local function TuneMap(t)
@@ -114,7 +127,7 @@ local function TuneMap(t)
     local out = {}
     for k, v in pairs(t) do
         if type(k) == "string" and #k <= 60 and k:match("^[%w%.]+$") and TUNE_AREAS[k:match("^(%w+)%.") or ""]
-            and TuneValue(v) then
+            and TuneValue(k, v) then
             out[k] = v
         end
     end
@@ -208,7 +221,7 @@ local function Decode(text)
         return C_EncodingUtil.DeserializeCBOR(C_EncodingUtil.DecompressString(C_EncodingUtil.DecodeBase64(text:sub(#used + 1))))
     end)
     if not ok or type(data) ~= "table" then return nil, "could not read the string (damaged or cut off?)" end
-    return data
+    return data, nil, used
 end
 
 ------------------------------------------------------------------------
@@ -419,12 +432,17 @@ local function Import(text)
         ns.Print("This client has no C_EncodingUtil, import is not possible.")
         return
     end
-    local data, reason = Decode(text)
+    local data, reason, used = Decode(text)
     if not data then
         ns.Print(ns.Paint("red", "Import failed:"), reason)
         return
     end
     local clean = Validate(data)
+    -- Older strings save keybind tick boxes per key (S), the wizard now reads them per action (STRAFELEFT)
+    local Bindings = ns.modules.bindings
+    if used ~= PREFIX and clean.toggles and Bindings and Bindings.MigrateToggles then
+        Bindings.MigrateToggles({ toggles = clean.toggles, movement = clean.movement or ns.db.movement })
+    end
     if next(clean) == nil then
         ns.Print(ns.Paint("red", "Import failed:"), "the string has none of the settings MLZ UI knows.")
         return

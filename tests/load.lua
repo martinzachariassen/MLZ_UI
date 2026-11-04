@@ -72,7 +72,8 @@ end
 ------------------------------------------------------------------------
 local function CheckMigration()
     -- Run the migrations on a database from before v3 and check the result
-    local old = { dbVersion = 1, healForce = "on", installed = true, toggles = { ["bindings:S"] = false } }
+    local old = { dbVersion = 1, healForce = "on", installed = true, toggles = { ["bindings:S"] = false },
+        tune = "x", keyEdits = 5 }
     MLZUIDB = old -- luacheck: ignore 111
     Step("migrate ADDON_LOADED", stub.Fire, "ADDON_LOADED", ADDON)
     local db = MLZUIDB
@@ -85,6 +86,7 @@ local function CheckMigration()
     if db.toggles["bindings:S"] ~= nil or db.toggles["bindings:STRAFELEFT"] ~= false then
         Fail("migration", "the unticked S key did not become an unticked STRAFELEFT")
     end
+    if db.tune ~= nil or db.keyEdits ~= nil then Fail("migration", "tune or keyEdits of the wrong type was kept") end
     for _, line in ipairs(stub.chat) do
         if line:find("Migration to v", 1, true) then Fail("migration", line) end
     end
@@ -421,6 +423,12 @@ local function CheckKeybinds()
     ns.SetEnabled("bindings", "ACTIONBUTTON2", true)
 
     -- two changes on the key map take one backup, and undo puts both keys back
+    -- bar 1 button 2 sits on its usual key, so moving it to V frees that key
+    local b2Key
+    for _, d in ipairs(B:Desired("ESDF", true)) do
+        if d.command == "ACTIONBUTTON2" then b2Key = d.key end
+    end
+    stub.bindings[b2Key] = "ACTIONBUTTON2"
     local before, backups = Copy(stub.bindings), #(ns.db.backups or {})
     local pk = ns.Keys and ns.Keys.Pick and ns.Keys.Pick("V")
     if not pk then return Fail("key map", "the picker did not open for V") end
@@ -431,15 +439,33 @@ local function CheckKeybinds()
     local applied, why = KE.Apply(plan)
     if not applied then return Fail("key map", why) end
     if GetBindingAction("V") ~= "ACTIONBUTTON2" then Fail("key map", "V is not bar 1 button 2") end
+    if #plan.freed == 0 then Fail("key map", "moving bar 1 button 2 to V freed no key") end
     for _, k in ipairs(plan.freed) do
         if GetBindingAction(k) ~= "" then Fail("key map", k .. " was not freed") end
     end
     if not KE.Apply(KE.Plan("N", "JUMP")) then Fail("key map", "N could not be set to jump") end
-    if #ns.db.backups ~= math.min(backups + 1, 5) then Fail("key map", "two changes took more than one backup") end
     if not (ns.db.keyEdits and ns.db.keyEdits.V == "ACTIONBUTTON2") then Fail("key map", "the change was not remembered") end
+    -- a key that only lost its action is not locked: once V moves on, the wizard gives button 2 its key back
+    for _, k in ipairs(plan.freed) do
+        if ns.db.keyEdits and ns.db.keyEdits[k] ~= nil then Fail("key map", k .. " was locked after it was freed") end
+    end
+    if not KE.Apply(KE.Plan("V", "ACTIONBUTTON3")) then Fail("key map", "V could not move on to button 3") end
+    local back = false
+    for _, d in ipairs(B:Desired("ESDF")) do
+        if d.command == "ACTIONBUTTON2" and d.key ~= "V" then back = true end
+    end
+    if not back then Fail("key map", "bar 1 button 2 has no key in the wizard after V moved on") end
+    -- in combat nothing changes, and the reason is given
+    _G.InCombatLockdown = function() return true end
+    local inCombat, combatWhy = KE.Apply(KE.Plan("B", "JUMP"))
+    _G.InCombatLockdown = function() return false end
+    if inCombat or not combatWhy then Fail("key map", "a key changed in combat") end
+    if GetBindingAction("B") == "JUMP" then Fail("key map", "B was bound in combat") end
+    if #ns.db.backups ~= math.min(backups + 1, 5) then Fail("key map", "two changes took more than one backup") end
     Step("key map undo", ns.Backup.Undo, ns.Backup, true)
     for _, d in ipairs(Diff(before, stub.bindings, "")) do Fail("key map undo", d) end
     if ns.db.keyEdits and next(ns.db.keyEdits) then Fail("key map undo", "the remembered changes were kept") end
+    stub.bindings[b2Key] = nil
     _G.MLZUI_Keys:Hide()
     _G.MLZUI_Keys:GetScript("OnHide")(_G.MLZUI_Keys)
 end
@@ -665,6 +691,32 @@ local function CheckProfiles()
         ns.Backup:Undo(true)
         if ns.Vendor.Get("sell") then Fail("import undo", "the MLZ!2! import was not undone") end
 
+        -- fine-tuned values with the wrong type are dropped, so they can't break the code that reads them
+        local bad = "MLZ!3!" .. fake.SerializeCBOR({ tune = {
+            ["plates.refreshAt"] = "abc", ["fade.alpha"] = 5, ["plates.threatSound"] = 1,
+            ["fade.mode.bar2"] = "nope", ["reminders.durability"] = true, ["group.pullSeconds"] = 8,
+        } })
+        SlashCmdList.MLZUI("import " .. bad)
+        local t = ns.db.tune or {}
+        if t["group.pullSeconds"] ~= 8 then Fail("import", "a valid fine-tune value was dropped") end
+        for _, k in ipairs({ "fade.alpha", "plates.threatSound", "fade.mode.bar2", "reminders.durability" }) do
+            if t[k] ~= nil then Fail("import", "a bad fine-tune value got in: " .. k .. " = " .. tostring(t[k])) end
+        end
+        if t["plates.refreshAt"] ~= 5 then Fail("import", "a bad value replaced refresh timing") end
+        ns.Backup:Undo(true)
+
+        -- an older string saves keybind tick boxes per key: they arrive per action
+        local sCmd
+        for _, d in ipairs(ns.modules.bindings:Desired("ESDF", true)) do
+            if d.key == "S" then sCmd = d.command end
+        end
+        local oldKeys = "MLZ!2!" .. fake.SerializeCBOR({ movement = "ESDF", toggles = { ["bindings:S"] = false } })
+        SlashCmdList.MLZUI("import " .. oldKeys)
+        local tg = ns.db.toggles or {}
+        if tg["bindings:S"] ~= nil then Fail("import", "an old key-based tick box was stored as it was") end
+        if sCmd and tg["bindings:" .. sCmd] ~= false then Fail("import", "the old tick box for S did not move to " .. sCmd) end
+        ns.Backup:Undo(true)
+
         -- leave the db as the other checks expect it
         ns.Defaults.Reset("all")
         table.remove(ns.db.backups)
@@ -709,6 +761,27 @@ local function CheckSettings()
     return #keys
 end
 
+-- Classic clients differ: with these APIs gone, pages, export, the key map and a key change still work
+-- without a Lua error (CLAUDE.md rule 3)
+local MISSING = { "C_EncodingUtil", "SetBinding", "SaveBindings", "GetCurrentBindingSet", "HasPetUI",
+    "UnitThreatSituation", "UnitDetailedThreatSituation", "C_Spell", "C_UnitAuras" }
+local function CheckMissingApis()
+    local S = ns.Settings
+    local saved = {}
+    for _, name in ipairs(MISSING) do saved[name] = _G[name]; _G[name] = nil end
+    local ok, err = pcall(function()
+        for key in pairs(S and S.pages or {}) do Step("no APIs: page " .. key, S.Select, S, key) end
+        Step("no APIs: /mlz export", SlashCmdList.MLZUI, "export")
+        Step("no APIs: /mlz keys", SlashCmdList.MLZUI, "keys")
+        local done, why = ns.KeyEdit.Apply(ns.KeyEdit.Plan("B", "JUMP"))
+        if done or not why then Fail("no APIs", "a key change without SetBinding gave no reason") end
+        stub.FlushTimers(function(e) Fail("no APIs timer", e) end)
+    end)
+    for _, name in ipairs(MISSING) do _G[name] = saved[name] end
+    if _G.MLZUI_Keys then _G.MLZUI_Keys:Hide() end
+    if not ok then Fail("no APIs", err) end
+end
+
 ------------------------------------------------------------------------
 -- Run
 ------------------------------------------------------------------------
@@ -725,6 +798,7 @@ local plates = CheckPlates() or 0
 CheckThreatMeter()
 CheckPlacement()
 CheckKeybinds()
+CheckMissingApis()
 CheckMigration()
 
 if verbose then

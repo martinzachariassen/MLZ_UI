@@ -185,10 +185,14 @@ function KeyEdit.Apply(plan)
         return nil, "The game did not accept " .. plan.key .. " for " .. KeyEdit.Name(plan.cmd) .. "."
     end
     Save()
-    -- remembered for export (Modules/Profile.lua): false = cleared on purpose
+    -- remembered for export (Modules/Profile.lua): false = cleared on purpose. A key that only lost its action
+    -- here is not locked: the wizard holds its default back while the action sits on the new key
+    -- (Bindings:WithKeyEdits), and gives it back once the action moves on.
     ns.db.keyEdits = ns.db.keyEdits or {}
+    for _, k in ipairs(plan.freed) do
+        if ns.db.keyEdits[k] then ns.db.keyEdits[k] = nil end
+    end
     ns.db.keyEdits[plan.key] = plan.cmd or false
-    for _, k in ipairs(plan.freed) do ns.db.keyEdits[k] = false end
     ns.FireState()
     return true
 end

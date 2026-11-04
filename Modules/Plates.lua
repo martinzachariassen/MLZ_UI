@@ -995,8 +995,9 @@ local function UpdateAuras(f)
     if f.hasTimers and Wake then Wake() end
 end
 
--- Cast info works across client versions: the "can't interrupt" flag is the first boolean after
--- the times, if the client sends one at all. Returns name, icon, startMS, endMS, locked, channel.
+-- Cast info works across client versions: the "can't interrupt" flag is return 8 for casts and 7 for
+-- channels. Clients without the flag send the spell id there, which `== true` ignores.
+-- Returns name, icon, startMS, endMS, locked, channel.
 local function CastInfo(unit)
     if UnitCastingInfo then
         local name, _, icon, startMS, endMS, _, _, a = UnitCastingInfo(unit)
@@ -1358,10 +1359,12 @@ local function SetClickThrough(on)
 end
 
 -- Older clients have one CVar for friendly plates; Forever splits it into players and NPCs. Healers only
--- need the players (the group), so the NPC plates stay as they are.
+-- need the players (the group), so the NPC plates stay as they are. The Forever name goes first: the old one
+-- may still exist there without doing anything.
 local function FriendsCVar()
-    for _, name in ipairs({ "nameplateShowFriends", "nameplateShowFriendlyPlayers" }) do
-        if GetCVar(name) ~= nil then return name end
+    for _, name in ipairs({ "nameplateShowFriendlyPlayers", "nameplateShowFriends" }) do
+        local ok, value = pcall(GetCVar, name)
+        if ok and value ~= nil then return name end
     end
 end
 
