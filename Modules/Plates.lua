@@ -33,6 +33,10 @@ end
 
 local function D() return ns.data.nameplates.plates end
 local function C() return ns.data.nameplates.plates.colors end
+local MAX_DEBUFFS = 8 -- icons built per plate; the control center picks how many show (debuffLimit)
+
+-- Numbers the player can fine-tune in the control center (ns.Tune), falling back to Data/Nameplates.lua
+local function Tuned(key) return ns.Tune("plates." .. key, D()[key]) end
 
 local active = false
 local lastError
@@ -358,7 +362,7 @@ local function Build(plate)
     f.cast:Hide()
 
     f.auras = {}
-    for i = 1, d.debuffLimit do
+    for i = 1, MAX_DEBUFFS do
         local a = MakeAura(f)
         if i == 1 then
             a:SetPoint("BOTTOMLEFT", f.health, "TOPLEFT", 0, d.nameSize + 9)
@@ -480,7 +484,7 @@ local function ThreatColor(unit)
     end
     -- DPS, healer, solo: red = the mob is on you, amber = you are close to pulling it
     if status == 3 or status == 2 then return on.warning and col.warning or nil end
-    if status == 1 or (pct and pct >= D().threatWarnAt) then return on.transition and col.transition or nil end
+    if status == 1 or (pct and pct >= Tuned("threatWarnAt")) then return on.transition and col.transition or nil end
     return nil
 end
 
@@ -695,8 +699,8 @@ local THREAT_SOUND = 8959 -- SOUNDKIT.RAID_WARNING, used when the client has no 
 -- One warning sound per mob as you get close to pulling it, only in a group (solo there is no tank)
 local function ThreatSound(f, pct)
     local d = D()
-    if pct < d.threatWarnAt then warned[f] = nil return end
-    if warned[f] or pct < d.threatSoundAt or not InGroup() or not PlaySound then return end
+    if pct < Tuned("threatWarnAt") then warned[f] = nil return end
+    if warned[f] or not Tuned("threatSound") or pct < d.threatSoundAt or not InGroup() or not PlaySound then return end
     warned[f] = true
     ns.Try(PlaySound, SOUNDKIT and SOUNDKIT.RAID_WARNING or THREAT_SOUND, "Master")
 end
@@ -719,7 +723,7 @@ local function UpdateThreatText(f)
     local t
     if status == 3 or status == 2 or pct >= 100 then
         t = Theme("red", { 1, 0.35, 0.35 })
-    elseif pct >= D().threatWarnAt then
+    elseif pct >= Tuned("threatWarnAt") then
         t = Theme("amber", { 1, 0.69, 0.25 })
     else
         t = Theme("text", { 0.9, 0.91, 0.93 })
@@ -769,7 +773,7 @@ local function UpdateTarget(f)
     else
         f.health.edge:SetVertexColor(unpack(EDGE))
     end
-    local nonTarget = cfg.pvp and D().pvp.nonTarget or m.nonTarget
+    local nonTarget = cfg.pvp and D().pvp.nonTarget or ns.Tune("plates.nonTarget." .. cfg.mode, m.nonTarget)
     f:SetAlpha((UnitExists("target") and not isTarget and not hovered) and nonTarget or 1)
     f:SetScale(cfg.size * (isTarget and m.targetScale or 1))
 end
@@ -848,7 +852,7 @@ local function TickTimer(a, now)
     local c
     if a.refresh and cfg.show.refresh and left <= 1 then
         c = Theme("red", { 1, 0.36, 0.36 })
-    elseif a.refresh and cfg.show.refresh and left <= (D().refreshAt or 3) then
+    elseif a.refresh and cfg.show.refresh and left <= (Tuned("refreshAt") or 3) then
         c = Theme("amber", { 1, 0.69, 0.25 })
     else
         c = Theme("text", { 0.93, 0.94, 0.96 })
@@ -959,7 +963,9 @@ end
 
 local function UpdateAuras(f)
     local m = D().modes[cfg.mode] or D().modes.solo
-    local want = cfg.show.debuffs and not f.nameOnly and (f.isTarget or m.debuffsAll or cfg.dotsAll)
+    local all = ns.Tune("plates.debuffsAll." .. cfg.mode, (m.debuffsAll or cfg.dotsAll) and true or false)
+    local want = cfg.show.debuffs and not f.nameOnly and (f.isTarget or all)
+    local limit = math.min(#f.auras, Tuned("debuffLimit") or MAX_DEBUFFS)
     local n = 0
     if want then
         for i = 1, 40 do
@@ -971,7 +977,7 @@ local function UpdateAuras(f)
             a.count:SetText((count and count > 1) and count or "")
             a:Show() -- before SetTimer, which only paints a shown icon
             SetTimer(a, duration, expires)
-            if n >= #f.auras then break end
+            if n >= limit then break end
         end
     end
     for i = n + 1, #f.auras do f.auras[i]:Hide() end
@@ -1447,3 +1453,12 @@ function Plates.Configure(on, opts)
 end
 
 function Plates.LastError() return lastError end
+
+-- Whether your debuffs show on every mob in a mode before the player changes it (control center default)
+function Plates.DefaultDebuffsAll(mode)
+    mode = mode or cfg.mode
+    local m = D().modes[mode] or D().modes.solo
+    if m.debuffsAll then return true end
+    local all, arch = D().archetypeDebuffsAll or {}, ns.Archetype and ns.Archetype()
+    return (mode == "dps" or mode == "solo") and arch and all[arch] and true or false
+end

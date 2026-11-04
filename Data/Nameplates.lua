@@ -114,7 +114,7 @@ ns.data.nameplates = {
         nameSize = 11,
         textSize = 10,        -- health percent, spell name, cast time, cast target
         iconSize = 22,        -- debuff icons (your DoTs)
-        debuffLimit = 6,
+        debuffLimit = 6,      -- your debuffs per plate (4, 6 or 8 in the control center; 8 icons are built)
         interruptedHold = 0.6, -- seconds an interrupted cast stays on the plate (red, "Interrupted")
         levelDiff = 3,        -- show the level only when it differs this much from yours (or is ??)
         missingShade = 0.25,  -- missing health = the bar color at this brightness (dark red on a red bar)
@@ -122,6 +122,7 @@ ns.data.nameplates = {
         refreshAt = 3,        -- your debuff timer turns amber at this many seconds left (refresh now), red at 1
         threatWarnAt = 80,    -- DPS, healer, solo: amber once your threat reaches this % of what pulls aggro
         threatSoundAt = 90,   -- one warning sound per mob at this % (only in a group, only with threat colors on)
+        threatSound = true,   -- the warning sound can be turned off in the control center
 
         -- Crowd control shown on every enemy plate, from anyone, so nobody breaks it by accident.
         -- First rank ids: names are used, so every rank matches. Ids the client doesn't know are skipped.

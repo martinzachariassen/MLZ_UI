@@ -40,14 +40,19 @@ local touched = {} -- frame -> its alpha before we changed it, so we can put it 
 local hidden = ns.hiddenFrames or {} -- frames another module keeps at alpha 0 (Tweaks: hidden tracker)
 ns.hiddenFrames = hidden
 
-local function TargetAlpha(row, hovered, inCombat, hasTarget)
-    if row.mode == "group" then
+-- How a row hides and how far "combat" rows dim: Data/Fade.lua, unless changed in the control center
+function Fade.ModeOf(row) return ns.Tune("fade.mode." .. row.id, row.mode) end
+function Fade.AlphaOf(row) return ns.Tune("fade.alpha", row.alpha or 0.3) end
+Fade.MODES = { "mouseover", "combat", "hideInCombat", "group" }
+
+local function TargetAlpha(row, mode, hovered, inCombat, hasTarget)
+    if mode == "group" then
         return (hovered or IsInGroup()) and 1 or 0
-    elseif row.mode == "mouseover" then
+    elseif mode == "mouseover" then
         return hovered and 1 or 0
-    elseif row.mode == "combat" then
-        return (inCombat or hasTarget or hovered) and 1 or (row.alpha or 0.3)
-    elseif row.mode == "hideInCombat" then
+    elseif mode == "combat" then
+        return (inCombat or hasTarget or hovered) and 1 or Fade.AlphaOf(row)
+    elseif mode == "hideInCombat" then
         return (inCombat and not hovered) and 0 or 1
     end
     return 1
@@ -55,9 +60,9 @@ end
 
 -- The hover check (IsMouseOver on every frame) only runs when hovering can change the result:
 -- hideInCombat out of combat and group rows in a group are fully visible anyway.
-local function HoverMatters(row, inCombat)
-    if row.mode == "hideInCombat" then return inCombat end
-    if row.mode == "group" then return not IsInGroup() end
+local function HoverMatters(mode, inCombat)
+    if mode == "hideInCombat" then return inCombat end
+    if mode == "group" then return not IsInGroup() end
     return true
 end
 
@@ -77,14 +82,15 @@ local function Update()
     for _, row in ipairs(ns.data.fade) do
         if db[row.id] then
             local frames = Frames(row)
+            local mode = Fade.ModeOf(row)
             local hovered = false
-            if not editMode and HoverMatters(row, inCombat) then
+            if not editMode and HoverMatters(mode, inCombat) then
                 for i = 1, #frames do
                     local f = frames[i]
                     if f:IsVisible() and f:IsMouseOver() then hovered = true break end
                 end
             end
-            local target = editMode and 1 or TargetAlpha(row, hovered, inCombat, hasTarget)
+            local target = editMode and 1 or TargetAlpha(row, mode, hovered, inCombat, hasTarget)
             for i = 1, #frames do
                 local f = frames[i]
                 local want = (hidden[f] and not editMode) and 0 or target
@@ -122,16 +128,17 @@ ns.TryOn("EDIT_MODE_LAYOUTS_UPDATED", Invalidate)
 local defaultTabAlpha
 
 function Fade:ApplyChat()
-    local cfg = ns.data.chat
+    local fadeAfter = Fade.Chat("fadeAfter")
     for i = 1, (NUM_CHAT_WINDOWS or 10) do
         local cf = _G["ChatFrame" .. i]
         if cf then
-            if cf.SetFading then cf:SetFading(true) end
-            if cf.SetTimeVisible then cf:SetTimeVisible(cfg.fadeAfter) end
-            if cfg.hideBackground and FCF_SetWindowAlpha then pcall(FCF_SetWindowAlpha, cf, 0) end
+            -- 0 = never fade
+            if cf.SetFading then cf:SetFading(fadeAfter > 0) end
+            if cf.SetTimeVisible and fadeAfter > 0 then cf:SetTimeVisible(fadeAfter) end
+            if Fade.Chat("hideBackground") and FCF_SetWindowAlpha then pcall(FCF_SetWindowAlpha, cf, 0) end
         end
     end
-    if cfg.hideTabs then
+    if Fade.Chat("hideTabs") then
         defaultTabAlpha = defaultTabAlpha or { CHAT_FRAME_TAB_NORMAL_NOMOUSE_ALPHA, CHAT_FRAME_TAB_SELECTED_NOMOUSE_ALPHA }
         CHAT_FRAME_TAB_NORMAL_NOMOUSE_ALPHA = 0
         CHAT_FRAME_TAB_SELECTED_NOMOUSE_ALPHA = 0
@@ -151,6 +158,7 @@ function Fade:ResetChat(alphas, times)
     for i = 1, (NUM_CHAT_WINDOWS or 10) do
         local cf = _G["ChatFrame" .. i]
         if cf then
+            if cf.SetFading then cf:SetFading(true) end -- "never fade" turned it off
             if cf.SetTimeVisible then cf:SetTimeVisible((times and times[i]) or 120) end
             local alpha = (alphas and alphas[i]) or DEFAULT_CHATFRAME_ALPHA or 0.25
             if FCF_SetWindowAlpha then pcall(FCF_SetWindowAlpha, cf, alpha) end
@@ -190,8 +198,8 @@ function Fade:Preview()
         local item = {
             id = row.id, label = row.label, group = "Hide until needed", note = row.desc,
             toggle = true, isOn = isOn, offText = "always visible",
-            old = isOn and MODE_TEXT[row.mode] or "always visible",
-            new = MODE_TEXT[row.mode] .. (row.alpha and (" (" .. math.floor(row.alpha * 100) .. "%)") or ""),
+            old = isOn and MODE_TEXT[self.ModeOf(row)] or "always visible",
+            new = self.DescribeMode(row),
             enabled = exists and (isOn or ns.Enabled("fade", row.id, row.enabled)),
         }
         if not exists then
@@ -281,6 +289,34 @@ function Fade:SetChat(on)
     local was = ns.db.chatTweaks
     ns.db.chatTweaks = on and true or false
     if on then self:ApplyChat() elseif was then self:ResetChat() end
+    ns.FireState()
+end
+
+-- "Out of combat (25%)": how the row hides, with the dim level for combat rows
+function Fade.DescribeMode(row)
+    local mode = Fade.ModeOf(row)
+    local text = MODE_TEXT[mode] or tostring(mode)
+    if mode == "combat" then text = text .. " (" .. math.floor(Fade.AlphaOf(row) * 100 + 0.5) .. "%)" end
+    return text
+end
+
+-- Chat settings: Data/Fade.lua (ns.data.chat), unless changed in the control center
+function Fade.Chat(key) return ns.Tune("chat." .. key, ns.data.chat[key]) end
+
+-- Applies a changed chat setting at once: back to the saved look, then the clean chat again
+-- The chat window alphas and fade times from before clean chat was turned on (newest backup that has them)
+local function SavedChat()
+    local list = ns.db.backups or {}
+    for i = #list, 1, -1 do
+        local snap = list[i].data and list[i].data.fade
+        if snap and snap.chatAlpha then return snap.chatAlpha, snap.chatTime end
+    end
+end
+
+function Fade:RefreshChat()
+    if not ns.db.chatTweaks then return end
+    self:ResetChat(SavedChat())
+    self:ApplyChat()
     ns.FireState()
 end
 

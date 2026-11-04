@@ -23,6 +23,38 @@ local SWITCHES = {
     { key = "reminders", mod = function() return ns.Reminders end, keys = { "buffs", "reagents", "durability", "raidFood", "levelFood" } },
 }
 
+-- Fine-tuned values (ns.Tune): flat "area.key" paths. Only these areas travel with a string or a setup.
+local TUNE_AREAS = { plates = true, fade = true, chat = true, reminders = true, group = true }
+-- Values a ready-made setup may set back to "the default", which is stored as no key at all
+local TUNE_DEFAULTS = { ["fade.alpha"] = 0.25 }
+
+local function TuneValue(v)
+    if type(v) == "boolean" then return true end
+    if type(v) == "number" then return v == v and v >= 0 and v <= 1000 end
+    return type(v) == "string" and #v <= 20 and v:match("^%a+$") ~= nil
+end
+
+local function TuneMap(t)
+    if type(t) ~= "table" then return nil end
+    local out = {}
+    for k, v in pairs(t) do
+        if type(k) == "string" and #k <= 60 and k:match("^[%w%.]+$") and TUNE_AREAS[k:match("^(%w+)%.") or ""]
+            and TuneValue(v) then
+            out[k] = v
+        end
+    end
+    return next(out) and out or nil
+end
+
+local function SetTunes(tune)
+    local t = ns.db.tune or {}
+    for k, v in pairs(tune) do
+        if v == TUNE_DEFAULTS[k] then v = nil end
+        t[k] = v
+    end
+    ns.db.tune = next(t) and t or nil
+end
+
 -- Fading: only the rows that differ. Returns true when something changed.
 local function LoadFade(saved)
     local fade = ns.modules.fade
@@ -202,6 +234,7 @@ local function Validate(data)
         end
         if next(out) then clean.switches = out end
     end
+    clean.tune = TuneMap(data.tune)
     clean.roleProfiles = Profiles(data.roleProfiles, { "TANK", "HEALER", "DAMAGER" }, RoleSnap)
     clean.situationProfiles = Profiles(data.situationProfiles, { "solo", "party", "raid", "pvp" }, SituationSnap)
     -- roleForce is never imported: your role belongs to this character, not to a shared setup
@@ -217,7 +250,7 @@ function Profile:Backup()
     return ns.CopyTable({
         toggles = ns.db.toggles, movement = ns.db.movement, spellQueueWindow = ns.db.spellQueueWindow,
         scale = ns.db.scale, nameplates = npCopy, roleForce = ns.GetRoleForce(), hasRoleForce = true,
-        fade = ns.db.fade or {}, switches = Switches(),
+        fade = ns.db.fade or {}, switches = Switches(), tune = ns.db.tune or false,
         roleProfiles = char.roleProfiles or {}, situationProfiles = char.situationProfiles or {}, hasProfiles = true,
     })
 end
@@ -244,6 +277,8 @@ function Profile:Restore(snap)
     -- backups made before 0.9 have none of these
     if snap.fade then LoadFade(snap.fade) end
     if snap.switches then SetSwitches(snap.switches) end
+    -- nil: a backup made before fine-tuning existed, so keep what you have
+    if snap.tune ~= nil then ns.db.tune = snap.tune and ns.CopyTable(snap.tune) or nil end
     if snap.hasProfiles then
         local char = ns.CharDB()
         char.roleProfiles = snap.roleProfiles
@@ -272,6 +307,7 @@ local function ApplyClean(clean, kind)
     end
     if clean.fade then LoadFade(clean.fade) end
     if clean.switches then SetSwitches(clean.switches) end
+    if clean.tune then SetTunes(clean.tune) end
     -- profiles are merged: a role or place the string doesn't have keeps what you saved here
     local char = ns.CharDB()
     for _, key in ipairs({ "roleProfiles", "situationProfiles" }) do
@@ -368,6 +404,9 @@ local function Matches(clean)
         elseif np[k] ~= v then
             return false
         end
+    end
+    for k, v in pairs(clean.tune or {}) do
+        if ns.Tune(k, TUNE_DEFAULTS[k]) ~= v then return false end
     end
     local now = Switches()
     for key, values in pairs(clean.switches or {}) do

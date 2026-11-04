@@ -164,6 +164,9 @@ local function Desired(mode, inPvP)
     if mode == "healer" and DB().healerFriends ~= false then
         for k, v in pairs(d.healerFriends) do want[k] = v end
     end
+    -- "Dim enemies you don't target" from the control center (the same value MLZ nameplates use)
+    local dim = ns.Tune("plates.nonTarget." .. mode)
+    if dim then want.not_target_alpha = dim end
     if inPvP then
         for k, v in pairs(d.pvp) do want[k] = v end
     end
@@ -474,7 +477,8 @@ local function Refresh(force)
     end
     pending = nil
     local key = table.concat({ mode, tostring((ns.LiveArchetype())), tostring(db.style), tostring(ThreatOn(db)),
-        tostring(inPvP), tostring(db.healerFriends ~= false), tostring(PLATYNATOR_CURRENT_PROFILE) }, "|")
+        tostring(inPvP), tostring(db.healerFriends ~= false), tostring(PLATYNATOR_CURRENT_PROFILE),
+        tostring(ns.Tune("plates.nonTarget." .. mode)) }, "|")
     if not force and key == db.lastKey then
         current = mode
         return true
@@ -621,6 +625,12 @@ function NP.SetThreat(on) DB().threat = on and true or false; Changed() end
 function NP.SetPvP(on) DB().pvp = on and true or false; Changed() end
 function NP.SetHealerFriends(on) DB().healerFriends = on and true or false; Changed() end
 function NP.Apply() Refresh(true); ns.FireState() end
+
+-- A fine-tuned number changed (ns.SetTune): redraw MLZ plates, re-import Platynator when its part changed
+function NP.Retune()
+    Refresh()
+    ns.FireState()
+end
 
 function NP.SetEngine(e)
     if not ENGINES[e] then return end

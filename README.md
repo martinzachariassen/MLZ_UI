@@ -135,6 +135,8 @@ If the guess is wrong, set your role by hand with `/mlz role`, on the Your role 
 - A keyboard map of every keybind (`/mlz keys`), with action icons and free keys. "Change keys" lets you give
   one key a new action and shows what loses its key first
 - One tip at a time on the overview, based on what you have turned on
+- Good defaults you can fine-tune in `/mlz`: nameplate dimming, threat warning, debuff timers, how each frame
+  fades, chat fade time, repair and reagent limits, and the pull timer length
 
 **Ecosystem**
 - Recommended settings for 16 addons, many of them per role: a healer and a tank do not get the same Questie, DBM or Details setup
@@ -184,7 +186,7 @@ If you use "Download ZIP" on GitHub, rename the unzipped `MLZ_UI-main` folder to
 | `/mlz fps` | Show or hide the FPS counter |
 | `/mlz quests` · `/mlz tracker` | Hide or show the quest tracker, or only its "All Objectives" line |
 | `/mlz pet save\|reset\|show` | Remember or reset the pet bar position |
-| `/mlz pull [seconds]` | Start a pull timer for the group (10 seconds by default, also on a key in Key Bindings > AddOns) |
+| `/mlz pull [seconds]` | Start a pull timer for the group (10 seconds unless you changed it on the Helpers page, also on a key in Key Bindings > AddOns) |
 | `/mlz buffs` | List who in your group misses a buff you can cast |
 | `/mlz xp` | XP per hour and time to level (`/mlz xp reset` starts counting again) |
 | `/mlz addons` | Which supported addons are loaded and how many of their settings differ |

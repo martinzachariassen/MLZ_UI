@@ -124,6 +124,9 @@ function methods:GetTextColor() return unpack(self.__textColor or { 1, 1, 1, 1 }
 function methods:SetStatusBarColor(r, g, b, a) self.__bar = { r, g, b, a } end
 function methods:GetStatusBarColor() return unpack(self.__bar or { 1, 1, 1, 1 }) end
 function methods:IsVisible() return self.__shown ~= false end
+-- alpha is kept too, so a test can check the dimming of plates you don't target
+function methods:SetAlpha(a) self.__alpha = a end
+function methods:GetAlpha() return self.__alpha or 1 end
 function methods:SetScript(name, fn) self.__scripts[name] = fn end
 function methods:GetScript(name) return self.__scripts[name] end
 function methods:HasScript() return true end

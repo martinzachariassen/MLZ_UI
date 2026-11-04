@@ -123,6 +123,24 @@ local ENGINE_OPTIONS = {
 }
 local ENGINE_TIP = "MLZ: MLZ UI draws its own flat nameplates.\nPlatynator: Platynator draws the plates and MLZ UI drives its settings.\n"
     .. "Off: Blizzard's own nameplates, left alone.\nMLZ and Platynator can't both draw: pick Platynator while it is loaded."
+-- Fine-tuning (ns.Tune) for the nameplates: the mode the dimming slider changes, and the Data/ defaults
+local function NPD() return ns.data.nameplates.plates end
+local function TuneMode() return ns.NP.Mode() or (ns.NP.Suggested()) or "dps" end
+local function DimDefault(mode) return (NPD().modes[mode] or NPD().modes.solo).nonTarget end
+local function DimPct(mode)
+    mode = mode or TuneMode()
+    return math.floor(ns.Tune("plates.nonTarget." .. mode, DimDefault(mode)) * 100 + 0.5)
+end
+local function SetTune(path, v, default)
+    ns.SetTune(path, v, default)
+    ns.NP.Retune()
+end
+local REFRESH_OPTIONS = {
+    { value = 2, text = "2 s" }, { value = 3, text = "3 s" }, { value = 4, text = "4 s" },
+    { value = 5, text = "5 s" }, { value = 6, text = "6 s" },
+}
+local DEBUFF_OPTIONS = { { value = 4, text = "4" }, { value = 6, text = "6" }, { value = 8, text = "8" } }
+
 local SIZE_OPTIONS = {
     { value = 0.8, text = "80%" }, { value = 0.9, text = "90%" }, { value = 1, text = "100%" },
     { value = 1.1, text = "110%" }, { value = 1.2, text = "120%" }, { value = 1.35, text = "135%" },
@@ -512,6 +530,7 @@ function Page:Row(opts, build, refresh)
     if opts.desc then
         row.desc = W.Text(row, "GameFontHighlightSmall", Eval(opts.desc))
         row.desc:SetTextColor(unpack(T.muted))
+        if type(opts.desc) == "function" then self:OnRefresh(function() row.desc:SetText(Eval(opts.desc)) end) end
         row.desc:SetPoint("TOPLEFT", row.label, "BOTTOMLEFT", 0, -4)
         row.desc:SetWidth(textW)
         local dh = row.desc:GetStringHeight()
@@ -1113,10 +1132,13 @@ PAGES[#PAGES + 1] = { key = "nameplates", title = "Nameplates", icon = "Interfac
         if not m then return C.grey .. (InCombatLockdown() and "waiting for combat to end" or "not applied yet") .. C.r end
         return MODE_TEXT[m] .. ((NP.PvP() and NP.InPvP()) and "  + PvP" or "")
     end, { avail = NPNotReady, width = 180, descLines = 2 })
-    p:Text(C.white .. "Tank" .. C.r .. ": every mob fully visible, your target a bit bigger.\n"
-        .. C.white .. "Healer" .. C.r .. ": enemies dimmed to 60% so your eyes stay on the raid frames.\n"
-        .. C.white .. "DPS" .. C.r .. ": mobs you don't target are faded a little.\n"
-        .. C.white .. "Solo" .. C.r .. ": calm, every mob readable (you often fight several).", 4)
+    p:Text(function()
+        return C.white .. "Tank" .. C.r .. ": every mob fully visible, your target a bit bigger.\n"
+            .. C.white .. "Healer" .. C.r .. ": enemies dimmed to " .. DimPct("healer")
+            .. "% so your eyes stay on the raid frames.\n"
+            .. C.white .. "DPS" .. C.r .. ": mobs you don't target are faded a little.\n"
+            .. C.white .. "Solo" .. C.r .. ": calm, every mob readable (you often fight several)."
+    end, 4)
 
     p:Card("Options")
     p:Toggle("Friendly names for healers", "In Healer mode friendly players get a name above their head, but it can't be clicked, so it never steals a click.",
@@ -1125,8 +1147,22 @@ PAGES[#PAGES + 1] = { key = "nameplates", title = "Nameplates", icon = "Interfac
     p:Toggle("Threat colors per role", "Tank: red = a mob is not on you. Others: amber = close to pulling, red = it is on you.",
         NP.Threat, NP.SetThreat, { avail = NPNotReady,
         tip = "Tank: blue = securely on you, orange = aggro is changing hands, red = a mob is on someone else, teal = on the other tank. "
-            .. "DPS, healer and solo: orange = your threat is 80% or more of what pulls aggro (the % shows in the bar), "
-            .. "red = the mob is on you. In a group a warning sound plays once per mob near 90%." })
+            .. "DPS, healer and solo: orange = your threat is near what pulls aggro (80% unless you changed it under "
+            .. "Fine-tune; the % shows in the bar), red = the mob is on you. In a group a warning sound plays once per mob." })
+    p:Slider("Dim enemies you don't target", function()
+            return "In " .. (MODE_TEXT[TuneMode()] or "this") .. " mode, while you have a target. Each mode keeps its own value."
+        end, 30, 100, 5, "%d%%",
+        function() return DimPct() end, function() end,
+        function(v)
+            local mode = TuneMode()
+            SetTune("plates.nonTarget." .. mode, v / 100, DimDefault(mode))
+            S:Notify(("%s mode: enemies you don't target at %d%%."):format(MODE_TEXT[mode] or mode, v), "good")
+        end,
+        { avail = NPNotReady, tip = function()
+            return "100% = every mob fully visible. Lower = mobs you don't target fade, so your target stands out. "
+                .. "Only the active mode changes; switch mode to set another one. Default for this mode: "
+                .. math.floor(DimDefault(TuneMode()) * 100 + 0.5) .. "%. Works with MLZ and Platynator, not in PvP."
+        end })
     p:Toggle("PvP tweak", "In battlegrounds and arenas: every enemy fully visible, no threat colors.",
         NP.PvP, NP.SetPvP, { avail = NPNotReady,
         tip = "Only inside battlegrounds and arenas. In the open world your normal mode is used, also against players." })
@@ -1178,7 +1214,10 @@ PAGES[#PAGES + 1] = { key = "nameplates", title = "Nameplates", icon = "Interfac
         ShowToggle("debuffs", "Your debuffs", "Only your own, with time left. On your target, or on every mob in Tank mode.",
             "On every mob in Tank mode. Casters and hunters see them on every mob in DPS and Solo mode too, "
                 .. "so you can keep several mobs dotted.")
-        ShowToggle("refresh", "Refresh timing", "Your debuff timers turn amber at 3 seconds left and red at 1.",
+        ShowToggle("refresh", "Refresh timing", function()
+                return ("Your debuff timers turn amber at %d seconds left and red at 1."):format(
+                    ns.Tune("plates.refreshAt", NPD().refreshAt))
+            end,
             "Amber means refresh it now, so the DoT never drops off. Only your own debuffs change color.")
         ShowToggle("cc", "Crowd control", "Polymorph, Sap, Fear and the like from anyone, next to the bar, so you don't break it.",
             "Polymorph, Sap, Gouge, Blind, Shackle Undead, Hibernate, Freezing Trap, Seduction, Banish, Fear, "
@@ -1194,6 +1233,48 @@ PAGES[#PAGES + 1] = { key = "nameplates", title = "Nameplates", icon = "Interfac
         p:Step("Size", "Width and text size of the plates. Your target is a bit bigger on top of this.", SIZE_OPTIONS, 140,
             NP.Size, NP.SetSize, { avail = MLZOnly,
             tip = "Scales the whole plate: bar, cast bar, text and icons. 100% is a 150 px wide bar." })
+
+        p:Card("Fine-tune", "The numbers behind the options above. Changes show at once.")
+        local function Needs(key, what)
+            return function()
+                local why = MLZOnly()
+                if why then return why end
+                if not NP.Show(key) then return "Turn on " .. what .. " first" end
+            end
+        end
+        local function ThreatOff()
+            local why = MLZOnly()
+            if why then return why end
+            if not NP.Threat() then return "Turn on threat colors first" end
+        end
+        p:Slider("Threat warning at", "DPS, healer and solo: the bar turns amber at this % of what pulls aggro.",
+            50, 95, 5, "%d%%", function() return ns.Tune("plates.threatWarnAt", NPD().threatWarnAt) end, function() end,
+            function(v) SetTune("plates.threatWarnAt", v, NPD().threatWarnAt) end,
+            { avail = ThreatOff, tip = "Lower = an earlier warning, so you have time to slow down. Higher = only "
+                .. "when it is close. Default " .. NPD().threatWarnAt .. "%. Tanks use their own colors." })
+        p:Toggle("Threat warning sound", "In a group, one sound per mob when your threat gets close to pulling it.",
+            function() return ns.Tune("plates.threatSound", NPD().threatSound) end,
+            function(on) SetTune("plates.threatSound", on, NPD().threatSound) end,
+            { avail = ThreatOff, tip = "Plays once per mob at " .. NPD().threatSoundAt .. "% (or at the warning "
+                .. "above, if that is higher). It plays again only after your threat on that mob drops." })
+        p:Step("Refresh timing at", "Your debuff timers turn amber at this many seconds left.", REFRESH_OPTIONS, 110,
+            function() return ns.Tune("plates.refreshAt", NPD().refreshAt) end,
+            function(v) SetTune("plates.refreshAt", v, NPD().refreshAt) end,
+            { avail = Needs("refresh", "refresh timing"), tip = "Pick the time your cast takes plus a little: "
+                .. "a 2 second cast wants 3 or 4. The timer turns red at 1 second. Default " .. NPD().refreshAt .. " s." })
+        p:Step("Debuffs per mob", "How many of your debuffs show above the bar.", DEBUFF_OPTIONS, 110,
+            function() return ns.Tune("plates.debuffLimit", NPD().debuffLimit) end,
+            function(v) SetTune("plates.debuffLimit", v, NPD().debuffLimit) end,
+            { avail = Needs("debuffs", "your debuffs"), tip = "Only your own debuffs count. The ones you put on "
+                .. "first come first. Default " .. NPD().debuffLimit .. "." })
+        local function AllPath() return "plates.debuffsAll." .. TuneMode() end
+        p:Toggle("Debuffs on every mob", function()
+                return "In " .. (MODE_TEXT[TuneMode()] or "this") .. " mode. Off: only on your target."
+            end,
+            function() return ns.Tune(AllPath(), ns.Plates.DefaultDebuffsAll(TuneMode())) end,
+            function(on) SetTune(AllPath(), on, ns.Plates.DefaultDebuffsAll(TuneMode())) end,
+            { avail = Needs("debuffs", "your debuffs"), tip = "On helps when you keep DoTs on several mobs. Each "
+                .. "mode keeps its own choice. By default on in Tank mode, and in DPS and Solo for casters and hunters." })
     end
 
     p:Card("Platynator", "MLZ UI saves a copy of your Platynator profile before it changes anything. Restore puts that copy back.")
@@ -1296,12 +1377,40 @@ PAGES[#PAGES + 1] = { key = "fade", title = "Minimalism", icon = "Interface\\Ico
     p:Toggle("Pause all fading", "Shows everything again until you turn this off or reload.",
         function() return ns.fadePaused end, function(on) fade:SetPaused(on) end,
         { tip = "Handy while you set things up or take a screenshot. Your choices below are kept." })
+    local function Missing(row) return function() if not fade:Exists(row) then return "Not in this client" end end end
     for _, row in ipairs(ns.data.fade) do
-        local how = FadeModeText(row.mode)
-        if row.alpha then how = how .. " (" .. math.floor(row.alpha * 100) .. "%)" end
-        p:Toggle(row.label, how .. ". " .. (row.desc or ""),
+        p:Toggle(row.label, function() return FadeModeText(fade.DescribeMode(row)) .. ". " .. (row.desc or "") end,
             function() return fade:IsOn(row.id) end, function(on) fade:SetRow(row.id, on) end,
-            { tip = FADE_TIP[row.mode], avail = function() if not fade:Exists(row) then return "Not in this client" end end })
+            { tip = function() return FADE_TIP[fade.ModeOf(row)] end, avail = Missing(row) })
+    end
+
+    p:Card("How each one hides", "Change when a frame shows. The switches above still turn each one on or off.")
+    local modeOptions = {}
+    for _, mode in ipairs(fade.MODES) do modeOptions[#modeOptions + 1] = { value = mode, text = FadeModeText(mode) } end
+    p:Slider("Dimmed to", "How visible \"out of combat\" frames are when they are dimmed. 0% = invisible.",
+        0, 60, 5, "%d%%", function() return math.floor(ns.Tune("fade.alpha", 0.25) * 100 + 0.5) end, function() end,
+        function(v)
+            -- the default leaves each row at its own level from Data/Fade.lua
+            ns.SetTune("fade.alpha", v / 100, 0.25)
+            ns.FireState()
+        end,
+        { tip = "Used by every row set to \"out of combat\". They are fully visible in combat, with a target and "
+            .. "on mouseover. Default 25% (30% for the player frame)." })
+    for _, row in ipairs(ns.data.fade) do
+        local path = "fade.mode." .. row.id
+        p:Step(row.label, function() return FADE_TIP[fade.ModeOf(row)] end, modeOptions, 170,
+            function() return fade.ModeOf(row) end,
+            function(v)
+                ns.SetTune(path, v, row.mode)
+                ns.FireState()
+            end,
+            { avail = function()
+                if not fade:Exists(row) then return "Not in this client" end
+                if not fade:IsOn(row.id) then return "Turned off above" end
+            end,
+              tip = "Mouseover: hidden until you point at it. Out of combat: dimmed until you fight, target or "
+                .. "point at it. Hidden in combat: the other way round. Group: only shown in a party or raid. "
+                .. "Default: " .. FadeModeText(row.mode) .. "." })
     end
 end }
 
@@ -1333,9 +1442,26 @@ PAGES[#PAGES + 1] = { key = "buttons", title = "Bars & interface", icon = "Inter
     Tweaks("Tooltips")
 
     p:Card("Chat")
-    p:Toggle("Clean chat", ("Chat lines fade after %ds (scroll or hover to see them again). Tabs and background only show on mouseover."):format(ns.data.chat.fadeAfter),
+    p:Toggle("Clean chat", "Old chat lines fade, tabs and background only show on mouseover. Fine-tune it below.",
         function() return ns.db.chatTweaks end, function(on) fade:SetChat(on) end,
-        { tip = "Applies to every chat window. New lines always show, and the input box works as before." })
+        { tip = "Applies to every chat window. New lines always show, and the input box works as before. "
+            .. "Scroll or hover to see faded lines again." })
+    local function ChatOff() if not ns.db.chatTweaks then return "Turn on clean chat first" end end
+    local function SetChat(key, v)
+        ns.SetTune("chat." .. key, v, ns.data.chat[key])
+        fade:RefreshChat()
+    end
+    p:Slider("Chat fades after", "Seconds before an old line fades out. 0 = never.", 0, 120, 5,
+        "%d s", function() return fade.Chat("fadeAfter") end, function() end,
+        function(v) SetChat("fadeAfter", v) end,
+        { avail = ChatOff, tip = "New lines always show. Default " .. ns.data.chat.fadeAfter .. " s. Blizzard's own "
+            .. "default is 120 s." })
+    p:Toggle("Hide chat tabs", "The tabs above chat only show when you point at them.",
+        function() return fade.Chat("hideTabs") end, function(on) SetChat("hideTabs", on) end,
+        { avail = ChatOff, tip = "General, Combat Log and your other tabs come back on mouseover." })
+    p:Toggle("Hide chat background", "No dark box behind the chat text.",
+        function() return fade.Chat("hideBackground") end, function(on) SetChat("hideBackground", on) end,
+        { avail = ChatOff, tip = "Off puts back the background you had before clean chat was turned on." })
     Tweaks("Chat")
 
     -- Edit Mode can't be saved in combat: SaveMap keeps the size and saves it when combat ends
@@ -1425,15 +1551,23 @@ PAGES[#PAGES + 1] = { key = "qol", title = "Helpers", icon = "Interface\\Icons\\
         .. "can give, not just yours.", function() return G.Get("leaderAll") end, function(on) G.Set("leaderAll", on) end,
         { avail = function() if not G.Get("buffCheck") then return "Turn on the buff check first" end end,
           tip = "Without lead or assist you only see the buffs you can cast yourself. The line stays in your own chat." })
-    p:Value("Pull timer key", "Press it in a group to start a 10 second pull timer.", function()
+    local PULL_OPTIONS = {}
+    for i, v in ipairs({ 5, 8, 10, 15 }) do PULL_OPTIONS[i] = { value = v, text = v .. " s" } end
+    p:Step("Pull timer length", "Used by the key, the button below and /mlz pull.", PULL_OPTIONS, 110,
+        G.PullSeconds, function(v) ns.SetTune("group.pullSeconds", v, G.PULL_DEFAULT) ns.FireState() end,
+        { tip = "Type /mlz pull 20 for a single other length. Default " .. G.PULL_DEFAULT .. " s." })
+    p:Value("Pull timer key", function()
+        return "Press it in a group to start a " .. G.PullSeconds() .. " second pull timer."
+    end, function()
         local key = GetBindingKey and GetBindingKey("MLZUI_PULL")
         return key and (C.blue .. key .. C.r) or (C.grey .. "Not set (Key Bindings > AddOns > MLZ UI)" .. C.r)
     end)
     p:Buttons({
-        { text = "Pull in 10", width = 120, fn = function()
-            if G.Pull(10) then S:Notify("Pull timer started: 10 seconds.", "good") end
+        { text = "Start pull timer", width = 140, fn = function()
+            local seconds = G.PullSeconds()
+            if G.Pull(seconds) then S:Notify("Pull timer started: " .. seconds .. " seconds.", "good") end
         end, avail = G.PullUnavailable,
-          tip = "Starts a 10 second countdown for the group. Type /mlz pull 5 for another length." },
+          tip = "Starts a countdown for the group, as long as the length above." },
     })
     end
 
@@ -1518,7 +1652,9 @@ PAGES[#PAGES + 1] = { key = "reminders", title = "Reminders", icon = "Interface\
         function() return R.Get("reagents") end, function(on) R.Set("reagents", on) end,
         { avail = function() if not HasKind("reagent") then return "Nothing to check for your class" end end,
           tip = "Only for spells you know. Each reagent can be turned off in the list below." })
-    p:Toggle("Worn gear", ("An icon and one chat line when your most worn item drops to %d%% durability."):format(R.DurabilityLimit()),
+    p:Toggle("Worn gear", function()
+            return ("An icon and one chat line when your most worn item drops to %d%% durability."):format(R.DurabilityLimit())
+        end,
         function() return R.Get("durability") end, function(on) R.Set("durability", on) end,
         { tip = "The chat line shows once, and again only after you have repaired. A reload does not repeat it." })
     p:Toggle("Food while leveling", "Solo and below max level: an icon when you are not Well Fed, for the extra XP.",
@@ -1531,6 +1667,36 @@ PAGES[#PAGES + 1] = { key = "reminders", title = "Reminders", icon = "Interface\
         function() return R.Get("raidFood") end, function(on) R.Set("raidFood", on) end,
         { tip = "Only inside raid instances, never in the open world or in dungeons.\n\n"
             .. "The flask icon only shows when a flask is in your bags, so you are never told to buy one." })
+
+    -- Limits: the defaults live in Data/Reminders.lua, changes go to ns.db.tune
+    p:Card("When to remind", "The defaults suit most players. Changes apply right away.")
+    local repairDefault = (ns.data.reminders or {}).durability or 25
+    p:Slider("Repair at", "Worn gear shows when your most worn item drops to this %.", 10, 50, 5, "%d%%",
+        R.DurabilityLimit, function() end, function(v) R.SetTune("reminders.durability", v, repairDefault) end,
+        { avail = function() if not R.Get("durability") then return "Turn on worn gear first" end end,
+          tip = "Lower = fewer trips to a vendor, but less room before an item breaks. Default " .. repairDefault .. "%." })
+    local LIMITS = {
+        ammo = { label = "Ammo at", desc = "Low ammo shows when you carry fewer than this.",
+            values = { 100, 200, 400, 800 }, tip = "One stack is 200. A long dungeon can use 800 or more." },
+        [6265] = { label = "Soul Shards at", desc = "Low shards show when you carry fewer than this.",
+            values = { 1, 2, 3, 4, 5 }, tip = "Summons, healthstones and soulstones each use 1." },
+    }
+    local shown = {}
+    for _, e in ipairs(entries) do
+        local limit = e.kind == "reagent" and LIMITS[e.item]
+        if limit and not shown[e.item] then
+            shown[e.item] = true
+            local item, default = e.item, e.defaultMin
+            local options = {}
+            for i, v in ipairs(limit.values) do options[i] = { value = v, text = tostring(v) } end
+            p:Step(limit.label, limit.desc, options, 110,
+                function() return R.ReagentMin(item, default) end,
+                function(v) R.SetTune("reminders.min." .. tostring(item), v, default) end,
+                { tip = limit.tip .. " Default " .. default .. ".", avail = function()
+                    if not R.Get("reagents") then return "Turn on low reagents first" end
+                end })
+        end
+    end
 
     -- What your class can be reminded about, one switch each. Rows wait until you learn the spell.
     if #entries > 0 then
@@ -1552,7 +1718,15 @@ PAGES[#PAGES + 1] = { key = "reminders", title = "Reminders", icon = "Interface\
             elseif e.roles then
                 desc = desc .. " Only as " .. RoleNames(e.roles) .. "."
             end
-            p:Toggle(e.name, desc, function() return not R.IsMuted(e.key) end, function(on) R.SetMuted(e.key, not on) end,
+            local rowDesc = desc
+            if e.kind == "reagent" then
+                -- follows the "Ammo at" and "Soul Shards at" steps above
+                local suffix = desc:sub(#("Shown when you carry fewer than %d."):format(e.min or 1) + 1)
+                rowDesc = function()
+                    return ("Shown when you carry fewer than %d."):format(R.ReagentMin(e.item, e.defaultMin) or 1) .. suffix
+                end
+            end
+            p:Toggle(e.name, rowDesc, function() return not R.IsMuted(e.key) end, function(on) R.SetMuted(e.key, not on) end,
                 { tip = "Off hides only this reminder. The others keep working.", avail = function()
                     local known = e.known
                     for _, cur in ipairs(R.Entries()) do

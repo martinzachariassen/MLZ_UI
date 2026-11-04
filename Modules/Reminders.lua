@@ -237,7 +237,7 @@ local function Missing()
         for _, r in ipairs(ReagentRows(data, class)) do
             if not seen[r.item] and not ignore["r:" .. tostring(r.item)] and Knows(r.spell) then
                 local count = ItemCount(r.item)
-                if count and count < r.min then
+                if count and count < R.ReagentMin(r.item, r.min) then
                     seen[r.item] = true
                     list[#list + 1] = { icon = ItemIcon(r.item), text = r.label .. " " .. count,
                         why = ("You carry %d %s. Buy more before you leave town."):format(count, r.label:lower()), low = true }
@@ -273,7 +273,7 @@ local function Missing()
 
     if cfg.durability then
         local low = LowestDurability()
-        if low and low <= (data.durability or 25) then
+        if low and low <= R.DurabilityLimit() then
             list[#list + 1] = { icon = REPAIR_ICON, text = "Repair " .. low .. "%",
                 why = "Your most worn item is at " .. low .. "% durability.", low = true }
         end
@@ -408,7 +408,7 @@ end
 -- "Warned" is kept per character, so a /reload or relog with worn gear does not repeat the line
 local function CheckDurability()
     if not (ns.db and Cfg().durability) then return end
-    local low, limit = LowestDurability(), (ns.data.reminders or {}).durability or 25
+    local low, limit = LowestDurability(), R.DurabilityLimit()
     if not low then return end
     local char = ns.CharDB()
     if low <= limit and not char.wornWarned then
@@ -488,7 +488,8 @@ function R.Entries()
     for _, r in ipairs(ReagentRows(data, class)) do
         if not seen[r.item] then
             seen[r.item] = true
-            out[#out + 1] = { key = "r:" .. tostring(r.item), name = r.label, kind = "reagent", known = Knows(r.spell), min = r.min }
+            out[#out + 1] = { key = "r:" .. tostring(r.item), name = r.label, kind = "reagent", known = Knows(r.spell),
+                min = R.ReagentMin(r.item, r.min), defaultMin = r.min, item = r.item }
         end
     end
     return out
@@ -500,4 +501,11 @@ function R.SetMuted(key, muted)
     Update()
     ns.FireState()
 end
-function R.DurabilityLimit() return (ns.data.reminders or {}).durability or 25 end
+-- Limits from Data/Reminders.lua, unless changed in the control center (ns.Tune)
+function R.DurabilityLimit() return ns.Tune("reminders.durability", (ns.data.reminders or {}).durability or 25) end
+function R.ReagentMin(item, default) return ns.Tune("reminders.min." .. tostring(item), default) end
+function R.SetTune(path, v, default)
+    ns.SetTune(path, v, default)
+    Update()
+    ns.FireState()
+end

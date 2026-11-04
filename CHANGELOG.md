@@ -104,6 +104,17 @@
   action says that it has no key afterwards. Arrow key movement shows as "custom (arrows)".
 - The mouse wheel keys are labeled "Bar 4 (mouse wheel)".
 
+- Fine-tune in game, no file editing. Every value applies right away and shows its default in the tooltip:
+  - Nameplates: how much enemies you don't target dim (per mode), the threat warning % and its sound, when
+    debuff timers turn amber (2-6 s), how many debuffs show (4, 6 or 8) and debuffs on every mob per mode.
+    The Platynator engine gets the same dimming.
+  - Minimalism: how far "out of combat" frames dim, and per frame whether it hides out of combat, until
+    mouseover or always.
+  - Chat: how long until chat fades (or never), and hiding the chat tabs and background on their own.
+  - Reminders: repair at 10-50% durability, and the ammo and Soul Shard counts that count as low.
+  - Pull timer: 5, 8, 10 or 15 seconds for the key, the button and `/mlz pull`.
+- Ready-made setups also set how far frames dim: Minimal 10%, Balanced 25%, Informative 40%.
+
 **Fixes**
 - Reagent reminders: Prayer of Fortitude rank 1 checks Holy Candles and Gift of the Wild rank 1 checks Wild
   Berries. With rank 2 learned you are only reminded about Sacred Candles or Wild Thornroot.

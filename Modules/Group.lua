@@ -20,7 +20,7 @@ end
 
 -- Shown in Key Bindings and on the keybind map (these names are read by the game)
 BINDING_HEADER_MLZUI = "MLZ UI"
-BINDING_NAME_MLZUI_PULL = "Pull timer (10 seconds)"
+BINDING_NAME_MLZUI_PULL = "Pull timer"
 
 local function SpellName(id)
     if C_Spell and C_Spell.GetSpellName then return C_Spell.GetSpellName(id) end
@@ -159,9 +159,14 @@ function G.PullUnavailable()
     return "Needs Deadly Boss Mods on this client"
 end
 
+-- Length used by the key, the button and /mlz pull without a number (Group & raid on the Helpers page)
+G.PULL_DEFAULT = 10
+function G.PullSeconds() return ns.Tune("group.pullSeconds", G.PULL_DEFAULT) end
+
 function G.Pull(seconds)
-    seconds = math.floor(tonumber(seconds) or 10)
-    if seconds < 1 or seconds > 60 then seconds = 10 end
+    local default = G.PullSeconds()
+    seconds = math.floor(tonumber(seconds) or default)
+    if seconds < 1 or seconds > 60 then seconds = default end
     -- In a raid the countdown (and DBM's) is ignored without lead or assist, with no message
     if IsInRaid and IsInRaid() and not (UnitIsGroupLeader and UnitIsGroupLeader("player"))
         and not (UnitIsGroupAssistant and UnitIsGroupAssistant("player")) then
@@ -181,7 +186,7 @@ function G.Pull(seconds)
     return false
 end
 
-ns.AddCommand("pull", "starts a pull timer: /mlz pull 10", function(arg) G.Pull(arg) end)
+ns.AddCommand("pull", "starts a pull timer: /mlz pull 10 (no number = your set length)", function(arg) G.Pull(arg) end)
 
 ------------------------------------------------------------------------
 -- Public API (settings window)

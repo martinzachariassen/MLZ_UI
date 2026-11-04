@@ -69,6 +69,24 @@ function ns.SetEnabled(modKey, id, value)
     ns.db.toggles[modKey .. ":" .. tostring(id)] = value and true or false
 end
 
+-- Fine-tuned numbers from the sliders in the control center. ns.db.tune only holds what the player changed,
+-- keyed by path ("plates.refreshAt"). A missing key means the value from Data/ is used.
+function ns.Tune(path, default)
+    local t = ns.db and ns.db.tune
+    local v = t and t[path]
+    if v == nil then return default end
+    return v
+end
+
+-- Setting a value back to its default removes the key, so a later change in Data/ reaches the player
+function ns.SetTune(path, value, default)
+    if not ns.db then return end
+    local t = ns.db.tune or {}
+    if value == default then value = nil end
+    t[path] = value
+    ns.db.tune = next(t) and t or nil
+end
+
 -- Calls f safely and returns ok, result...
 function ns.Try(f, ...)
     if type(f) ~= "function" then return false, "not a function" end

@@ -219,6 +219,26 @@ local function CheckPlates()
             Fail("plates", "the DoT timer stays amber with refresh timing off")
         end
         if ours.petBox:IsShown() then Fail("plates", "the paw shows while it is turned off") end
+
+        -- fine-tuning (ns.Tune): no saved value means the Data default, a saved one wins, the default clears it
+        local PD = ns.data.nameplates.plates
+        if ns.Tune("plates.refreshAt", PD.refreshAt) ~= PD.refreshAt then Fail("tune", "no fallback to Data") end
+        ns.SetTune("plates.refreshAt", 1, PD.refreshAt)
+        P.Configure(true, Opts({ debuffs = true, refresh = true }))
+        if Same({ dot.time:GetTextColor() }, amber) then
+            Fail("tune", "refresh timing at 1 second still turns a DoT with 2 seconds left amber")
+        end
+        ns.SetTune("plates.refreshAt", PD.refreshAt, PD.refreshAt)
+        if ns.db.tune and ns.db.tune["plates.refreshAt"] ~= nil then Fail("tune", "the default was saved") end
+        -- another mob is your target: this plate dims to the value for the active mode
+        stub.same.nameplate1, stub.units.target = nil, {}
+        ns.SetTune("plates.nonTarget.dps", 0.5, PD.modes.dps.nonTarget)
+        P.Configure(true, Opts())
+        if math.abs(ours:GetAlpha() - 0.5) > 0.01 then
+            Fail("tune", "a plate you don't target has alpha " .. ours:GetAlpha() .. " (want 0.5)")
+        end
+        ns.SetTune("plates.nonTarget.dps", nil)
+        stub.same.nameplate1, stub.units.target = "target", nil
         P.Configure(true, Opts({ execute = false, cc = false }))
 
         -- threat as DPS in a group: 85% of what pulls aggro shows in the bar, the sound plays once at 90%
@@ -457,11 +477,12 @@ local function Dump(v)
 end
 
 -- Each ready-made setup must load without errors, change something, and undo back to the same db
-local PRESET_KEYS = { "fade", "nameplates", "reminders", "group", "vendor", "automate" }
+local PRESET_KEYS = { "fade", "nameplates", "reminders", "group", "vendor", "automate", "tune" }
 
 -- Every value the setup asks for is what the player now has
 local function CheckPresetSet(preset)
     local data, label = preset.data or {}, "preset set " .. preset.id
+    if (ns.Presets.Current() or {}).id ~= preset.id then Fail(label, "Current() is not " .. preset.id) end
     for _, row in ipairs(ns.data.fade) do
         local want = (data.fade or {})[row.id] and true or false
         if ns.modules.fade:IsOn(row.id) ~= want then Fail(label, "fade " .. row.id .. " is not " .. tostring(want)) end
@@ -520,6 +541,17 @@ local function CheckPresets()
     for _, preset in ipairs(P.List()) do
         for key, values in pairs((preset.data or {}).switches or {}) do
             for k in pairs(values) do all[key .. "." .. k] = { key, k } end
+        end
+    end
+    local tunes = {}
+    for _, preset in ipairs(P.List()) do
+        for k in pairs((preset.data or {}).tune or {}) do tunes[k] = true end
+    end
+    for _, preset in ipairs(P.List()) do
+        for k in pairs(tunes) do
+            if ((preset.data or {}).tune or {})[k] == nil then
+                Fail("preset " .. preset.id, "tune " .. k .. " is set by another setup but not by this one")
+            end
         end
     end
     for _, preset in ipairs(P.List()) do

@@ -2,6 +2,7 @@
 -- One-click setups on Profiles & backup (and /mlz preset <id>). Each one has the same shape as an export
 -- string (see Modules/Profile.lua), so it goes through the same checks and a backup is taken first.
 -- Only choices that apply at once are set: faded frames, nameplate options and helpers.
+-- `tune` sets fine-tuned values (ns.Tune paths). A value one setup sets, all of them set.
 -- Keybinds, scale and wizard rows stay as they are. Fade ids: Data/Fade.lua (a row left out is not faded).
 
 local _, ns = ...
@@ -25,6 +26,7 @@ ns.data.presets = {
                 reminders = { buffs = false, reagents = false, durability = true, raidFood = false, levelFood = false },
                 group = { buffCheck = false },
             },
+            tune = { ["fade.alpha"] = 0.1 }, -- dimmed frames almost disappear
         },
     },
     {
@@ -44,6 +46,7 @@ ns.data.presets = {
                 reminders = { buffs = false, reagents = false, durability = true, raidFood = false, levelFood = false },
                 group = { buffCheck = false },
             },
+            tune = { ["fade.alpha"] = 0.25 }, -- the default
         },
     },
     {
@@ -60,6 +63,7 @@ ns.data.presets = {
                 reminders = { buffs = true, reagents = true, durability = true, raidFood = true, levelFood = true },
                 group = { buffCheck = true },
             },
+            tune = { ["fade.alpha"] = 0.4 }, -- dimmed frames stay easy to read
         },
     },
 }
