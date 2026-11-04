@@ -12,6 +12,8 @@ ns.Automate = A
 local DEFAULTS = { acceptQuests = false, turnInQuests = false, summon = false, resurrect = false,
     bopSolo = false, declineDuels = false }
 
+A.DEFAULTS = DEFAULTS -- read by "Reset page" (Modules/Profile.lua)
+
 local function Cfg()
     ns.db.automate = ns.db.automate or {}
     local c = ns.db.automate

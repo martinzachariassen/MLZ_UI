@@ -446,10 +446,61 @@ function Page:Refresh()
     end
 end
 
-function Page:Title(title, subtitle)
+-- Click twice to confirm: returns the button handler. The label comes back after 4 seconds.
+local function Confirm(label, fn)
+    return function(b)
+        if not b.armed then
+            -- each click gets its own token, so an old timer can't disarm a newer click
+            local token = {}
+            b.armed = token
+            b.tipTitle = b.tipTitle or label -- the tooltip keeps the real name while the button asks to confirm
+            b:SetText("Click again to confirm")
+            C_Timer.After(4, function()
+                if b.armed == token then
+                    b.armed = nil
+                    b:SetText(label)
+                end
+            end)
+            return
+        end
+        b.armed = nil
+        b:SetText(label)
+        fn(b)
+    end
+end
+
+-- "Reset page" at the top right of a page title (ns.Defaults in Modules/Profile.lua). Backed up first.
+local RESET_LABEL = "Reset page"
+function Page:ResetButton(id)
+    local area = ns.Defaults and ns.Defaults.AREAS[id]
+    if not area then return end
+    local tip = "Puts back the MLZ UI defaults: " .. area.what .. "\n\nA backup is taken first, so Undo last change "
+        .. "on Profiles & backup brings your values back. Click twice to confirm."
+    local b = W.Button(self.content, RESET_LABEL, 170, W.BUTTON_H, Confirm(RESET_LABEL, function()
+        local ok, why = ns.Defaults.Reset(id)
+        if ok then
+            S:Notify("This page is back to the defaults. Undo last change on Profiles & backup puts it back.", "good")
+        else
+            S:Notify(why, "info")
+        end
+        S:Refresh()
+    end), "subtle")
+    b:SetPoint("TOPLEFT", PAGE_W - 170, -self.y)
+    b.tipText = tip
+    self:AddToIndex({ kind = "button", label = RESET_LABEL, desc = tip, keywords = "default defaults standard",
+        card = false, y = self.y })
+    self:OnRefresh(function()
+        local differs = ns.Defaults.Differs(id)
+        b:SetEnabled(differs)
+        b.tipText = differs and tip or ("Everything here is already at the default.\n" .. tip)
+    end)
+end
+
+function Page:Title(title, subtitle, resetId)
     local t = W.Text(self.content, "MLZUI_FontTitle", title)
     t:SetPoint("TOPLEFT", 0, -self.y)
     self:AddToIndex({ kind = "page", label = title, desc = subtitle, card = false, y = self.y })
+    if resetId then self:ResetButton(resetId) end
     self.y = self.y + 28
     if subtitle then
         local s = W.Text(self.content, "GameFontHighlight", subtitle)
@@ -737,29 +788,6 @@ function Page:Buttons(list)
     end)
     c.cy = c.cy + 48
     return made
-end
-
--- Click twice to confirm: returns the button handler. The label comes back after 4 seconds.
-local function Confirm(label, fn)
-    return function(b)
-        if not b.armed then
-            -- each click gets its own token, so an old timer can't disarm a newer click
-            local token = {}
-            b.armed = token
-            b.tipTitle = b.tipTitle or label -- the tooltip keeps the real name while the button asks to confirm
-            b:SetText("Click again to confirm")
-            C_Timer.After(4, function()
-                if b.armed == token then
-                    b.armed = nil
-                    b:SetText(label)
-                end
-            end)
-            return
-        end
-        b.armed = nil
-        b:SetText(label)
-        fn(b)
-    end
 end
 
 -- Grey paragraph inside the current card. text may be a function; lines reserves room for it.
@@ -1102,7 +1130,7 @@ end }
 
 PAGES[#PAGES + 1] = { key = "nameplates", title = "Nameplates", icon = "Interface\\Icons\\Ability_Warrior_DefensiveStance", build = function(p)
     local NP = ns.NP
-    p:Title("Nameplates", "Nameplates that follow your role. Changes show at once.")
+    p:Title("Nameplates", "Nameplates that follow your role. Changes show at once.", "nameplates")
 
     p:Card("Engine", "Who draws your nameplates. Modes, threat colors and the PvP tweak work with both MLZ and Platynator.")
     p:Choice("Nameplates drawn by", "Switching applies at once, no reload.", ENGINE_OPTIONS, NP.Engine, NP.SetEngine, 80, { tip = ENGINE_TIP })
@@ -1371,7 +1399,7 @@ end }
 
 PAGES[#PAGES + 1] = { key = "fade", title = "Minimalism", icon = "Interface\\Icons\\Ability_Stealth", build = function(p)
     local fade = M("fade")
-    p:Title("Minimalism", "Hide what you rarely need. Faded frames come back on mouseover, and everything shows while Edit Mode is open.")
+    p:Title("Minimalism", "Hide what you rarely need. Faded frames come back on mouseover, and everything shows while Edit Mode is open.", "fade")
 
     p:Card("Hide until needed", "Keybinds keep working when a bar is invisible. Show me around (on About & help) points them out.")
     p:Toggle("Pause all fading", "Shows everything again until you turn this off or reload.",
@@ -1416,7 +1444,7 @@ end }
 
 PAGES[#PAGES + 1] = { key = "buttons", title = "Bars & interface", icon = "Interface\\Icons\\Ability_DualWield", build = function(p)
     local ab, tw, fade = M("actionbuttons"), M("tweaks"), M("fade")
-    p:Title("Bars & interface", "See at a glance why a button doesn't work, plus small tweaks that declutter the screen.")
+    p:Title("Bars & interface", "See at a glance why a button doesn't work, plus small tweaks that declutter the screen.", "buttons")
 
     p:Card("Action buttons", C.red .. "Red" .. C.r .. " = out of range, " .. C.blue .. "blue" .. C.r .. " = not enough mana, dark grey = can't be used right now.")
     local function NoButtons() if not _G.ActionButton1 then return "No action buttons found" end end
@@ -1501,7 +1529,7 @@ end }
 
 PAGES[#PAGES + 1] = { key = "qol", title = "Helpers", icon = "Interface\\Icons\\INV_Misc_Coin_01", build = function(p)
     local V, MT, IA = ns.Vendor, ns.ManaTick, ns.Interrupt
-    p:Title("Helpers", "Small helpers that save you clicks and give you information Blizzard doesn't show.")
+    p:Title("Helpers", "Small helpers that save you clicks and give you information Blizzard doesn't show.", "qol")
 
     p:Card("Merchants", "Hold SHIFT while you talk to a merchant to skip this once.")
     p:Toggle("Repair automatically", "Repairs all your gear when you open a merchant who can repair.",
@@ -1630,7 +1658,7 @@ end }
 
 PAGES[#PAGES + 1] = { key = "reminders", title = "Reminders", icon = "Interface\\Icons\\INV_Misc_PocketWatch_01", build = function(p)
     local R = ns.Reminders
-    p:Title("Reminders", "Small icons below the middle of the screen, out of combat only. They go away once it is fixed.")
+    p:Title("Reminders", "Small icons below the middle of the screen, out of combat only. They go away once it is fixed.", "reminders")
     if not R then
         p:Card("Not available")
         p:Text(C.amber .. "Reminders could not load in this client." .. C.r)
@@ -1961,13 +1989,34 @@ PAGES[#PAGES + 1] = { key = "profiles", title = "Profiles & backup", icon = "Int
         .. "Clicking the setup that is already in use does nothing." })
     p:Buttons(presetButtons)
 
-    p:Card("Share your setup", "Export gives a string with your MLZ UI choices: wizard choices, faded frames, helpers, "
-        .. "reminders, and the role and situation profiles of this character. Import it on another character or computer.")
+    p:Card("Share your setup", "Export gives a string with your MLZ UI choices: wizard choices, keys you changed, faded "
+        .. "frames, helpers, reminders, fine-tuning, and the role and situation profiles of this character. Import it "
+        .. "on another character or computer.")
     p:Buttons({
         { text = "Export", width = 120, fn = function() ns.RunCommand("export") end,
           tip = "Shows a text string with your MLZ UI choices that you can copy to another character or share." },
         { text = "Import...", width = 120, fn = function() ns.RunCommand("import") end,
-          tip = "Paste a string from Export. A backup is taken first, so undo can put things back." },
+          tip = "Paste a string from Export. A backup is taken first, so undo can put things back.\n\n"
+            .. "Helpers and fine-tuning apply at once. Movement, scale and changed keys apply the next time you run "
+            .. "the setup wizard." },
+    })
+
+    p:Card("Defaults", "Every page with fine-tuning has its own Reset page button at the top right.")
+    local ALL_LABEL = "Everything to defaults"
+    p:Buttons({
+        { text = ALL_LABEL, width = 200, style = "subtle", fn = Confirm(ALL_LABEL, function()
+            local ok, why = ns.Defaults.Reset("all")
+            if ok then
+                S:Notify("Helpers, reminders and fine-tuning are back to the defaults. Undo last change puts them back.", "good")
+            else
+                S:Notify(why, "info")
+            end
+        end), avail = function()
+            if not ns.Defaults.Differs("all") then return "Everything is already at the default" end
+        end, keywords = "reset default standard",
+          tip = "Puts back the MLZ UI defaults on the Nameplates, Minimalism, Bars & interface, Helpers and "
+            .. "Reminders pages. Keybinds, Edit Mode, game settings and which frames fade stay as they are: "
+            .. "those belong to the setup wizard. A backup is taken first. Click twice to confirm." },
     })
 
     p:Card("Backups", "A backup is taken every time the setup wizard applies changes. 5 are kept, and the oldest one (from before MLZ UI changed anything) is never thrown away.")
@@ -1984,6 +2033,7 @@ PAGES[#PAGES + 1] = { key = "profiles", title = "Profiles & backup", icon = "Int
             end
             table.sort(parts)
             local what = (e.kind == "import" and "import") or (e.kind == "preset" and "ready-made setup")
+                or (e.kind == "keys" and "key change") or (e.kind == "reset" and "reset to defaults")
                 or (i == 1 and "before MLZ UI" or "setup wizard")
             lines[#lines + 1] = (i == #list and C.green or C.grey) .. S.BackupLabel(e.time) .. ", " .. what .. C.r
                 .. "   " .. table.concat(parts, ", ") .. (i == #list and (C.green .. "   (undo restores this)" .. C.r) or "")
@@ -2007,7 +2057,8 @@ PAGES[#PAGES + 1] = { key = "profiles", title = "Profiles & backup", icon = "Int
             end
         end), avail = function()
             if (ns.db.backups and #ns.db.backups or 0) == 0 then return "No backups yet" end
-        end, tip = "Puts back everything the newest backup saved, from the setup wizard, an import or a ready-made setup. Click twice to confirm." },
+        end, tip = "Puts back everything the newest backup saved, from the setup wizard, an import, a ready-made setup, "
+            .. "a key change or a reset. Click twice to confirm." },
     })
 end }
 

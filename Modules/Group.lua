@@ -11,6 +11,8 @@ ns.Group = G
 
 local DEFAULTS = { buffCheck = false, leaderAll = false }
 
+G.DEFAULTS = DEFAULTS -- read by "Reset page" (Modules/Profile.lua)
+
 local function Cfg()
     ns.db.group = ns.db.group or {}
     local c = ns.db.group

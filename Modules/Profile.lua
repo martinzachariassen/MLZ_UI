@@ -1,13 +1,14 @@
--- MLZ UI: Export / import of your MLZ UI choices
+-- MLZ UI: Export / import of your MLZ UI choices, ready-made setups and "Reset page"
 -- /mlz export gives a string with your MLZ UI choices: the wizard choices (key movement, ticked rows,
--- scale mode, spell queue window, nameplates), faded frames, helpers, reminders, and the role and
--- situation profiles of this character. /mlz import applies such a string, after taking a backup that
--- /mlz undo can restore. Settings that live in the game or other addons are not included; run the wizard.
+-- scale mode, spell queue window, nameplates, keys changed on the key map), faded frames, helpers,
+-- reminders, fine-tuned values and the role and situation profiles of this character. /mlz import applies
+-- such a string, after taking a backup that /mlz undo can restore. Settings that live in the game or other
+-- addons are not included; run the wizard. "Reset page" in the control center also lives here.
 
 local _, ns = ...
 
-local PREFIX = "MLZ!2!"
-local OLD_PREFIXES = { "MLZ!1!" } -- older strings still import (they simply have fewer keys)
+local PREFIX = "MLZ!3!"
+local OLD_PREFIXES = { "MLZ!2!", "MLZ!1!" } -- older strings still import (they simply have fewer keys)
 
 local Profile = ns.RegisterModule({ key = "profile", title = "MLZ UI choices" })
 
@@ -22,6 +23,80 @@ local SWITCHES = {
     { key = "group", mod = function() return ns.Group end, keys = { "buffCheck", "leaderAll" } },
     { key = "reminders", mod = function() return ns.Reminders end, keys = { "buffs", "reagents", "durability", "raidFood", "levelFood" } },
 }
+
+-- MLZ!3!: helpers that are not plain on/off switches. Read and written through their own module.
+local function Extras()
+    local out = {}
+    if ns.Cooking then out.cooking = ns.Cooking.Get() end
+    if ns.Interrupt then out.interrupt = ns.Interrupt.Get() end
+    if ns.ManaTick then out.manaTick = ns.ManaTick.IsOn() end
+    if ns.Reminders then
+        local mutes = {}
+        for k in pairs((ns.db.reminders or {}).ignore or {}) do mutes[#mutes + 1] = k end
+        table.sort(mutes)
+        out.mutes = mutes
+    end
+    if ns.NP then out.engine, out.size = ns.NP.Engine(), ns.NP.Size() end
+    return out
+end
+
+local function ExtrasMap(t)
+    if type(t) ~= "table" then return nil end
+    local out = {}
+    for _, k in ipairs({ "cooking", "manaTick" }) do
+        if type(t[k]) == "boolean" then out[k] = t[k] end
+    end
+    if ns.Interrupt and type(t.interrupt) == "string" then
+        for _, c in ipairs(ns.Interrupt.CHANNELS) do
+            if c.value == t.interrupt then out.interrupt = t.interrupt end
+        end
+    end
+    if type(t.mutes) == "table" then
+        out.mutes = {}
+        for _, k in ipairs(t.mutes) do
+            if type(k) == "string" and k:match("^[br]:[%w]+$") then out.mutes[#out.mutes + 1] = k end
+        end
+    end
+    if ns.NP and ns.NP.ENGINE_TEXT and type(t.engine) == "string" and ns.NP.ENGINE_TEXT[t.engine] then
+        out.engine = t.engine
+    end
+    local size = tonumber(t.size)
+    if size and size >= 0.5 and size <= 2 then out.size = size end
+    return next(out) and out or nil
+end
+
+local function SetExtras(t)
+    if t.cooking ~= nil and ns.Cooking and ns.Cooking.Get() ~= t.cooking then ns.Cooking.Set(t.cooking) end
+    if t.interrupt and ns.Interrupt and ns.Interrupt.Get() ~= t.interrupt then ns.Interrupt.Set(t.interrupt) end
+    if t.manaTick ~= nil and ns.ManaTick and ns.ManaTick.IsOn() ~= t.manaTick then ns.ManaTick.SetOn(t.manaTick) end
+    if t.mutes and ns.Reminders then
+        local want = {}
+        for _, k in ipairs(t.mutes) do want[k] = true end
+        for k in pairs((ns.db.reminders or {}).ignore or {}) do
+            if not want[k] then ns.Reminders.SetMuted(k, false) end
+        end
+        for k in pairs(want) do
+            if not ns.Reminders.IsMuted(k) then ns.Reminders.SetMuted(k, true) end
+        end
+    end
+    if ns.NP then
+        if t.engine and ns.NP.Engine() ~= t.engine then ns.NP.SetEngine(t.engine) end
+        if t.size and ns.NP.Size() ~= t.size then ns.NP.SetSize(t.size) end
+    end
+end
+
+-- Keys changed on the key map (Modules/KeyEdit.lua): key -> command, or false when cleared on purpose
+local function KeyEditsMap(t)
+    if type(t) ~= "table" then return nil end
+    local out = {}
+    for k, v in pairs(t) do
+        if type(k) == "string" and #k <= 40 and k:match("^[%w%p]+$")
+            and (v == false or (type(v) == "string" and #v <= 60 and v:match("^[%u%d_]+$"))) then
+            out[k] = v
+        end
+    end
+    return next(out) and out or nil
+end
 
 -- Fine-tuned values (ns.Tune): flat "area.key" paths. Only these areas travel with a string or a setup.
 local TUNE_AREAS = { plates = true, fade = true, chat = true, reminders = true, group = true }
@@ -109,6 +184,10 @@ local function Export()
         switches = Switches(),
         roleProfiles = char.roleProfiles,
         situationProfiles = char.situationProfiles,
+        -- MLZ!3!
+        extras = Extras(),
+        tune = db.tune and ns.CopyTable(db.tune) or nil,
+        keyEdits = db.keyEdits and ns.CopyTable(db.keyEdits) or nil,
     }
     return data
 end
@@ -235,6 +314,10 @@ local function Validate(data)
         if next(out) then clean.switches = out end
     end
     clean.tune = TuneMap(data.tune)
+    -- MLZ!3! keys. A full string replaces your fine-tuning; a ready-made setup only sets its own values.
+    clean.extras = ExtrasMap(data.extras)
+    clean.keyEdits = KeyEditsMap(data.keyEdits)
+    if type(data.extras) == "table" then clean.replaceTune = true end
     clean.roleProfiles = Profiles(data.roleProfiles, { "TANK", "HEALER", "DAMAGER" }, RoleSnap)
     clean.situationProfiles = Profiles(data.situationProfiles, { "solo", "party", "raid", "pvp" }, SituationSnap)
     -- roleForce is never imported: your role belongs to this character, not to a shared setup
@@ -251,6 +334,7 @@ function Profile:Backup()
         toggles = ns.db.toggles, movement = ns.db.movement, spellQueueWindow = ns.db.spellQueueWindow,
         scale = ns.db.scale, nameplates = npCopy, roleForce = ns.GetRoleForce(), hasRoleForce = true,
         fade = ns.db.fade or {}, switches = Switches(), tune = ns.db.tune or false,
+        extras = Extras(), keyEdits = ns.db.keyEdits or false,
         roleProfiles = char.roleProfiles or {}, situationProfiles = char.situationProfiles or {}, hasProfiles = true,
     })
 end
@@ -279,6 +363,8 @@ function Profile:Restore(snap)
     if snap.switches then SetSwitches(snap.switches) end
     -- nil: a backup made before fine-tuning existed, so keep what you have
     if snap.tune ~= nil then ns.db.tune = snap.tune and ns.CopyTable(snap.tune) or nil end
+    if snap.extras then SetExtras(snap.extras) end
+    if snap.keyEdits ~= nil then ns.db.keyEdits = snap.keyEdits and ns.CopyTable(snap.keyEdits) or nil end
     if snap.hasProfiles then
         local char = ns.CharDB()
         char.roleProfiles = snap.roleProfiles
@@ -307,7 +393,14 @@ local function ApplyClean(clean, kind)
     end
     if clean.fade then LoadFade(clean.fade) end
     if clean.switches then SetSwitches(clean.switches) end
+    if clean.replaceTune then ns.db.tune = nil end
     if clean.tune then SetTunes(clean.tune) end
+    if clean.extras then SetExtras(clean.extras) end
+    if clean.keyEdits then
+        -- merged, and used the next time the setup wizard sets your keys (Modules/Bindings.lua)
+        ns.db.keyEdits = ns.db.keyEdits or {}
+        for k, v in pairs(clean.keyEdits) do ns.db.keyEdits[k] = v end
+    end
     -- profiles are merged: a role or place the string doesn't have keeps what you saved here
     local char = ns.CharDB()
     for _, key in ipairs({ "roleProfiles", "situationProfiles" }) do
@@ -462,6 +555,137 @@ ns.AddCommand("preset", "loads a ready-made setup: minimal | balanced | informat
         ns.Print(text)
     end
 end)
+
+------------------------------------------------------------------------
+-- Reset to defaults ("Reset page" in the control center, "Everything to defaults" on Profiles & backup)
+-- Only MLZ UI's own choices: fine-tuned values and helper switches. Keybinds, Edit Mode, CVars and the
+-- frames the wizard fades belong to the wizard and /mlz undo. Profile:Backup covers all of it.
+------------------------------------------------------------------------
+local Defaults = {}
+ns.Defaults = Defaults
+
+local function TuneDiffers(area)
+    for k in pairs(ns.db.tune or {}) do
+        if k:sub(1, #area + 1) == area .. "." then return true end
+    end
+    return false
+end
+
+local function ClearTune(area)
+    local t = ns.db.tune
+    if not t then return end
+    for k in pairs(t) do
+        if k:sub(1, #area + 1) == area .. "." then t[k] = nil end
+    end
+    if next(t) == nil then ns.db.tune = nil end
+end
+
+-- On/off switches of a helper module (Vendor, Automate, Group, Reminders) that differ from its defaults
+local function SwitchesDiffer(mod)
+    if not (mod and mod.DEFAULTS) then return false end
+    for k, v in pairs(mod.DEFAULTS) do
+        if mod.Get(k) ~= v then return true end
+    end
+    return false
+end
+
+local function ResetSwitches(mod)
+    if not (mod and mod.DEFAULTS) then return end
+    for k, v in pairs(mod.DEFAULTS) do
+        if mod.Get(k) ~= v then mod.Set(k, v) end
+    end
+end
+
+local function HasMutes() return next((ns.db.reminders or {}).ignore or {}) ~= nil end
+
+-- Keyed by control center page. what = the tooltip line that says what goes back.
+Defaults.AREAS = {
+    nameplates = {
+        what = "Which parts the nameplates show, their size and the fine-tuning below.",
+        differs = function()
+            local NP = ns.NP
+            if not NP then return false end
+            for k, def in pairs(NP.SHOW_KEYS or {}) do
+                if NP.Show(k) ~= def then return true end
+            end
+            return NP.Size() ~= 1 or TuneDiffers("plates")
+        end,
+        reset = function()
+            local np = ns.db.nameplates
+            if np then np.show, np.size = nil, nil end
+            ClearTune("plates")
+            if ns.NP then ns.NP.Retune() end
+        end,
+    },
+    fade = {
+        what = "How each frame hides and how far \"out of combat\" frames dim. Which frames fade stays as it is.",
+        differs = function() return TuneDiffers("fade") end,
+        reset = function() ClearTune("fade") end,
+    },
+    buttons = {
+        what = "How long until chat fades, and the chat tabs and background. The other rows belong to the setup wizard.",
+        differs = function() return TuneDiffers("chat") end,
+        reset = function()
+            ClearTune("chat")
+            local fade = ns.modules.fade
+            if fade and fade.RefreshChat then fade:RefreshChat() end
+        end,
+    },
+    qol = {
+        what = "Vendor, fewer clicks, group and raid, cooking tooltips, the interrupt announce and the pull timer length.",
+        differs = function()
+            return SwitchesDiffer(ns.Vendor) or SwitchesDiffer(ns.Automate) or SwitchesDiffer(ns.Group)
+                or (ns.Cooking and ns.Cooking.Get() ~= ns.Cooking.DEFAULTS.tooltip)
+                or (ns.Interrupt and ns.Interrupt.Get() ~= "off") or TuneDiffers("group")
+        end,
+        reset = function()
+            ResetSwitches(ns.Vendor)
+            ResetSwitches(ns.Automate)
+            ResetSwitches(ns.Group)
+            if ns.Cooking and ns.Cooking.Get() ~= ns.Cooking.DEFAULTS.tooltip then ns.Cooking.Set(ns.Cooking.DEFAULTS.tooltip) end
+            if ns.Interrupt and ns.Interrupt.Get() ~= "off" then ns.Interrupt.Set("off") end
+            ClearTune("group")
+        end,
+    },
+    reminders = {
+        what = "What to check, the reminders you turned off one by one, and the repair and reagent limits.",
+        differs = function() return SwitchesDiffer(ns.Reminders) or HasMutes() or TuneDiffers("reminders") end,
+        reset = function()
+            local R = ns.Reminders
+            ClearTune("reminders")
+            if not R then return end
+            for k in pairs((ns.db.reminders or {}).ignore or {}) do R.SetMuted(k, false) end
+            ResetSwitches(R)
+            R.SetTune("reminders.durability", nil) -- runs the check again with the default limits
+        end,
+    },
+}
+Defaults.ORDER = { "nameplates", "fade", "buttons", "qol", "reminders" }
+
+-- True when the page (or "all") has something that is not the default
+function Defaults.Differs(id)
+    if id == "all" then
+        for _, key in ipairs(Defaults.ORDER) do
+            if Defaults.AREAS[key].differs() then return true end
+        end
+        return false
+    end
+    local area = Defaults.AREAS[id]
+    return area and area.differs() and true or false
+end
+
+-- Returns true, or false and the reason. A backup is taken first, so /mlz undo brings it all back.
+function Defaults.Reset(id)
+    if not Defaults.Differs(id) then return false, "Everything here is already at the default." end
+    if not ns.Backup:Create({ { mod = Profile, items = {} } }, "reset") then
+        return false, "The backup failed. Nothing was changed."
+    end
+    for _, key in ipairs(Defaults.ORDER) do
+        if id == "all" or id == key then Defaults.AREAS[key].reset() end
+    end
+    ns.FireState()
+    return true
+end
 
 ------------------------------------------------------------------------
 -- Role profiles (per character)

@@ -13,6 +13,8 @@ local DEFAULTS = { tooltip = true }
 local MAX_LINES = 3
 local COOKING_SPELL = 2550 -- the Cooking profession spell, used for its localized name
 
+C.DEFAULTS = DEFAULTS -- read by "Reset page" (Modules/Profile.lua)
+
 local function Cfg()
     ns.db.cooking = ns.db.cooking or {}
     local c = ns.db.cooking

@@ -114,6 +114,13 @@
   - Reminders: repair at 10-50% durability, and the ammo and Soul Shard counts that count as low.
   - Pull timer: 5, 8, 10 or 15 seconds for the key, the button and `/mlz pull`.
 - Ready-made setups also set how far frames dim: Minimal 10%, Balanced 25%, Informative 40%.
+- "Reset page" at the top of Nameplates, Minimalism, Bars & interface, Helpers and Reminders puts that page's
+  MLZ choices back to the defaults. "Everything to defaults" on Profiles & backup does all of them. Keybinds,
+  Edit Mode and game settings stay as they are. Both take a backup first, so `/mlz undo` brings them back.
+- Export covers the whole setup: keys you changed on the key map, every fine-tune value, the nameplate engine
+  and size, cooking tooltips, interrupt announce, the tick bar and muted reminders. Older export strings
+  still import.
+- The setup wizard keeps keys you changed on the key map instead of setting them back.
 
 **Fixes**
 - Reagent reminders: Prayer of Fortitude rank 1 checks Holy Candles and Gift of the Wild rank 1 checks Wild

@@ -136,7 +136,7 @@ If the guess is wrong, set your role by hand with `/mlz role`, on the Your role 
   one key a new action and shows what loses its key first
 - One tip at a time on the overview, based on what you have turned on
 - Good defaults you can fine-tune in `/mlz`: nameplate dimming, threat warning, debuff timers, how each frame
-  fades, chat fade time, repair and reagent limits, and the pull timer length
+  fades, chat fade time, repair and reagent limits, and the pull timer length. "Reset page" puts a page back to the defaults
 
 **Ecosystem**
 - Recommended settings for 16 addons, many of them per role: a healer and a tank do not get the same Questie, DBM or Details setup
@@ -170,12 +170,12 @@ If you use "Download ZIP" on GitHub, rename the unzipped `MLZ_UI-main` folder to
 | `/mlz` | Open the control center |
 | `/mlz search [words]` | Find a setting in the control center, for example `/mlz search minimap` |
 | `/mlz install` | Open the setup wizard |
-| `/mlz undo` | Undo the last wizard run, import or ready-made setup |
+| `/mlz undo` | Undo the last wizard run, import, ready-made setup, key change or reset |
 | `/mlz backups` | List saved backups |
 | `/mlz role tank\|healer\|dps\|auto` | Set your role for this character |
 | `/mlz heal on\|off\|auto\|build` | Healer layouts: status, switch them, or rebuild |
 | `/mlz np auto\|tank\|healer\|dps\|solo` | Nameplate mode (also `engine mlz\|platynator\|off`, `style`, `threat`, `pvp`, `save`, `load`, `export`) |
-| `/mlz export` · `/mlz import` | Share your choices as a string (wizard choices, fading, helpers, reminders, role and situation profiles) |
+| `/mlz export` · `/mlz import` | Share your choices as a string (wizard choices, fading, helpers, reminders, fine-tuning, changed keys, role and situation profiles) |
 | `/mlz preset [name]` | Load a ready-made setup: `minimal`, `balanced` or `informative` (no name lists them) |
 | `/mlz keys` | A keyboard map of your keybinds, with the SHIFT, CTRL and ALT layers. Change single keys here |
 | `/mlz tour` | Show where the hidden bars and buttons are |
@@ -255,7 +255,7 @@ Rows that only fit one role or archetype show only for you. Settings that don't 
 | Helpers | Repair and sell greys, fewer clicks, group and raid (buff check, pull timer), mana tick bar, cooking tooltips, interrupt announce, XP per hour |
 | Reminders | Missing self buffs, pet happiness, reagents, ammo, durability, food while leveling, and food and flask in raids, with one switch per reminder for your class |
 | Other addons | Your addons (loaded, switched off or missing, version, how many settings differ, turn switched-off addons back on), addons worth a look for your role, list addon problems |
-| Profiles & backup | Role profiles, situation profiles, export and import, backups, undo |
+| Profiles & backup | Role profiles, situation profiles, export and import, everything to defaults, backups, undo |
 | About & help | Game version, how it works, show me around, commands, debug, collect client info |
 
 The search box at the top of the sidebar finds any setting by its name, its description or a common word for it (also `/mlz search`). The footer always shows whether a reload is needed and why.

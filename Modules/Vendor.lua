@@ -11,6 +11,8 @@ ns.Vendor = V
 
 local DEFAULTS = { repair = true, guild = true, sell = true }
 
+V.DEFAULTS = DEFAULTS -- read by "Reset page" (Modules/Profile.lua)
+
 local function Cfg()
     ns.db.vendor = ns.db.vendor or {}
     local c = ns.db.vendor

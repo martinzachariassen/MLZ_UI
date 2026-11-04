@@ -583,6 +583,97 @@ local function CheckPresets()
     return count
 end
 
+-- Reset to defaults and export/import: a reset clears your values and undo brings them back, an MLZ!3!
+-- string gives back the same values, an MLZ!2! string still imports, and the wizard keeps changed keys.
+local function CheckProfiles()
+    if not (ns.Defaults and ns.Interrupt and ns.Reminders and ns.Vendor and ns.NP) then
+        return Fail("profiles", "ns.Defaults or a helper module is missing")
+    end
+    -- a fake C_EncodingUtil: the "string" points at a copy of the table, so import reads what export wrote
+    local store = {}
+    local fake = {
+        SerializeCBOR = function(t) store[#store + 1] = ns.CopyTable(t) return "#" .. #store end,
+        CompressString = function(s) return s end, DecompressString = function(s) return s end,
+        EncodeBase64 = function(s) return s end, DecodeBase64 = function(s) return s end,
+        DeserializeCBOR = function(s) return ns.CopyTable(store[tonumber(s:sub(2))]) end,
+    }
+    local savedEnc, savedCopy, savedEdits = _G.C_EncodingUtil, ns.ShowCopy, ns.db.keyEdits
+    local exported
+    _G.C_EncodingUtil = fake
+    ns.ShowCopy = function(_, text) exported = text end
+    local function State()
+        local np = ns.db.nameplates or {}
+        return Dump({ tune = ns.db.tune, interrupt = ns.db.interrupt, reminders = ns.db.reminders, vendor = ns.db.vendor,
+            keyEdits = ns.db.keyEdits, size = np.size })
+    end
+    local ok, err = pcall(function()
+        local PD = ns.data.nameplates.plates
+        ns.SetTune("plates.refreshAt", 5, PD.refreshAt)
+        ns.Interrupt.Set("self")
+        ns.Reminders.SetMuted("r:6265", true)
+        ns.Vendor.Set("sell", false)
+        ns.NP.SetSize(1.1)
+        ns.db.keyEdits = { V = "ACTIONBUTTON2" }
+        local mine = State()
+
+        -- the wizard keeps a key changed on the key map: V gets bar 1 button 2, its old key is not set again
+        local count = 0
+        for _, d in ipairs(ns.modules.bindings:Desired("ESDF")) do
+            if d.command == "ACTIONBUTTON2" then
+                count = count + 1
+                if d.key ~= "V" then Fail("profiles", "the wizard sets ACTIONBUTTON2 on " .. d.key .. " too") end
+            end
+        end
+        if count ~= 1 then Fail("profiles", "the wizard has " .. count .. " rows for ACTIONBUTTON2 (want 1)") end
+
+        SlashCmdList.MLZUI("export")
+        if type(exported) ~= "string" or exported:sub(1, 6) ~= "MLZ!3!" then
+            error("export did not give an MLZ!3! string: " .. tostring(exported), 0)
+        end
+
+        -- reset everything: values go back to the defaults, keys you changed stay
+        local backups = #ns.db.backups
+        local done, why = ns.Defaults.Reset("all")
+        if not done then error("reset failed: " .. tostring(why), 0) end
+        if #ns.db.backups ~= backups + 1 then Fail("reset", "no backup was taken") end
+        if ns.Tune("plates.refreshAt", PD.refreshAt) ~= PD.refreshAt then Fail("reset", "refresh timing is not back") end
+        if ns.Interrupt.Get() ~= "off" then Fail("reset", "the interrupt announce is " .. ns.Interrupt.Get()) end
+        if ns.Reminders.IsMuted("r:6265") then Fail("reset", "a reminder stays turned off") end
+        if not ns.Vendor.Get("sell") then Fail("reset", "selling greys is not back on") end
+        if ns.NP.Size() ~= 1 then Fail("reset", "the nameplate size is " .. ns.NP.Size()) end
+        if not (ns.db.keyEdits and ns.db.keyEdits.V) then Fail("reset", "a reset dropped the keys you changed") end
+        if ns.Defaults.Differs("all") then Fail("reset", "something still differs after a reset") end
+        local again = ns.Defaults.Reset("all")
+        if again then Fail("reset", "a second reset took another backup") end
+        ns.Backup:Undo(true)
+        if State() ~= mine then Fail("reset undo", "values are not back:\n  " .. mine .. "\n  " .. State()) end
+
+        -- import the string on a "fresh" setup: the same values come back
+        ns.Defaults.Reset("all")
+        ns.db.keyEdits = nil
+        SlashCmdList.MLZUI("import " .. exported)
+        if State() ~= mine then Fail("import", "values differ from the export:\n  " .. mine .. "\n  " .. State()) end
+        ns.Backup:Undo(true) -- the import
+        ns.Backup:Undo(true) -- the reset
+        ns.db.keyEdits = { V = "ACTIONBUTTON2" }
+        if State() ~= mine then Fail("import undo", "values are not back") end
+
+        -- an older string still imports
+        local old = "MLZ!2!" .. fake.SerializeCBOR({ switches = { vendor = { sell = true } } })
+        SlashCmdList.MLZUI("import " .. old)
+        if not ns.Vendor.Get("sell") then Fail("import", "an MLZ!2! string did not import") end
+        ns.Backup:Undo(true)
+        if ns.Vendor.Get("sell") then Fail("import undo", "the MLZ!2! import was not undone") end
+
+        -- leave the db as the other checks expect it
+        ns.Defaults.Reset("all")
+        table.remove(ns.db.backups)
+    end)
+    if not ok then Fail("profiles", err) end
+    _G.C_EncodingUtil, ns.ShowCopy, ns.db.keyEdits = savedEnc, savedCopy, savedEdits
+    stub.FlushTimers(function(e) Fail("profiles timer", e) end)
+end
+
 local function CheckSettings()
     local S = ns.Settings
     if not S then return Fail("settings", "ns.Settings is missing") end
@@ -629,6 +720,7 @@ CheckWizard()
 local pages = CheckSettings() or 0
 local changed = CheckApplyUndo() or 0
 local presets = CheckPresets() or 0
+CheckProfiles()
 local plates = CheckPlates() or 0
 CheckThreatMeter()
 CheckPlacement()

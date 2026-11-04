@@ -14,6 +14,8 @@ local DEFAULTS = { buffs = false, reagents = false, durability = true, raidFood 
 local ICON, GAP, MAX_ICONS = 28, 10, 8
 local REPAIR_ICON = "Interface\\Icons\\Trade_BlackSmithing"
 
+R.DEFAULTS = DEFAULTS -- read by "Reset page" (Modules/Profile.lua)
+
 local function Cfg()
     ns.db.reminders = ns.db.reminders or {}
     local c = ns.db.reminders

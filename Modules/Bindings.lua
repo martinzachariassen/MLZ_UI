@@ -30,7 +30,7 @@ function Bindings.ExtraKeyCount(class)
 end
 
 -- Returns a list of { key, command, group, role } for the chosen movement setup
-function Bindings:Desired(movement)
+function Bindings:Desired(movement, raw)
     local D = ns.data.bindings
     movement = D.movement[movement] and movement or "ESDF"
     local list = {}
@@ -83,6 +83,31 @@ function Bindings:Desired(movement)
             out[#out + 1] = d
         end
     end
+    if raw then return out end
+    return self:WithKeyEdits(out)
+end
+
+-- Keys you changed on the key map (/mlz keys, or an imported string) win over the setup, so running the
+-- wizard again keeps them: the action moved to your key, and a key you cleared is left alone.
+function Bindings:WithKeyEdits(list)
+    local edits = ns.db and ns.db.keyEdits
+    if type(edits) ~= "table" or next(edits) == nil then return list end
+    local moved = {}
+    for _, cmd in pairs(edits) do
+        if cmd then moved[cmd] = true end
+    end
+    local out = {}
+    for _, d in ipairs(list) do
+        if edits[d.key] == nil and not moved[d.command] then out[#out + 1] = d end
+    end
+    local keys = {}
+    for k, cmd in pairs(edits) do
+        if cmd then keys[#keys + 1] = k end
+    end
+    table.sort(keys)
+    for _, k in ipairs(keys) do
+        out[#out + 1] = { key = k, command = edits[k], group = "Your changes", role = "Changed on the key map" }
+    end
     return out
 end
 
@@ -91,7 +116,7 @@ end
 function Bindings.MigrateToggles(db)
     local toggles = db.toggles
     if type(toggles) ~= "table" then return end
-    for _, d in ipairs(Bindings:Desired(db.movement)) do
+    for _, d in ipairs(Bindings:Desired(db.movement, true)) do
         local old = "bindings:" .. d.key
         if toggles[old] ~= nil then
             if toggles["bindings:" .. d.command] == nil then toggles["bindings:" .. d.command] = toggles[old] end
