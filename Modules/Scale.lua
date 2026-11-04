@@ -77,8 +77,16 @@ function Scale:ValidMode(mode)
     return n ~= nil and n >= 0.4 and n <= CVAR_MAX
 end
 
--- MLZ_Safe: a centered 16:9 container that our own frames can anchor to,
--- so the HUD doesn't spread out on ultrawide.
+-- How far in from each side edge a centered 16:9 area starts, in UIParent units (0 on 16:9 or narrower).
+-- The layout and the addon windows use it, so the HUD doesn't spread out on ultrawide.
+function Scale.SafeInset()
+    local w, h = UIParent:GetWidth(), UIParent:GetHeight()
+    return math.max(0, (w - h * 16 / 9) / 2)
+end
+
+ns.SafeInset = Scale.SafeInset
+
+-- MLZ_Safe: a centered 16:9 container that our own frames can anchor to.
 function Scale:UpdateSafeArea()
     local f = _G.MLZ_Safe
     if not f then
@@ -86,8 +94,7 @@ function Scale:UpdateSafeArea()
         f:SetPoint("CENTER")
         f:SetFrameStrata("BACKGROUND")
     end
-    local w, h = UIParent:GetWidth(), UIParent:GetHeight()
-    f:SetSize(math.min(w, h * 16 / 9), h)
+    f:SetSize(UIParent:GetWidth() - 2 * Scale.SafeInset(), UIParent:GetHeight())
 end
 
 ------------------------------------------------------------------------

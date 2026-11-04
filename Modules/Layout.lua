@@ -131,6 +131,30 @@ function Layout:ToRaw(sysEnum, sysIndex, setting, value, currentRaw)
     return nil
 end
 
+-- Final anchor for a spec: the player's saved position if there is one, else the data position. Frames anchored
+-- to the left or right screen edge move in by the ultrawide inset, so the corners stay near the action.
+local function SpecAnchor(spec)
+    local own = spec.anchorOverride and ns.db.overrides and ns.db.overrides[spec.anchorOverride]
+    if own then
+        return { point = own.point, relativeTo = own.relativeTo or "UIParent", relativePoint = own.relativePoint,
+                 offsetX = own.offsetX, offsetY = own.offsetY }, true
+    end
+    local x = spec.x or 0
+    if not spec.relTo and spec.relPoint and ns.SafeInset then
+        local inset = math.floor(ns.SafeInset() + 0.5)
+        if spec.relPoint:find("LEFT") then x = x + inset
+        elseif spec.relPoint:find("RIGHT") then x = x - inset end
+    end
+    return { point = spec.point, relativeTo = spec.relTo or "UIParent", relativePoint = spec.relPoint,
+             offsetX = x, offsetY = spec.y }, false
+end
+Layout.SpecAnchor = SpecAnchor
+
+-- Screen size in UIParent units, rounded (what the layout positions were computed for)
+local function ScreenUnits()
+    return math.floor(UIParent:GetWidth() + 0.5), math.floor(UIParent:GetHeight() + 0.5)
+end
+
 local function SizeText(spec)
     local s = spec.settings
     if not s then return "" end
@@ -199,18 +223,17 @@ function Layout:Preview()
     end
     for i, spec in ipairs(data.frames) do
         local sys, err = FindSystem(active, spec)
+        local anchor, own = SpecAnchor(spec)
         local item = {
             id = "frame" .. i, spec = spec, label = spec.label, group = "Placement", requires = "__layout",
             old = sys and AnchorText(sys.anchorInfo) or "-",
             new = spec.keepAnchor and "hidden"
-                  or (AnchorText({ point = spec.point, relativeTo = spec.relTo, offsetX = spec.x, offsetY = spec.y }) .. SizeText(spec)),
+                  or (AnchorText(anchor) .. SizeText(spec) .. (own and "  (your saved position)" or "")),
             enabled = sys ~= nil and ns.Enabled("layout", "frame" .. i, fresh),
         }
         if i == 1 and inUse then
             item.groupNote = "Unticked because you already use this layout, so your own Edit Mode changes stay. Tick a frame to move it back."
         end
-        local own = spec.anchorOverride and ns.db.overrides and ns.db.overrides[spec.anchorOverride]
-        if own then item.new = AnchorText(own) .. SizeText(spec) .. "  (your saved position)" end
         if not sys then
             item.unavailable = true
             item.new = "skipped"
@@ -313,14 +336,7 @@ function Layout:WriteSpecs(target, specs)
         end
         if sys then
             if not spec.keepAnchor then
-                local own = spec.anchorOverride and ns.db.overrides and ns.db.overrides[spec.anchorOverride]
-                sys.anchorInfo = own and {
-                    point = own.point, relativeTo = own.relativeTo, relativePoint = own.relativePoint,
-                    offsetX = own.offsetX, offsetY = own.offsetY,
-                } or {
-                    point = spec.point, relativeTo = spec.relTo or "UIParent", relativePoint = spec.relPoint,
-                    offsetX = spec.x, offsetY = spec.y,
-                }
+                sys.anchorInfo = (SpecAnchor(spec))
                 sys.anchorInfo2 = nil
                 sys.isInDefaultPosition = false
             end
@@ -461,6 +477,8 @@ function Layout:Apply(items)
         end
     end
     ns.db.layoutLog = log -- ends up in SavedVariables, so we can check the conversion after /reload
+    local w, h = ScreenUnits()
+    ns.db.layoutScreen = { w = w, h = h }
 
     raw.activeLayout = numPresets + idx
     local ok, err = pcall(C_EditMode.SaveLayouts, raw)
@@ -573,6 +591,19 @@ function Layout:ActiveName()
     if name == ns.data.layout.name then return name, true end
     for _, v in ipairs(self:VariantNames()) do if v == name then return name, true end end
     return name, false
+end
+
+-- Whether the saved layout still fits the screen. Returns fits, text. fits is nil when there is nothing to check.
+-- Only the ultrawide inset depends on the screen size, so a change below 20 units doesn't matter.
+function Layout:ScreenFit()
+    local made = ns.db.layoutScreen
+    if not made or not made.w then return nil, "The layout has not been applied by this version yet." end
+    local w, h = ScreenUnits()
+    local function Inset(ww, hh) return math.max(0, (ww - hh * 16 / 9) / 2) end
+    if math.abs(Inset(made.w, made.h) - Inset(w, h)) <= 20 then
+        return true, ("Made for this screen (%dx%d units)."):format(made.w, made.h)
+    end
+    return false, ("Made for %dx%d, the screen is now %dx%d. Re-apply the layout."):format(made.w, made.h, w, h)
 end
 
 -- True when the MLZ UI layout has been created

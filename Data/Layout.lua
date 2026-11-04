@@ -1,21 +1,25 @@
 -- MLZ UI: Layout specification for Edit Mode (minimalist)
 -- Edit freely. The logic lives in Modules/Layout.lua.
 --
--- Screen layout (scale 0.64 => the screen is 1200 units tall):
+-- Screen layout (the screen is about 1200-1350 units tall, depending on the scale):
 --
 --   [tracker]                                              [buffs][minimap]
---
+--   [guide (RXP)]
 --                                                                    [bar4][bar5]
 --          [focus]               [swing ranged]                       (mouseover)
 --                                [swing main  ]
---                [stance]        [swing off   ]        [pet]
+--                                [swing off   ]
 --                                [  cast bar  ]
+--                                [ pet/stance ]
 --          [player]   [ bar 3  (Ctrl)  ]   [target]
 --                     [ bar 2  (Shift) ]
 --                     [ bar 1          ]
---   [party / raid    ]   (5 per row, growing upward from here)
---   [bar 6, separate ]
---   [chat]            [ XP / rep, small]                    [meter][micro/bags]
+--   [party / raid    ]   (5 per row, growing upward from here)            [threat]
+--   [bar 6, separate ]                                                    [meter ]
+--   [chat]            [ XP / rep, small]                              [micro/bags]
+--
+-- Ultrawide: frames anchored to the left or right screen edge are moved in by Scale.SafeInset(), so the
+-- corners sit at the edges of a centered 16:9 area instead of far out at the sides (see Modules/Layout.lua).
 --
 -- Principles (inspired by ElvUI / Bartender4 / Dominos setups):
 --   * The middle of the screen stays clear. Everything you need in combat is grouped at the bottom center.
@@ -53,11 +57,15 @@ local UNIT_Y = BASE + 40                       -- bottom edge of player/target (
 local STACK_TOP = BASE + 3 * ROW               -- top of the stack: bar 3's top edge (142) plus one PAD of air
 
 -- Above the stack, bottom to top (all centered on the middle of the screen):
---   cast bar  ->  swing off hand  ->  swing main hand  ->  swing ranged
--- The swing timers are anchored to each other and to the top of the cast bar, so they never overlap,
--- no matter how tall the frames actually are. Stance/pet line up with off hand, focus lines up with ranged.
+--   class bar (pet or stance)  ->  cast bar  ->  swing off hand  ->  swing main hand  ->  swing ranged
+-- The pet bar (hunter, warlock) and the stance bar (warrior, druid, rogue, priest) share one slot right
+-- above bar 3: no class has both. The swing timers are anchored to each other and to the top of the cast bar,
+-- so they never overlap, no matter how tall the frames actually are. Focus lines up with the ranged timer.
+local CLASS_ICON = 70                          -- pet / stance icon size in %
+local CLASS_H = math.floor(45 * CLASS_ICON / 100 + 0.5) -- 32
+local CLASS_Y = STACK_TOP + 2                  -- bottom edge of the pet / stance bar
 local CAST_TEXT = 12                           -- the text under the cast bar hangs about 12 units below the frame
-local CAST_Y = STACK_TOP + CAST_TEXT + 6       -- bottom edge of cast bar (6 units of space above bar 3)
+local CAST_Y = CLASS_Y + CLASS_H + CAST_TEXT + 6 -- bottom edge of cast bar (6 units of space above the class bar)
 local CAST_GAP = 4                             -- gap between cast bar and off hand
 local SWING_GAP = 2                            -- gap between the swing timers
 
@@ -74,9 +82,6 @@ local SWING_HIDDEN = { Visibility = 2 }        -- 0 = always, 1 = in combat, 2 =
 -- Edit Mode stores group frame sizes in steps of 10. 5 x 90 = 450, the width of the action bars (454).
 local HEAL_W = 90
 
--- Stance bar height (60 % icons) and the gap above it, for frames stacked on top of it
-local STANCE_H = math.floor(45 * 60 / 100 + 0.5) -- 27
-
 -- Chat at bottom left, with bar 6 (no hotkeys) right above it
 local CHAT_Y = 40                              -- bottom edge of chat (room for the input box below)
 local CHAT_H = 170                             -- chat height
@@ -87,13 +92,22 @@ local BAR6_BTN = 32                            -- bar 6 button size in units (70
 local GROUP_W, GROUP_H, GROUP_ROW = 80, 40, 5
 local GROUP_Y = BAR6_Y + BAR6_BTN + 8
 
+-- Bottom right column (Blizzard meter, Details windows): above bags and micro menu, below bars 4-5
+local METER_X = 4                              -- from the right edge (plus the ultrawide inset)
+local METER_Y = 90                             -- bottom edge, above the micro menu
+
 local MAIN_BAR = { Orientation = 0, NumRows = 1, NumIcons = 12, IconSize = ICON, IconPadding = PAD,
                    HideBarArt = 1, HideBarScrolling = 1, AlwaysShowButtons = 0 }
 local SIDE_BAR = { Orientation = 1, NumRows = 1, IconSize = 70, IconPadding = PAD, AlwaysShowButtons = 0 }
-local SMALL_BAR = { IconSize = 60, IconPadding = PAD }
+local CLASS_BAR = { Orientation = 0, NumRows = 1, IconSize = CLASS_ICON, IconPadding = PAD }
+-- Always shown (0 = always, 1 = in combat, 2 = out of combat, 3 = hidden). The game still hides an empty pet bar.
+local CLASS_VIS = { VisibleSetting = 0 }
 
 ns.data.layout = {
     name = "MLZ UI",   -- name of the Edit Mode layout that is created / updated
+
+    -- Shared with Data/Addons.lua, so addon windows line up with the bars (UIParent units)
+    metrics = { HALF = HALF, GAP = GAP, UNIT_Y = UNIT_Y, CAST_Y = CAST_Y, METER_X = METER_X, METER_Y = METER_Y },
 
     -- Action bars to enable (bars 2-6). Bars 4-5 are hidden until mouseover in Fade. Bar 6 = separate bar above chat.
     showBars = { 2, 3, 4, 5, 6 },
@@ -135,18 +149,15 @@ ns.data.layout = {
           point = "BOTTOM", relPoint = "TOP", relTo = "SwingTimerMainHandFrame", x = 0, y = SWING_GAP,
           settingEnum = "EditModeSwingTimerSetting", rawSettings = SWING },
 
-        -- Stance on the left and pet on the right, in line with off hand and with the edges of the stack.
-        -- Anchored to the center of the off hand bar, so x = half the stack width no matter how wide the bar is.
-        -- The bars hang OUTSIDE the swing timers (which are as wide as the stack): stance grows to the left
-        -- of the left edge, pet (10 buttons, ~290 wide: warlock, hunter, ...) grows to the right of the right edge.
-        -- Anchoring the other way round made them grow inward and cover the swing timers.
+        -- Class bar: pet (hunter, warlock: 10 buttons, ~338 wide) or stance, centered right above bar 3,
+        -- so pet commands are as close to your eyes as your own spells. Both use the same spot.
         { label = "Stance bar", system = "ActionBar", indexEnum = ABI, index = "StanceBar",
-          point = "BOTTOMRIGHT", relPoint = "BOTTOM", relTo = "SwingTimerOffHandFrame", x = -(HALF + GAP), y = 0,
-          settingEnum = AB, settings = SMALL_BAR },
+          point = "BOTTOM", relPoint = "BOTTOM", x = 0, y = CLASS_Y,
+          settingEnum = AB, settings = CLASS_BAR, rawSettings = CLASS_VIS },
         -- Your own placement wins: drag it in Edit Mode, then /mlz pet save (stored in MLZUIDB.overrides.petBar).
         { id = "petbar", anchorOverride = "petBar", label = "Pet bar", system = "ActionBar", indexEnum = ABI, index = "PetActionBar",
-          point = "BOTTOMLEFT", relPoint = "BOTTOM", relTo = "SwingTimerOffHandFrame", x = HALF + GAP, y = 0,
-          settingEnum = AB, settings = SMALL_BAR },
+          point = "BOTTOM", relPoint = "BOTTOM", x = 0, y = CLASS_Y,
+          settingEnum = AB, settings = CLASS_BAR, rawSettings = CLASS_VIS },
 
         -- XP / rep: small, at the very bottom below the stack
         { label = "XP bar (small, bottom)", system = "StatusTrackingBar",
@@ -216,11 +227,12 @@ ns.data.layout = {
           point = "BOTTOMLEFT", relPoint = "BOTTOMLEFT", x = 6, y = BAR6_Y, settingEnum = AB,
           settings = { Orientation = 0, NumRows = 1, NumIcons = 12, IconSize = 70, IconPadding = PAD, AlwaysShowButtons = 0 } },
 
-        -- Right edge: bars 4-5 vertical (hidden until mouseover)
+        -- Right edge: bars 4-5 vertical (hidden until mouseover). Raised 60 above the middle, so their bottom
+        -- (about 263 below their center) stays clear of the meter and threat windows even on a 1080-unit screen.
         { label = "Bar 4 (mouseover)", system = "ActionBar", indexEnum = ABI, index = "RightBar1",
-          point = "RIGHT", relPoint = "RIGHT", x = -4, y = -60, settingEnum = AB, settings = SIDE_BAR },
+          point = "RIGHT", relPoint = "RIGHT", x = -4, y = 60, settingEnum = AB, settings = SIDE_BAR },
         { label = "Bar 5", system = "ActionBar", indexEnum = ABI, index = "RightBar2",
-          point = "RIGHT", relPoint = "RIGHT", x = -(4 + 32 + PAD), y = -60, settingEnum = AB, settings = SIDE_BAR },
+          point = "RIGHT", relPoint = "RIGHT", x = -(4 + 32 + PAD), y = 60, settingEnum = AB, settings = SIDE_BAR },
 
         -- Bottom right: the "clutter corner" (hidden until mouseover). Raised 14 units: the FPS counter sits at the very bottom.
         { label = "Bags", system = "Bags",
@@ -229,8 +241,10 @@ ns.data.layout = {
         { label = "Micro menu", system = "MicroMenu",
           point = "BOTTOMRIGHT", relPoint = "BOTTOMRIGHT", x = -4, y = 50,
           settingEnum = "EditModeMicroMenuSetting", settings = { Size = 70 } },
+        -- Blizzard's own meter (only shown if it is turned on in the game options) uses the same spot as
+        -- the Details window (see Data/Addons.lua), so there is only one meter corner.
         { label = "Damage meter", system = "DamageMeter",
-          point = "BOTTOMRIGHT", relPoint = "BOTTOMRIGHT", x = -80, y = 80 },
+          point = "BOTTOMRIGHT", relPoint = "BOTTOMRIGHT", x = -METER_X, y = METER_Y },
     },
 
     -- Variants for Modules/Healer.lua. `frames` lists the frames that differ from the main layout, by label
@@ -268,10 +282,9 @@ ns.data.layout = {
                 frames = {
                     ["Swing timer off hand"]   = { rawSettings = SWING_HIDDEN },
                     ["Swing timer main hand"]  = { rawSettings = SWING_HIDDEN },
+                    -- Focus is anchored to the ranged timer, so it moves down with it (the space left of the
+                    -- swing timers is free, the class bar sits below the cast bar).
                     ["Swing timer ranged"]     = { relTo = "PlayerCastingBarFrame", y = CAST_GAP },
-                    -- The ranged timer moved down to the stance bar's height, so Focus (anchored to it in the main
-                    -- layout) would cover the stance bar. Stack it on top of the stance bar instead.
-                    ["Focus"] = { relTo = "PlayerCastingBarFrame", relPoint = "TOP", y = CAST_GAP + STANCE_H + GAP },
                 },
             },
         },

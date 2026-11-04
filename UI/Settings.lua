@@ -1028,6 +1028,16 @@ PAGES[#PAGES + 1] = { key = "layout", title = "Layout & scale", icon = "Interfac
         if not name then return "na" end
         return ours and "on" or "warn", name
     end, { width = 240, descLines = 1 })
+    p:Status("Screen fit", function()
+        local _, text = lay:ScreenFit()
+        return text
+    end, function()
+        local fits = lay:ScreenFit()
+        if fits == nil then return "na", "Not applied" end
+        return fits and "on" or "warn", fits and "Fits" or "Re-apply"
+    end, { width = 240, descLines = 1,
+           tip = "On a wide screen the corners (chat, minimap, bags) move in to the edges of a 16:9 area in the middle, "
+               .. "so your eyes don't travel far. That depends on the screen size when the layout is applied." })
     local function NoEditMode() if not EditModeAvailable() then return "Needs Edit Mode" end end
     p:Buttons({
         { text = "Open Edit Mode", width = 150, fn = OpenEditMode, avail = NoEditMode,
