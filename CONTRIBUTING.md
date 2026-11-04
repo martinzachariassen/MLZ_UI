@@ -20,7 +20,7 @@ Open an issue with the **Bug report** template and include:
 1. Clone the repo and symlink it into your AddOns folder as `MLZ_UI`:
    ```sh
    git clone https://github.com/martinzachariassen/MLZ_UI.git
-   ln -s "$PWD/MLZ_UI" "/Applications/World of Warcraft/_<flavor>_/Interface/AddOns/MLZ_UI"
+   ln -s "$PWD/MLZ_UI" "/Applications/World of Warcraft/_forever_/Interface/AddOns/MLZ_UI"
    ```
    On Windows: `mklink /D "...\Interface\AddOns\MLZ_UI" "C:\path\to\MLZ_UI"`.
 2. Install BugGrabber + BugSack and turn on `/mlz debug` for verbose output.

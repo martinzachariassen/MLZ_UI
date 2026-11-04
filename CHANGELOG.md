@@ -1,6 +1,9 @@
 # Changelog
 
-## Unreleased
+## 0.9.0
+
+Ready for the WoW Forever launch. Found a problem? Install BugGrabber and BugSack, then
+[open an issue](https://github.com/martinzachariassen/MLZ_UI/issues/new/choose) with the error text.
 
 - The layout fits wide screens. On an ultrawide monitor chat, group frames, minimap, bags, micro menu and
   the meter sit at the edges of a 16:9 area in the middle instead of the far screen edges. On a 16:9
@@ -145,6 +148,9 @@
 - Interrupt announce no longer listens to the combat log while it is off.
 - Right-clicking the minimap button in combat says the quick menu opens after combat.
 - Key names show in caps (SHIFT, CTRL, ALT, TAB).
+- Healer friendly names try the Forever CVar first, so the right setting is turned on.
+- An import skips fine-tune values of the wrong type instead of breaking nameplates or reminders.
+- Importing an older string keeps your keybind tick boxes.
 
 ## 0.8.0
 

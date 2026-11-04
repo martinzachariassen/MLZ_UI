@@ -4,7 +4,7 @@
 
 **A clean, minimal World of Warcraft UI in one guided setup, built for WoW Forever and every class. Every change previewed, every change undoable.**
 
-![Version](https://img.shields.io/badge/version-0.8.0-33a0ff?style=flat-square)
+![Version](https://img.shields.io/badge/version-0.9.0-33a0ff?style=flat-square)
 [![Checks](https://img.shields.io/github/actions/workflow/status/martinzachariassen/MLZ_UI/lint.yml?branch=main&label=checks&style=flat-square)](https://github.com/martinzachariassen/MLZ_UI/actions/workflows/lint.yml)
 [![License](https://img.shields.io/badge/license-MIT-20242b?style=flat-square)](LICENSE)
 ![Client](https://img.shields.io/badge/client-WoW%20Forever-33a0ff?style=flat-square)
@@ -147,8 +147,8 @@ If the guess is wrong, set your role by hand with `/mlz role`, on the Your role 
 
 1. Download the `MLZ_UI` zip from the [latest release](https://github.com/martinzachariassen/MLZ_UI/releases/latest)
    and unzip it into your AddOns folder, so you get `Interface/AddOns/MLZ_UI/MLZ_UI.toc`:
-   - macOS: `/Applications/World of Warcraft/_<flavor>_/Interface/AddOns`
-   - Windows: `C:\Program Files (x86)\World of Warcraft\_<flavor>_\Interface\AddOns`
+   - macOS: `/Applications/World of Warcraft/_forever_/Interface/AddOns`
+   - Windows: `C:\Program Files (x86)\World of Warcraft\_forever_\Interface\AddOns`
 2. Start the game or `/reload`. The setup wizard opens on first login.
 3. Open the control center at any time with `/mlz` or the minimap button.
 
