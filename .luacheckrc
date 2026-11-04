@@ -71,7 +71,7 @@ read_globals = {
     "UnitCanAttack", "UnitCastingInfo", "UnitChannelInfo", "UnitClass", "UnitClassification",
     "UnitEffectiveLevel", "UnitExists", "UnitGroupRolesAssigned", "UnitGUID", "UnitHasEffectivelyTankAura",
     "UnitHealth", "UnitHealthMax", "UnitIsConnected", "UnitIsDeadOrGhost", "UnitIsFriend", "UnitIsGroupAssistant", "UnitIsGroupLeader", "UnitIsPlayer", "UnitIsQuestBoss",
-    "UnitIsTapDenied", "UnitIsUnit", "UnitLevel", "UnitName", "UnitNameplateShowsWidgetsOnly", "UnitOnTaxi",
+    "UnitIsTapDenied", "UnitIsUnit", "UnitIsVisible", "UnitLevel", "UnitName", "UnitNameplateShowsWidgetsOnly", "UnitOnTaxi",
     "UnitPlayerOrPetInParty", "UnitPlayerOrPetInRaid", "UnitPower", "UnitPowerMax", "UnitPowerType",
     "UnitReaction", "UnitThreatSituation", "UnitDetailedThreatSituation", "PlaySound", "SOUNDKIT", "UnitXP", "UnitXPMax", "UseContainerItem",
 

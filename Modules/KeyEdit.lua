@@ -177,13 +177,13 @@ function KeyEdit.Apply(plan)
     for _, k in ipairs(plan.freed) do touched[#touched + 1] = k end
     if not Remember(touched) then return nil, "Could not save a backup, so nothing was changed." end
 
-    for _, k in ipairs(plan.freed) do pcall(SetBinding, k) end
+    -- bind the new key first, so a key the game rejects leaves the action on its old keys
     local ok, result = pcall(SetBinding, plan.key, plan.cmd)
     if not ok or result == false then
         ns.Debug("KeyEdit: could not bind", plan.key, plan.cmd, ok and "" or result)
-        Save()
         return nil, "The game did not accept " .. plan.key .. " for " .. KeyEdit.Name(plan.cmd) .. "."
     end
+    for _, k in ipairs(plan.freed) do pcall(SetBinding, k) end
     Save()
     -- remembered for export (Modules/Profile.lua): false = cleared on purpose. A key that only lost its action
     -- here is not locked: the wizard holds its default back while the action sits on the new key

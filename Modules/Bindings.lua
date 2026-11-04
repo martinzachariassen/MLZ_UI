@@ -125,6 +125,12 @@ function Bindings.MigrateToggles(db)
     end
 end
 
+-- At ADDON_LOADED (the v9 migration) stance, form and pet keys aren't known yet, so their old tick boxes are
+-- converted here once the character is in the world. Only old entries are touched, so running it again is safe.
+ns.On("PLAYER_ENTERING_WORLD", function()
+    if ns.db then Bindings.MigrateToggles(ns.db) end
+end)
+
 -- What the movement keys are bound to right now (for the "Current" column)
 local function CurrentMovement()
     local keys = { GetBindingKey("MOVEFORWARD") }

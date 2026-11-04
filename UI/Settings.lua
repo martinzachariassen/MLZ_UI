@@ -2774,6 +2774,8 @@ function S:RebuildPage(key)
     C_Timer.After(0, function()
         local entry = self.pages and self.pages[key]
         if not (entry and entry.page) then return end
+        -- two refreshes in one frame queue two rebuilds: the second finds a fresh page and stops
+        if entry.page.IsStale and not entry.page.IsStale() then return end
         local scroll = entry.page.scroll
         local offset = scroll:GetVerticalScroll()
         scroll:Hide()

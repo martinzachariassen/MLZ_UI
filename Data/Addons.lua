@@ -136,8 +136,8 @@ local function DetailsPlace(id, label, desc, want)
             local d = DetailsReady()
             local w = d and d:GetInstance(id)
             local normal = w and w.posicao and w.posicao.normal
-            if not (normal and w.libwindow) then return nil end
-            local lw = w.libwindow
+            if not normal then return nil end
+            local lw = w.libwindow or {}
             if lw.x then
                 return { point = lw.point, relPoint = lw.point, x = lw.x, y = lw.y, w = normal.w, h = normal.h }
             end

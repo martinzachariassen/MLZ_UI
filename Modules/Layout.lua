@@ -655,7 +655,8 @@ function Layout:Restore(snap)
         table.remove(raw.layouts, idx)
     end
     -- Layouts were removed above, so the old index may point at a different layout now: look it up by name
-    local index = (snap.activeName and self:IndexOf(snap.activeName, raw)) or snap.activeLayout
+    local index = snap.activeLayout
+    if snap.activeName then index = self:IndexOf(snap.activeName, raw) or 1 end
     local n = NumPresets(Presets())
     if index > n + #raw.layouts then index = 1 end
     raw.activeLayout = index

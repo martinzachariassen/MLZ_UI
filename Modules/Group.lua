@@ -81,7 +81,11 @@ local function Check(onlyMine)
             local _, class = UnitClass(unit)
             if class then
                 classesHere[class] = true
-                members[#members + 1] = { unit = unit, class = class, name = UnitName(unit), buffs = UnitBuffNames(unit) }
+                -- far away (another zone or out of sight): the client doesn't know their buffs, so they are never
+                -- called missing, but their class still counts as here
+                local seen = not UnitIsVisible or UnitIsVisible(unit)
+                members[#members + 1] = { unit = unit, class = class, name = UnitName(unit),
+                    buffs = seen and UnitBuffNames(unit) or nil }
             end
         end
     end
@@ -95,7 +99,7 @@ local function Check(onlyMine)
             for _, id in ipairs(b.also or {}) do local n = SpellName(id) if n then names[n] = true end end
             local missing = {}
             for _, m in ipairs(members) do
-                if not (b.skip and b.skip[m.class]) then
+                if m.buffs and not (b.skip and b.skip[m.class]) then
                     local has = false
                     for n in pairs(names) do if m.buffs[n] then has = true break end end
                     if not has then missing[#missing + 1] = m.name end

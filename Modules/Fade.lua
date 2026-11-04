@@ -15,21 +15,22 @@ local MODE_TEXT = { -- also used by the control center (UI/Settings.lua)
 }
 Fade.MODE_TEXT = MODE_TEXT
 
--- Frame lists are cached per row. A row with no frames yet (made later by the client or an addon)
+-- Frame lists are cached per row. A row that misses frames (made later by the client or an addon)
 -- is looked up again at most every 5 seconds.
 local cache, missedAt = {}, {}
 local GetTime = GetTime
 
 local function Frames(row)
     local list = cache[row.id]
-    if list and (#list > 0 or GetTime() - (missedAt[row.id] or 0) < 5) then return list end
+    if list and (#list == #row.frames or GetTime() - (missedAt[row.id] or 0) < 5) then return list end
     list = {}
     for _, name in ipairs(row.frames) do
         local f = _G[name]
         if f and f.SetAlpha then list[#list + 1] = f end
     end
     cache[row.id] = list
-    if #list == 0 then missedAt[row.id] = GetTime() end
+    -- some frames are still missing (load on demand): look again later
+    if #list < #row.frames then missedAt[row.id] = GetTime() end
     return list
 end
 
@@ -186,6 +187,16 @@ local function ChatWindowAlphas()
     return t
 end
 
+-- The chat window alphas and fade times from before clean chat was turned on: the newest backup that
+-- has them and was taken while clean chat was off (a later one holds the clean chat values)
+local function SavedChat()
+    local list = ns.db.backups or {}
+    for i = #list, 1, -1 do
+        local snap = list[i].data and list[i].data.fade
+        if snap and snap.chatAlpha and not snap.chatTweaks then return snap.chatAlpha, snap.chatTime end
+    end
+end
+
 ------------------------------------------------------------------------
 -- Module interface
 ------------------------------------------------------------------------
@@ -236,7 +247,7 @@ function Fade:Apply(items)
         if item.id == "__chat" then
             local wasOn = ns.db.chatTweaks
             ns.db.chatTweaks = item.enabled and true or false
-            if ns.db.chatTweaks then self:ApplyChat() elseif wasOn then self:ResetChat() end
+            if ns.db.chatTweaks then self:ApplyChat() elseif wasOn then self:ResetChat(SavedChat()) end
         else
             ns.db.fade[item.id] = item.enabled or nil
         end
@@ -288,7 +299,7 @@ end
 function Fade:SetChat(on)
     local was = ns.db.chatTweaks
     ns.db.chatTweaks = on and true or false
-    if on then self:ApplyChat() elseif was then self:ResetChat() end
+    if on then self:ApplyChat() elseif was then self:ResetChat(SavedChat()) end
     ns.FireState()
 end
 
@@ -304,15 +315,6 @@ end
 function Fade.Chat(key) return ns.Tune("chat." .. key, ns.data.chat[key]) end
 
 -- Applies a changed chat setting at once: back to the saved look, then the clean chat again
--- The chat window alphas and fade times from before clean chat was turned on (newest backup that has them)
-local function SavedChat()
-    local list = ns.db.backups or {}
-    for i = #list, 1, -1 do
-        local snap = list[i].data and list[i].data.fade
-        if snap and snap.chatAlpha then return snap.chatAlpha, snap.chatTime end
-    end
-end
-
 function Fade:RefreshChat()
     if not ns.db.chatTweaks then return end
     self:ResetChat(SavedChat())

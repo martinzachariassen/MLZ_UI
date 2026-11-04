@@ -137,6 +137,8 @@ local function FrameGet(name)
     local point, rel, relPoint, x, y = f:GetPoint(1)
     local s = f:GetScale() or 1
     local relName = rel and rel.GetName and rel:GetName() or nil
+    -- offsets from a frame without a name can't be put back (restore would anchor them to UIParent)
+    if rel and rel ~= UIParent and not relName then return nil end
     return { point = point, relPoint = relPoint, relTo = relName ~= "UIParent" and relName or nil,
              x = (x or 0) * s, y = (y or 0) * s }
 end
@@ -356,6 +358,9 @@ function Addons:Backup(items)
                 if parent then
                     local current = parent[key]
                     parts[i] = { has = current ~= nil, value = type(current) == "table" and ns.CopyTable(current) or current }
+                else
+                    -- the path doesn't exist yet: Apply creates it, so undo has to clear the value again
+                    parts[i] = { has = false }
                 end
             end
             snap[item.id] = { parts = parts }

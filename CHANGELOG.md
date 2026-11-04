@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+- Undo in Other addons also removes settings that didn't exist before (for example a new Details! window).
+- Details! windows that were never moved can be placed and moved back by undo.
+- Turning off Clean chat puts back your own chat background and fade time, not the game defaults.
+- Changing a key on the key map: if the game rejects the new key, the action keeps its old key.
+- Undoing a layout no longer picks a different layout when the old one was renamed or deleted.
+- Old keybind tick boxes for stance, form and pet keys are converted after login too, so keys you turned
+  off stay off.
+- The XP rate counts the full gain when a big quest reward levels you up.
+- The ready check buff report no longer lists far-away raid members as missing a buff.
+- An imported setup can't change `ESCAPE` or the left and right mouse buttons.
+- The nameplates page is no longer built twice when you change the engine.
+- Fading also picks up frames that appear later when the row already found some of its frames.
+
 ## 0.9.0
 
 Ready for the WoW Forever launch. Found a problem? Install BugGrabber and BugSack, then

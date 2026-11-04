@@ -85,12 +85,18 @@ local function SetExtras(t)
     end
 end
 
+-- Keys an imported setup may never change: Escape and the two main mouse buttons (also with ALT, CTRL, SHIFT)
+local PROTECTED_KEYS = { ESCAPE = true, BUTTON1 = true, BUTTON2 = true }
+local function Protected(key)
+    return PROTECTED_KEYS[(key:gsub("^%u+%-", ""):gsub("^%u+%-", ""):gsub("^%u+%-", ""))] or false
+end
+
 -- Keys changed on the key map (Modules/KeyEdit.lua): key -> command, or false when cleared on purpose
 local function KeyEditsMap(t)
     if type(t) ~= "table" then return nil end
     local out = {}
     for k, v in pairs(t) do
-        if type(k) == "string" and #k <= 40 and k:match("^[%w%p]+$")
+        if type(k) == "string" and #k <= 40 and k:match("^[%w%p]+$") and not Protected(k)
             and (v == false or (type(v) == "string" and #v <= 60 and v:match("^[%u%d_]+$"))) then
             out[k] = v
         end

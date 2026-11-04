@@ -10,7 +10,7 @@ ns.XPRate = X
 
 local MIN_SECONDS = 120 -- below this the rate jumps around too much to be useful
 
-local startTime, gained, lastXP, lastMax
+local startTime, gained, lastXP, lastMax, lastLevel
 
 local function AtMaxLevel()
     if IsPlayerAtEffectiveMaxLevel then return IsPlayerAtEffectiveMaxLevel() end
@@ -27,7 +27,7 @@ function X.Leveling() return not Disabled() end
 
 local function Reset()
     startTime, gained = GetTime(), 0
-    lastXP, lastMax = UnitXP("player"), UnitXPMax("player")
+    lastXP, lastMax, lastLevel = UnitXP("player"), UnitXPMax("player"), UnitLevel("player")
 end
 
 ns.On("PLAYER_ENTERING_WORLD", function()
@@ -37,12 +37,13 @@ end)
 ns.On("PLAYER_XP_UPDATE", function(_, unit)
     if unit and unit ~= "player" then return end
     if not startTime then Reset() return end
-    local xp, max = UnitXP("player"), UnitXPMax("player")
+    local xp, max, level = UnitXP("player"), UnitXPMax("player"), UnitLevel("player")
     local delta = xp - lastXP
     -- a level up wraps the bar: the rest of the old level plus what is on the new one
-    if delta < 0 then delta = (lastMax - lastXP) + xp end
+    -- (the level check also catches a big gain that ends higher on the new bar than before)
+    if delta < 0 or (level and lastLevel and level > lastLevel) then delta = (lastMax - lastXP) + xp end
     gained = gained + math.max(0, delta)
-    lastXP, lastMax = xp, max
+    lastXP, lastMax, lastLevel = xp, max, level
     ns.FireState()
 end)
 

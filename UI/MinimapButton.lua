@@ -203,7 +203,7 @@ local function BuildMenu()
         tw:Set("fps", not tw:IsOn("fps"))
     end, function() return ns.modules.tweaks:IsOn("fps") end)
     Divider()
-    Item("Open settings", function() ns.Settings:Open() end, nil, nil, true)
+    Item("Open settings", function() if ns.Settings then ns.Settings:Open() end end, nil, nil, true)
     Item("Setup wizard", function() if ns.Installer then ns.Installer:Open() end end, nil, nil, true)
     Item("My keybinds", function() if ns.Keys then ns.Keys.Open() end end, nil, nil, true)
     Item("Show me around", function() if ns.Tour then ns.Tour.Start() end end, nil,
