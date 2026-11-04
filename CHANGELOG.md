@@ -95,6 +95,15 @@
   Justice)". Neither is an interrupt.
 - Reagent reminders: Symbol of Kings is checked for every Greater Blessing, not only Might.
 
+- Change single keys on the key map: `/mlz keys`, then "Change keys" (also on the Your role page). Click a
+  key, pick what it does from a list with search, and see what loses its key before anything changes. One
+  `/mlz undo` puts back every key you changed since you opened the map. Not in combat.
+- Pet spell keys for hunters and warlocks: pet bar buttons 4-6 (Spell Lock, Seduction, Growl and so on)
+  get V, SHIFT-V and CTRL-V with ESDF, or G, V and SHIFT-V with WASD.
+- Keybinds step: a key you unticked stays unticked when you switch between ESDF and WASD. Unticking a moved
+  action says that it has no key afterwards. Arrow key movement shows as "custom (arrows)".
+- The mouse wheel keys are labeled "Bar 4 (mouse wheel)".
+
 **Fixes**
 - Reagent reminders: Prayer of Fortitude rank 1 checks Holy Candles and Gift of the Wild rank 1 checks Wild
   Berries. With rank 2 learned you are only reminded about Sacred Candles or Wild Thornroot.

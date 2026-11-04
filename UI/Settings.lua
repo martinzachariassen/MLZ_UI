@@ -1237,6 +1237,23 @@ PAGES[#PAGES + 1] = { key = "healer", title = "Your role", icon = "Interface\\Ic
         if c and c.pet then parts[#parts + 1] = "pet keys" end
         return table.concat(parts, ", ")
     end, { width = 260 })
+    p:Buttons({
+        { text = "Change keys", width = 130, keywords = "keybind hotkey key binding bind map",
+          avail = function() return not ns.Keys and "The key map is not loaded" or nil end,
+          tip = "Opens the key map (/mlz keys). Click a key, pick what it does, and see what loses its key before "
+              .. "anything changes. /mlz undo puts your keys back.",
+          fn = function()
+              if InCombatLockdown() then
+                  S:Notify("Keys can't change in combat. Try again after combat.", "warn")
+                  return
+              end
+              ns.Keys.Open(true)
+          end },
+        { text = "Show my keys", width = 130, style = "subtle", keywords = "keybind hotkey key map",
+          avail = function() return not ns.Keys and "The key map is not loaded" or nil end,
+          tip = "A map of your keyboard with what every key does, layer by layer (none, SHIFT, CTRL, ALT).",
+          fn = function() ns.Keys.Open() end },
+    })
 
     p:Card("Role layouts", "One layout for healing in dungeons, one for raids, and one without melee swing timers for casters and hunters. They switch only while an MLZ UI layout is active, and never in combat.")
     p:Status("Counts as healer", "Yes when your role above is Healer. Healers get the group frames in the middle.", function()
@@ -1855,7 +1872,7 @@ PAGES[#PAGES + 1] = { key = "about", title = "About & help", icon = "Interface\\
     p:Text(C.white .. "/mlz" .. C.r .. "   opens or closes this window\n"
         .. C.white .. "/mlz search" .. C.r .. "   finds a setting, for example /mlz search minimap\n"
         .. C.white .. "/mlz install" .. C.r .. "   opens the setup wizard\n"
-        .. C.white .. "/mlz undo" .. C.r .. "   undoes the last wizard run, import or ready-made setup\n"
+        .. C.white .. "/mlz undo" .. C.r .. "   undoes the last wizard run, import, ready-made setup, reset or key change\n"
         .. C.white .. "/mlz role" .. C.r .. "   shows your role, or sets it: tank, healer, dps, auto\n"
         .. C.white .. "/mlz np" .. C.r .. "   nameplate mode and options\n"
         .. C.white .. "/mlz keys" .. C.r .. "   a map of your keybinds\n"

@@ -8,12 +8,15 @@ local Backup = {}
 ns.Backup = Backup
 
 local MAX_BACKUPS = 5
+-- Backups that only cover a part of the setup: undoing the last one doesn't mean setup never ran
+local PARTIAL_KINDS = { import = true, preset = true, keys = true, reset = true }
 
 -- Order the wizard applies modules in (UI/Installer.lua); undo goes the other way
 Backup.APPLY_ORDER = { "role", "scale", "settings", "layout", "bindings", "fade", "actionbuttons", "tweaks", "addons", "nameplates" }
 
 -- selections = { { mod = <module>, items = {...} }, ... }
--- kind = "import" for profile imports, "preset" for ready-made setups.
+-- kind = "import" for profile imports, "preset" for ready-made setups, "keys" for keys changed on the
+-- key map, "reset" for a page put back to defaults.
 -- Returns the entry, or nil plus the title of the module that failed (the caller tells the player).
 function Backup:Create(selections, kind)
     local entry = { time = date("%Y-%m-%d %H:%M:%S"), data = {}, kind = kind }
@@ -82,7 +85,7 @@ function Backup:Undo(quiet)
             return
         end
         -- Undoing an import only gives back your old choices; the setup itself is still in place
-        if #list == 0 and entry.kind ~= "import" and entry.kind ~= "preset" then ns.db.installed = false end
+        if #list == 0 and not PARTIAL_KINDS[entry.kind or ""] then ns.db.installed = false end
         -- Modules that can't restore live (some addon settings) have called ns.MarkReload themselves
         Say("Undone: back to how things were on " .. entry.time .. "."
             .. (ns.needsReload and " Reload to finish." or ""))
@@ -92,7 +95,7 @@ function Backup:Undo(quiet)
     return ran
 end
 
-ns.AddCommand("undo", "undoes the last wizard run, import or ready-made setup", function() Backup:Undo() end)
+ns.AddCommand("undo", "undoes the last wizard run, import, ready-made setup, reset or key change", function() Backup:Undo() end)
 ns.AddCommand("backups", "lists saved backups", function()
     local list = ns.db.backups or {}
     if #list == 0 then ns.Print("No backups.") return end

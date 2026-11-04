@@ -103,17 +103,25 @@ B.extra = {
 
 -- Which classes have a stance/form/aura bar or a pet bar: see `stance` (extra keys) and `pet` in Data/Classes.lua.
 
--- Pet keys for pet classes (BONUSACTIONBUTTON1-10 = the pet bar: 1 Attack, 2 Follow, 3 Stay)
+-- Pet keys for pet classes (BONUSACTIONBUTTON1-10 = the pet bar: 1 Attack, 2 Follow, 3 Stay,
+-- 4-7 the pet's own spells such as Spell Lock, Seduction, Growl or Dash). Pet classes have no stance
+-- keys, so the keys bar 5 uses for stances (V, G) are free for them.
 B.pet = {
     ESDF = {
         { key = "5",       command = "BONUSACTIONBUTTON1", role = "Pet attack" },
         { key = "SHIFT-5", command = "BONUSACTIONBUTTON2", role = "Pet follow" },
         { key = "CTRL-5",  command = "BONUSACTIONBUTTON3", role = "Pet stay" },
+        { key = "V",       command = "BONUSACTIONBUTTON4", role = "Pet spell 1 (pet bar 4)" },
+        { key = "SHIFT-V", command = "BONUSACTIONBUTTON5", role = "Pet spell 2 (pet bar 5)" },
+        { key = "CTRL-V",  command = "BONUSACTIONBUTTON6", role = "Pet spell 3 (pet bar 6)" },
     },
     WASD = {
         { key = "T",       command = "BONUSACTIONBUTTON1", role = "Pet attack" },
         { key = "CTRL-T",  command = "BONUSACTIONBUTTON2", role = "Pet follow" },
         { key = "CTRL-G",  command = "BONUSACTIONBUTTON3", role = "Pet stay" },
+        { key = "G",       command = "BONUSACTIONBUTTON4", role = "Pet spell 1 (pet bar 4)" },
+        { key = "V",       command = "BONUSACTIONBUTTON5", role = "Pet spell 2 (pet bar 5)" },
+        { key = "SHIFT-V", command = "BONUSACTIONBUTTON6", role = "Pet spell 3 (pet bar 6)" },
     },
 }
 

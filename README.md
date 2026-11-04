@@ -132,7 +132,8 @@ If the guess is wrong, set your role by hand with `/mlz role`, on the Your role 
 
 **Understanding your UI**
 - A short tour after setup that points at each hidden frame and says how to bring it back
-- A keyboard map of every keybind (`/mlz keys`), with action icons and free keys
+- A keyboard map of every keybind (`/mlz keys`), with action icons and free keys. "Change keys" lets you give
+  one key a new action and shows what loses its key first
 - One tip at a time on the overview, based on what you have turned on
 
 **Ecosystem**
@@ -174,7 +175,7 @@ If you use "Download ZIP" on GitHub, rename the unzipped `MLZ_UI-main` folder to
 | `/mlz np auto\|tank\|healer\|dps\|solo` | Nameplate mode (also `engine mlz\|platynator\|off`, `style`, `threat`, `pvp`, `save`, `load`, `export`) |
 | `/mlz export` · `/mlz import` | Share your choices as a string (wizard choices, fading, helpers, reminders, role and situation profiles) |
 | `/mlz preset [name]` | Load a ready-made setup: `minimal`, `balanced` or `informative` (no name lists them) |
-| `/mlz keys` | A keyboard map of your keybinds, with the SHIFT, CTRL and ALT layers |
+| `/mlz keys` | A keyboard map of your keybinds, with the SHIFT, CTRL and ALT layers. Change single keys here |
 | `/mlz tour` | Show where the hidden bars and buttons are |
 | `/mlz scale [auto\|0.64\|...]` | Recalculate and reapply the UI scale |
 | `/mlz map [percent]` | Minimap size, for example `/mlz map 120` |

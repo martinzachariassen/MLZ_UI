@@ -72,7 +72,7 @@ end
 ------------------------------------------------------------------------
 local function CheckMigration()
     -- Run the migrations on a database from before v3 and check the result
-    local old = { dbVersion = 1, healForce = "on", installed = true, toggles = {} }
+    local old = { dbVersion = 1, healForce = "on", installed = true, toggles = { ["bindings:S"] = false } }
     MLZUIDB = old -- luacheck: ignore 111
     Step("migrate ADDON_LOADED", stub.Fire, "ADDON_LOADED", ADDON)
     local db = MLZUIDB
@@ -82,6 +82,9 @@ local function CheckMigration()
         Fail("migration", "healForce = on did not become roleForce = HEALER")
     end
     if not db.wizardSeen then Fail("migration", "wizardSeen was not set for an installed database") end
+    if db.toggles["bindings:S"] ~= nil or db.toggles["bindings:STRAFELEFT"] ~= false then
+        Fail("migration", "the unticked S key did not become an unticked STRAFELEFT")
+    end
     for _, line in ipairs(stub.chat) do
         if line:find("Migration to v", 1, true) then Fail("migration", line) end
     end
@@ -360,6 +363,67 @@ local function CheckPlacement()
     if not ok then Fail("placement", err) end
 end
 
+-- Keybinds: no class gets the same key twice, tick boxes follow the action across ESDF and WASD, and a key
+-- changed on the key map (/mlz keys) is put back by undo
+local function CheckKeybinds()
+    local B, KE = ns.modules.bindings, ns.KeyEdit
+    if not (B and KE) then return Fail("keybinds", "the bindings module or ns.KeyEdit is missing") end
+    local savedClass, savedDebug, savedForms = _G.UnitClass, ns.Debug, _G.GetNumShapeshiftForms
+    local ok, err = pcall(function()
+        local dupes = {}
+        ns.Debug = function(first, ...)
+            if first == "Keybinds:" then dupes[#dupes + 1] = table.concat({ ... }, " ") end
+        end
+        _G.GetNumShapeshiftForms = function() return 5 end -- priests get their Shadowform key too
+        for class in pairs(ns.data.classes) do
+            _G.UnitClass = function() return class, class, 1 end
+            for _, movement in ipairs({ "ESDF", "WASD" }) do
+                dupes = {}
+                B:Desired(movement)
+                for _, d in ipairs(dupes) do Fail("keybinds " .. class .. " " .. movement, d) end
+            end
+        end
+    end)
+    _G.UnitClass, ns.Debug, _G.GetNumShapeshiftForms = savedClass, savedDebug, savedForms
+    if not ok then return Fail("keybinds", err) end
+
+    -- an unticked bar button stays unticked when the movement setup changes
+    ns.SetEnabled("bindings", "ACTIONBUTTON2", false)
+    for _, movement in ipairs({ "ESDF", "WASD" }) do
+        B.pendingMovement = movement
+        for _, item in ipairs(B:Preview()) do
+            if item.id == "ACTIONBUTTON2" and item.enabled then
+                Fail("keybinds", "bar 1 button 2 is ticked again with " .. movement)
+            end
+        end
+    end
+    B.pendingMovement = nil
+    ns.SetEnabled("bindings", "ACTIONBUTTON2", true)
+
+    -- two changes on the key map take one backup, and undo puts both keys back
+    local before, backups = Copy(stub.bindings), #(ns.db.backups or {})
+    local pk = ns.Keys and ns.Keys.Pick and ns.Keys.Pick("V")
+    if not pk then return Fail("key map", "the picker did not open for V") end
+    pk.cmd = "ACTIONBUTTON2"
+    pk:Refresh()
+    local plan = pk:Plan()
+    if not (plan and plan.key == "V" and plan.cmd == "ACTIONBUTTON2") then return Fail("key map", "no plan for V") end
+    local applied, why = KE.Apply(plan)
+    if not applied then return Fail("key map", why) end
+    if GetBindingAction("V") ~= "ACTIONBUTTON2" then Fail("key map", "V is not bar 1 button 2") end
+    for _, k in ipairs(plan.freed) do
+        if GetBindingAction(k) ~= "" then Fail("key map", k .. " was not freed") end
+    end
+    if not KE.Apply(KE.Plan("N", "JUMP")) then Fail("key map", "N could not be set to jump") end
+    if #ns.db.backups ~= math.min(backups + 1, 5) then Fail("key map", "two changes took more than one backup") end
+    if not (ns.db.keyEdits and ns.db.keyEdits.V == "ACTIONBUTTON2") then Fail("key map", "the change was not remembered") end
+    Step("key map undo", ns.Backup.Undo, ns.Backup, true)
+    for _, d in ipairs(Diff(before, stub.bindings, "")) do Fail("key map undo", d) end
+    if ns.db.keyEdits and next(ns.db.keyEdits) then Fail("key map undo", "the remembered changes were kept") end
+    _G.MLZUI_Keys:Hide()
+    _G.MLZUI_Keys:GetScript("OnHide")(_G.MLZUI_Keys)
+end
+
 -- Applies the wizard with its suggested rows, then undoes it: CVars and bindings must be back as before
 local function CheckApplyUndo()
     local I = ns.Installer
@@ -536,6 +600,7 @@ local presets = CheckPresets() or 0
 local plates = CheckPlates() or 0
 CheckThreatMeter()
 CheckPlacement()
+CheckKeybinds()
 CheckMigration()
 
 if verbose then

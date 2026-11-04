@@ -71,16 +71,46 @@ function Bindings:Desired(movement)
         end
     end
     for _, b in ipairs(D.mouse) do
-        list[#list + 1] = { key = b.key, command = b.command, group = "Bar 4 (mouseover)" }
+        list[#list + 1] = { key = b.key, command = b.command, group = "Bar 4 (mouse wheel)" }
     end
-    return list
+    -- The tables in Data/Bindings.lua are edited by hand: a key that two rows want goes to the first
+    local seen, out = {}, {}
+    for _, d in ipairs(list) do
+        if seen[d.key] then
+            ns.Debug("Keybinds:", d.key, "is wanted by", seen[d.key], "and", d.command, "- kept", seen[d.key])
+        else
+            seen[d.key] = d.command
+            out[#out + 1] = d
+        end
+    end
+    return out
+end
+
+-- Tick boxes used to be saved per key (S), so they followed the key when ESDF changed to WASD.
+-- Now they are saved per action (STRAFELEFT). Called by the v9 migration in Core.lua.
+function Bindings.MigrateToggles(db)
+    local toggles = db.toggles
+    if type(toggles) ~= "table" then return end
+    for _, d in ipairs(Bindings:Desired(db.movement)) do
+        local old = "bindings:" .. d.key
+        if toggles[old] ~= nil then
+            if toggles["bindings:" .. d.command] == nil then toggles["bindings:" .. d.command] = toggles[old] end
+            toggles[old] = nil
+        end
+    end
 end
 
 -- What the movement keys are bound to right now (for the "Current" column)
 local function CurrentMovement()
-    for _, k in ipairs({ GetBindingKey("MOVEFORWARD") }) do
+    local keys = { GetBindingKey("MOVEFORWARD") }
+    for _, k in ipairs(keys) do
         if k == "E" then return "ESDF" end
+    end
+    for _, k in ipairs(keys) do
         if k == "W" then return "WASD" end
+    end
+    for _, k in ipairs(keys) do
+        if k == "UP" then return "custom (arrows)" end
     end
     return "custom"
 end
@@ -96,7 +126,7 @@ function Bindings:Preview()
     local current = CurrentMovement()
     -- Before the first setup, keep the movement keys the player already uses. ESDF is one click away.
     local movement = self.pendingMovement
-        or (not ns.db.installed and current ~= "custom" and current)
+        or (not ns.db.installed and D.movement[current] and current)
         or ns.db.movement or "ESDF"
     local desired = self:Desired(movement)
 
@@ -126,10 +156,11 @@ function Bindings:Preview()
     for _, d in ipairs(desired) do
         local current = CurrentAction(d.key)
         local item = {
-            id = d.key, key = d.key, command = d.command, group = d.group,
+            -- saved per action, so an unticked row stays unticked when ESDF changes to WASD
+            id = d.command, key = d.key, command = d.command, group = d.group,
             label = d.key .. (d.role and ("  " .. ns.Paint("grey", d.role)) or ""),
             old = Pretty(current), new = Pretty(d.command),
-            enabled = ns.Enabled("bindings", d.key, true),
+            enabled = ns.Enabled("bindings", d.command, true),
             alreadySet = current == d.command,
             conflict = current ~= "" and current ~= d.command,
         }
@@ -152,14 +183,15 @@ function Bindings:Preview()
                     items[#items + 1] = {
                         id = newKey, key = newKey, command = current, group = "Moved actions",
                         label = newKey, old = "", new = Pretty(current) .. "  " .. ns.Paint("grey", "(was " .. d.key .. ")"),
-                        enabled = ns.Enabled("bindings", newKey, true), displaced = true, requires = d.key,
-                        note = "Only moved if " .. d.key .. " is changed above.",
+                        enabled = ns.Enabled("bindings", newKey, true), displaced = true, requires = d.command,
+                        note = "Only moved if " .. d.key .. " is changed above. Untick this and " .. Pretty(current)
+                            .. " has no key afterwards.",
                     }
                 else
                     items[#items + 1] = {
                         id = "lost:" .. d.key, group = "Moved actions",
                         label = d.key, old = Pretty(current), new = "loses its key (" .. newKey .. " is taken)",
-                        enabled = false, unavailable = true, attention = true, requires = d.key,
+                        enabled = false, unavailable = true, attention = true, requires = d.command,
                         note = newKey .. " is taken. Set a new key for this in Blizzard's keybinding menu if you need it.",
                     }
                 end
@@ -176,7 +208,7 @@ function Bindings:Preview()
                     items[#items + 1] = {
                         id = "unbind:" .. k, key = k, unbind = true, group = "Extra keys to remove",
                         label = k, old = Pretty(d.command), new = "none",
-                        enabled = ns.Enabled("bindings", "unbind:" .. k, true), requires = d.key,
+                        enabled = ns.Enabled("bindings", "unbind:" .. k, true), requires = d.command,
                         note = "The button already has " .. d.key .. ". With two keys Blizzard only shows the first, so " ..
                                d.key .. " would not be visible on the button.",
                     }
@@ -218,7 +250,8 @@ local function BindingItems(items)
 end
 
 function Bindings:Backup(items)
-    local snap = { set = GetCurrentBindingSet and GetCurrentBindingSet() or nil, keys = {}, movement = ns.db.movement }
+    local snap = { set = GetCurrentBindingSet and GetCurrentBindingSet() or nil, keys = {}, movement = ns.db.movement,
+        keyEdits = ns.CopyTable(ns.db.keyEdits or {}) }
     for _, item in ipairs(BindingItems(items)) do
         snap.keys[item.key] = CurrentAction(item.key)
     end
@@ -266,4 +299,5 @@ function Bindings:Restore(snap)
     end
     pcall(Save, snap.set)
     if snap.movement then ns.db.movement = snap.movement end
+    if snap.keyEdits then ns.db.keyEdits = next(snap.keyEdits) and ns.CopyTable(snap.keyEdits) or nil end
 end

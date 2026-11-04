@@ -35,6 +35,7 @@ Modules\Role.lua
 Modules\Scale.lua
 Modules\Settings.lua
 Modules\Bindings.lua
+Modules\KeyEdit.lua
 Modules\Layout.lua
 Modules\Healer.lua
 Modules\Fade.lua

@@ -9,7 +9,7 @@ ns.version = "0.8.0"
 ns.modules = {}       -- registered modules, in load order (see MLZ_UI.toc), also indexed by key
 ns.data = {}          -- data tables (Data/*.lua)
 
-local DB_VERSION = 8
+local DB_VERSION = 9
 
 ------------------------------------------------------------------------
 -- Output
@@ -575,6 +575,15 @@ local migrations = {
     [8] = function(db)
         local np = db.nameplates
         if type(np) == "table" and np.threat ~= nil and type(np.threat) ~= "boolean" then np.threat = nil end
+    end,
+    -- v9: keybind tick boxes are saved per action instead of per key (Modules/Bindings.lua). New optional
+    -- keys: keyEdits (keys changed on the key map, Modules/KeyEdit.lua) and tune (fine-tuned numbers, ns.Tune).
+    [9] = function(db)
+        local b = ns.modules and ns.modules.bindings
+        if b and b.MigrateToggles then b.MigrateToggles(db) end
+        for _, key in ipairs({ "keyEdits", "tune" }) do
+            if db[key] ~= nil and type(db[key]) ~= "table" then db[key] = nil end
+        end
     end,
 }
 
