@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- The layout fits wide screens. On an ultrawide monitor chat, group frames, minimap, bags, micro menu and
+  the meter sit at the edges of a 16:9 area in the middle instead of the far screen edges. On a 16:9
+  screen nothing changes. A saved pet position is kept as it is.
+- The pet bar (hunter, warlock) is always shown, right above bar 3. The stance bar uses the same spot.
+  The cast bar moved up to make room.
+- Bars 4-5 on the right sit a little higher, so they stay clear of the threat meter on shorter screens.
+- Layout & scale shows "Screen fit": whether the layout was made for this screen, or needs to be applied
+  again after you changed monitor or resolution.
+- Other addons: window placement for Details! (meter and TinyThreat at the bottom right), RestedXP (guide,
+  target and quest item windows), the TomTom arrow and Bagnon bags and bank. Undo moves them back.
+
 - Combat text settings work on WoW Forever. The client renamed those CVars (`_v2`), so the rows showed as
   not available.
 - Healers see friendly nameplates again on Forever, which uses `nameplateShowFriendlyPlayers`.
