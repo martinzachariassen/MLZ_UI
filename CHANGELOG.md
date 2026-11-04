@@ -28,6 +28,20 @@
 - MLZ nameplates look sharper: thicker bars in Roboto, a cast bar with the spell icon, time left and who
   the spell is aimed at, a red "Interrupted" when a cast is kicked, and a light edge on the mob under
   your mouse.
+- MLZ nameplates have a new, modern look. The name sits on the left above the bar, the level and an elite
+  mark on the right. Missing health shows in a dark shade of the bar color, and health you just lost shows
+  as a light chip that slides away in 0.4 seconds. Your target gets small arrows on both sides and a white
+  edge instead of the blue strip.
+- Elite and rare marks: a gold diamond for elite, a silver one for rare, silver with a gold edge for rare
+  elite and a red skull for world bosses.
+- Interrupt ready: the cast bar is blue when your interrupt is ready before the cast ends, slate when it is
+  on cooldown and grey when the cast can't be interrupted. Warrior, rogue, priest, shaman and mage use
+  their own spell, a warlock's Spell Lock is read from the felhunter.
+- Refresh timing: your debuff timers turn amber at 3 seconds left and red at 1, so a DoT never drops off.
+  Casters and hunters see their debuffs on every mob in DPS and Solo mode, so several mobs stay dotted.
+- Pet holds it: a paw next to the level while a mob attacks your pet. When it turns to you, the paw goes
+  and the bar turns red.
+- The cast bar has a thin spark at the edge of the fill. Bigger debuff icons.
 - Threat colors on the nameplates are now on by default, also for healers and solo. As DPS, healer or
   solo the bar turns amber at 80% of what pulls aggro and red once the mob is on you. Your threat % shows
   inside the bar, and in a group a warning sound plays once per mob near 90%. If you turned threat colors

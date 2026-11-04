@@ -120,7 +120,7 @@ If the guess is wrong, set your role by hand with `/mlz role`, on the Your role 
 - Action buttons colored by range, mana and usability, with short hotkey labels
 - Role detection (talents, spec, form, group or your choice; DPS until your talents decide) that drives the layouts and nameplates, with melee, ranged and caster DPS told apart
 - Class-aware key hints, extra form keys, pet keys, and reminders for all 9 classes
-- Our own flat nameplates: health, cast bar with spell icon and target, quest marker, your debuffs, crowd control from anyone, execute range, and threat colors and threat % per role. Platynator is optional
+- Our own modern nameplates: name left and level right above a soft bar, a light chip where health was just lost, arrows on your target, elite and rare marks, a cast bar with spell icon and target that turns slate when your interrupt is on cooldown, your debuffs with refresh timing (on every mob for casters and hunters), a paw when your pet holds the mob, quest marker, crowd control from anyone, execute range, and threat colors and threat % per role. Platynator is optional
 - Auto-repair, sell greys, a mana tick bar and an interrupt announce
 - Fewer clicks (all off until you turn them on): accept and turn in quests, accept summons and resurrections, confirm bind on pickup loot when solo, decline duels
 - Group and raid: a buff check on ready check (only in your own chat) and a pull timer on `/mlz pull` or a key

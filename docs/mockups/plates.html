@@ -1,0 +1,215 @@
+<!doctype html>
+<!-- Mockup of the MLZ nameplates (Modules/Plates.lua), today and the modern look. Render: see CLAUDE.md > Screenshots -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>MLZ UI - MLZ nameplates</title>
+<link rel="stylesheet" href="theme.css">
+<style>
+    html, body { width: 1200px; height: 960px; margin: 0; }
+    body { font-family: "Roboto MLZ", sans-serif; color: var(--text); }
+    .stage {
+        display: block; width: 1200px; height: 960px; box-sizing: border-box; padding: 28px 34px;
+        /* a dusky world behind the plates, so the bars read the way they do in game */
+        background:
+            radial-gradient(ellipse 60% 50% at 20% 85%, rgba(70, 90, 50, 0.55), transparent 70%),
+            radial-gradient(ellipse 50% 45% at 85% 80%, rgba(90, 70, 45, 0.5), transparent 70%),
+            radial-gradient(ellipse 80% 60% at 50% 0%, rgba(60, 80, 110, 0.55), transparent 70%),
+            linear-gradient(180deg, #1d2633 0%, #242a22 55%, #1b1f17 100%);
+    }
+    h1 { font-size: 22px; margin: 0 0 4px; font-weight: 700; }
+    .sub { font-family: Georgia, serif; font-weight: 400; font-size: 13px; color: var(--muted); margin-bottom: 20px; }
+    .tag { font-size: 11px; letter-spacing: 1px; color: var(--muted); text-transform: uppercase; margin-bottom: 8px; }
+    .tag.new { color: var(--accent); }
+    .panel { position: relative; }
+    .cap { position: absolute; left: 18px; right: 18px; bottom: 14px; font-family: Georgia, serif; font-size: 12px; color: var(--muted); line-height: 1.45; }
+    .cap b { font-family: "Roboto MLZ"; color: var(--text); font-weight: 700; }
+
+    .compare { display: flex; gap: 22px; margin-bottom: 22px; }
+    .panel {
+        background: rgba(10, 12, 15, 0.35); border: 1px solid rgba(255, 255, 255, 0.06);
+        padding: 14px 18px 14px; box-sizing: border-box;
+    }
+    .compare .panel { flex: 1; height: 220px; }
+    .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; }
+    .grid .panel { height: 300px; }
+    .scene { transform: scale(1.75); transform-origin: top center; display: flex; flex-direction: column; align-items: center; gap: 14px; padding-top: 4px; }
+    .scene.row { flex-direction: row; justify-content: center; gap: 26px; align-items: flex-end; }
+    .arrow-sep { font-size: 22px; color: var(--muted); align-self: center; }
+
+    /* ---------- shared plate parts (units = in-game units, the scene zoom makes them readable) ---------- */
+    .np { position: relative; width: 150px; font-size: 10px; }
+    .bar {
+        position: relative; height: 12px; outline: 1px solid rgba(0, 0, 0, 0.9);
+        background: color-mix(in srgb, var(--c) 25%, black);
+    }
+    .fill { position: absolute; left: 0; top: 0; bottom: 0; background: var(--c); }
+    .lost { position: absolute; top: 0; bottom: 0; background: color-mix(in srgb, var(--c) 45%, white); opacity: 0.85; }
+    /* soft bar: sheen over the upper half, shade over the lower half */
+    .bar::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 50%; background: rgba(255, 255, 255, 0.08); }
+    .bar::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 50%; background: rgba(0, 0, 0, 0.15); }
+    .in { position: absolute; top: 0; bottom: 0; display: flex; align-items: center; z-index: 2;
+          -webkit-text-stroke: 0.5px rgba(0, 0, 0, 0.9); paint-order: stroke fill; font-size: 10px; }
+    .in.r { right: 4px; } .in.l { left: 4px; }
+    .top { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 3px;
+           font-size: 11px; -webkit-text-stroke: 0.5px rgba(0, 0, 0, 0.9); paint-order: stroke fill; }
+    .lvl { display: flex; align-items: center; gap: 3px; font-size: 10px; }
+    .np.target .bar { outline-color: var(--text); }
+    .np.target::before, .np.target::after {
+        content: ""; position: absolute; top: calc(var(--top, 17px) + 2px); width: 0; height: 0;
+        border-top: 4px solid transparent; border-bottom: 4px solid transparent;
+    }
+    .np.target::before { left: -9px; border-left: 5px solid var(--accent); }
+    .np.target::after { right: -9px; border-right: 5px solid var(--accent); }
+    .np.dim { opacity: 0.8; }
+
+    .cast { display: flex; gap: 3px; margin-top: 3px; }
+    .icon { width: 12px; height: 12px; outline: 1px solid rgba(0, 0, 0, 0.9); flex: none; }
+    .cbar { position: relative; flex: 1; height: 12px; outline: 1px solid rgba(0, 0, 0, 0.9); background: rgba(15, 18, 22, 0.85); }
+    .cbar .fill::after { content: ""; position: absolute; right: -1px; top: -1px; bottom: -1px; width: 2px; background: rgba(255, 255, 255, 0.8); }
+    .ctgt { text-align: right; margin-top: 3px; font-size: 10px; -webkit-text-stroke: 0.5px rgba(0, 0, 0, 0.9); paint-order: stroke fill; }
+
+    .auras { display: flex; gap: 3px; margin-bottom: 4px; }
+    .aura { position: relative; width: 22px; height: 16.5px; outline: 1px solid rgba(0, 0, 0, 0.9); }
+    .aura span { position: absolute; left: 0; right: 0; bottom: -4px; text-align: center; font-size: 10px;
+                 -webkit-text-stroke: 0.6px rgba(0, 0, 0, 1); paint-order: stroke fill; }
+    .amber { color: var(--amber); } .red { color: var(--red); } .muted { color: var(--muted); }
+    .mark { width: 10px; height: 10px; display: inline-block; vertical-align: -1px; }
+    .pet { width: 11px; height: 11px; outline: 1px solid rgba(0, 0, 0, 0.9);
+           background: linear-gradient(135deg, #a2763c, #5a3b1c); display: inline-block; }
+
+    /* spell icon stand-ins */
+    .i-fire { background: radial-gradient(circle at 40% 40%, #ffd36b, #e2531b 55%, #5a1406); }
+    .i-shadow { background: radial-gradient(circle at 40% 40%, #c7a0ff, #5b2a9a 55%, #1c0a33); }
+    .i-heal { background: radial-gradient(circle at 40% 40%, #fff6b0, #d9b52b 55%, #4d3a07); }
+    .i-curse { background: radial-gradient(circle at 40% 40%, #b9e07a, #4c7a1e 55%, #15240a); }
+    .i-sting { background: radial-gradient(circle at 40% 40%, #9be8a0, #2c8a3a 55%, #0c2a10); }
+    .i-corr { background: radial-gradient(circle at 40% 40%, #e6a0ff, #7a2a8a 55%, #22082a); }
+
+    /* today's plate */
+    .old { position: relative; width: 140px; font-size: 10px; }
+    .old .name { text-align: center; font-size: 11px; margin-bottom: 4px; -webkit-text-stroke: 0.5px rgba(0, 0, 0, 0.9); paint-order: stroke fill; }
+    .old .bar { height: 14px; background: rgba(15, 18, 22, 0.85); outline-color: var(--accent); }
+    .old .bar::before, .old .bar::after { display: none; }
+    .old .strip { position: absolute; left: -6px; width: 3px; height: 16px; bottom: 30px; background: var(--accent); }
+    .old .cast .icon, .old .cbar { height: 14px; } .old .cast .icon { width: 14px; }
+</style>
+</head>
+<body>
+<div class="stage">
+    <h1>MLZ nameplates</h1>
+    <div class="sub">Today and the new look. In-game size, zoomed in 1.75x so the details read.</div>
+
+    <div class="compare">
+        <div class="panel">
+            <div class="tag">Today</div>
+            <div class="scene row" style="align-items:center">
+                <div class="old">
+                    <div class="name"><span style="color:#ff5c5c">62</span><span class="amber">+</span> Defias Pillager</div>
+                    <div class="strip"></div>
+                    <div class="bar" style="--c:#d94545"><div class="fill" style="width:58%"></div><span class="in l">72%</span><span class="in r">58%</span></div>
+                    <div class="cast"><div class="icon i-fire"></div><div class="cbar"><div class="fill" style="width:40%;background:#33a0ff"></div><span class="in l">Fireball</span><span class="in r">1.2</span></div></div>
+                    <div class="ctgt" style="color:#9482c9">Martin</div>
+                </div>
+            </div>
+            <div class="cap">Name centered, level as text, flat grey background, a blue strip for your target.</div>
+        </div>
+        <div class="panel">
+            <div class="tag new">New</div>
+            <div class="scene row" style="align-items:center">
+                <div class="np target">
+                    <div class="top"><span>Defias Pillager</span><span class="lvl"><span style="color:#ff5c5c">62</span>
+                        <svg class="mark" viewBox="0 0 10 10"><path d="M5 0.6 L9.4 5 L5 9.4 L0.6 5 Z" fill="#000"/><path d="M5 2.2 L7.8 5 L5 7.8 L2.2 5 Z" fill="#ffd100"/></svg></span></div>
+                    <div class="bar" style="--c:#d94545"><div class="lost" style="left:58%;width:9%"></div><div class="fill" style="width:58%"></div><span class="in l amber">82%</span><span class="in r">58%</span></div>
+                    <div class="cast"><div class="icon i-fire"></div><div class="cbar"><div class="fill" style="width:40%;background:#33a0ff"></div><span class="in l">Fireball</span><span class="in r">1.2</span></div></div>
+                    <div class="ctgt" style="color:#9482c9">Martin</div>
+                </div>
+            </div>
+            <div class="cap">Name left, level and elite mark right, missing health in dark red, arrows on your target,
+                a light chip where health was just lost, a spark on the cast bar.</div>
+        </div>
+    </div>
+
+    <div class="grid">
+        <div class="panel">
+            <div class="tag">Your DoTs</div>
+            <div class="scene">
+                <div class="np target" style="--top:38px">
+                    <div class="auras">
+                        <div class="aura i-corr"><span>14</span></div>
+                        <div class="aura i-curse"><span class="amber">3</span></div>
+                        <div class="aura i-fire"><span class="red">1</span></div>
+                    </div>
+                    <div class="top"><span>Murloc Hunter</span><span class="lvl"></span></div>
+                    <div class="bar" style="--c:#d94545"><div class="fill" style="width:71%"></div><span class="in r">71%</span></div>
+                </div>
+                <div class="np dim">
+                    <div class="auras"><div class="aura i-corr"><span>9</span></div><div class="aura i-sting"><span class="amber">2</span></div></div>
+                    <div class="top"><span>Murloc Coastrunner</span><span class="lvl"></span></div>
+                    <div class="bar" style="--c:#d94545"><div class="fill" style="width:88%"></div><span class="in r">88%</span></div>
+                </div>
+            </div>
+            <div class="cap"><b>Amber</b> = refresh now, <b>red</b> = last second. As warlock or hunter your DoTs show on every mob, not only your target.</div>
+        </div>
+
+        <div class="panel">
+            <div class="tag">Interrupt ready</div>
+            <div class="scene" style="gap:9px">
+                <div class="np"><div class="cast"><div class="icon i-shadow"></div><div class="cbar"><div class="fill" style="width:55%;background:#33a0ff"></div><span class="in l">Shadow Bolt</span><span class="in r">1.4</span></div></div></div>
+                <div class="np"><div class="cast"><div class="icon i-heal"></div><div class="cbar"><div class="fill" style="width:30%;background:#4d6680"></div><span class="in l">Holy Light</span><span class="in r">1.9</span></div></div></div>
+                <div class="np"><div class="cast"><div class="icon i-fire"></div><div class="cbar"><div class="fill" style="width:70%;background:#737885"></div><span class="in l">Flame Buffet</span><span class="in r">0.6</span></div></div></div>
+            </div>
+            <div class="cap"><b style="color:#33a0ff">Blue</b> = your kick or Spell Lock is ready. <b style="color:#8aa0b8">Slate</b> = it is on cooldown.
+                <b style="color:#9aa0aa">Grey</b> = this spell can't be interrupted.</div>
+        </div>
+
+        <div class="panel">
+            <div class="tag">Pet-aware threat</div>
+            <div class="scene" style="gap:12px">
+                <div class="np">
+                    <div class="top"><span>Venom Web Spider</span><span class="lvl"><span class="pet"></span></span></div>
+                    <div class="bar" style="--c:#d94545"><div class="fill" style="width:64%"></div><span class="in l muted">41%</span><span class="in r">64%</span></div>
+                </div>
+                <div class="np">
+                    <div class="top"><span>Venom Web Spider</span><span class="lvl"></span></div>
+                    <div class="bar" style="--c:#ff3333"><div class="lost" style="left:47%;width:6%"></div><div class="fill" style="width:47%"></div><span class="in l" style="color:#ff5c5c">100%</span><span class="in r">47%</span></div>
+                </div>
+            </div>
+            <div class="cap">The paw means your pet holds the mob, the bar stays calm. The moment it turns to you the bar goes <b style="color:#ff5c5c">red</b>.</div>
+        </div>
+
+        <div class="panel" style="grid-column: span 2">
+            <div class="tag">Elite, rare and boss</div>
+            <div class="scene row" style="gap:30px; transform: scale(1.35)">
+                <div class="np"><div class="top"><span>Defias Overseer</span><span class="lvl">
+                    <svg class="mark" viewBox="0 0 10 10"><path d="M5 0.6 L9.4 5 L5 9.4 L0.6 5 Z" fill="#000"/><path d="M5 2.2 L7.8 5 L5 7.8 L2.2 5 Z" fill="#ffd100"/></svg></span></div>
+                    <div class="bar" style="--c:#d94545"><div class="fill" style="width:100%"></div></div></div>
+                <div class="np"><div class="top"><span>Foulmane</span><span class="lvl">
+                    <svg class="mark" viewBox="0 0 10 10"><path d="M5 0.6 L9.4 5 L5 9.4 L0.6 5 Z" fill="#000"/><path d="M5 2.2 L7.8 5 L5 7.8 L2.2 5 Z" fill="#c8ccd4"/></svg></span></div>
+                    <div class="bar" style="--c:#f2b340"><div class="fill" style="width:100%"></div></div></div>
+                <div class="np"><div class="top"><span>Edwin VanCleef</span><span class="lvl"><span style="color:#ff5c5c">??</span>
+                    <svg class="mark" viewBox="0 0 10 10"><path d="M5 0.8 C2.4 0.8 1 2.6 1 4.6 C1 6 1.8 6.8 2.8 7.2 L2.8 9.2 L7.2 9.2 L7.2 7.2 C8.2 6.8 9 6 9 4.6 C9 2.6 7.6 0.8 5 0.8 Z" fill="#ff5c5c" stroke="#000" stroke-width="0.6"/><circle cx="3.6" cy="4.8" r="1" fill="#000"/><circle cx="6.4" cy="4.8" r="1" fill="#000"/></svg></span></div>
+                    <div class="bar" style="--c:#d94545"><div class="fill" style="width:93%"></div><span class="in r">93%</span></div></div>
+            </div>
+            <div class="cap"><b style="color:#ffd100">Gold</b> = elite, <b style="color:#c8ccd4">silver</b> = rare, <b style="color:#ff5c5c">red</b> = boss.
+                The level only shows when it is 3 or more from yours. Neutral mobs stay yellow.</div>
+        </div>
+
+        <div class="panel">
+            <div class="tag">A pull, as DPS</div>
+            <div class="scene" style="gap:10px; transform: scale(1.45)">
+                <div class="np target" style="--top:15px">
+                    <div class="top"><span>Defias Thug</span><span class="lvl"></span></div>
+                    <div class="bar" style="--c:#d94545"><div class="lost" style="left:38%;width:7%"></div><div class="fill" style="width:38%"></div><span class="in l">54%</span><span class="in r">38%</span></div>
+                </div>
+                <div class="np dim"><div class="top"><span>Defias Thug</span><span class="lvl"></span></div>
+                    <div class="bar" style="--c:#ff8c26"><div class="fill" style="width:90%"></div><span class="in l amber">84%</span><span class="in r">90%</span></div></div>
+                <div class="np dim"><div class="top"><span>Defias Thug</span><span class="lvl"></span></div>
+                    <div class="bar" style="--c:#d94545"><div class="fill" style="width:100%"></div></div></div>
+            </div>
+            <div class="cap">Your target in front. Orange = you are close to pulling it.</div>
+        </div>
+    </div>
+</div>
+</body>
+</html>

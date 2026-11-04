@@ -17,6 +17,7 @@ SHOTS=(
     "wizard         1000 780"
     "minimap-menu   1000 620"
     "addons         1000 780"
+    "plates         1200 960"
 )
 
 for shot in "${SHOTS[@]}"; do
